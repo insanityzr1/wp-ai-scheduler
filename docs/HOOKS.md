@@ -175,6 +175,25 @@ Fires immediately before the content prompt is constructed.
 
 ---
 
+### Integrations (Third-Party Plugin Bridge)
+
+#### `aips_before_build_integration_field_prompt`
+Fires immediately before the prompt for a single mapped third-party field (e.g. an ACF field) is constructed.
+
+*   **Arguments:**
+    *   `array $field_def`: Field definition (`key`, `label`, `native_type`, `instructions`).
+    *   `AIPS_Generation_Context $context`: The generation context driving this post.
+
+#### `aips_integration_fields_applied`
+Fires after a batch of mapped fields has been generated and written for one integration on a post.
+
+*   **Arguments:**
+    *   `int $post_id`: The post the fields were written to.
+    *   `string $integration_id`: Integration identifier (e.g. `acf`).
+    *   `array $results`: `field_key => true|WP_Error` outcome map.
+
+---
+
 ## Filter Hooks
 
 ### Prompt Builder
@@ -186,6 +205,34 @@ Filters the final content prompt before it is sent to the AI service.
     *   `string $content_prompt`: The constructed prompt string.
     *   `object $template`: The template object.
     *   `string $topic`: The topic being processed.
+
+---
+
+### Integrations (Third-Party Plugin Bridge)
+
+#### `aips_integrations_registry`
+Registers a third-party plugin as an "AIPS-compatible plugin". Any plugin can add its own adapter here without modifying AIPS core — see `docs/AI_AGENT_REFERENCE.md` for the `AIPS_Integration_Interface` contract.
+
+*   **Arguments:**
+    *   `array $map`: `integration_id => class name implementing AIPS_Integration_Interface`.
+
+```php
+add_filter('aips_integrations_registry', function ($map) {
+    $map['my_plugin'] = 'My_Plugin_AIPS_Integration';
+    return $map;
+});
+```
+
+#### `aips_integration_field_prompt`
+Filters the generation prompt built for a single mapped field.
+
+*   **Arguments:**
+    *   `string $prompt`: The constructed prompt string.
+    *   `array $field_def`: Field definition (`key`, `label`, `native_type`, `instructions`).
+    *   `AIPS_Generation_Context $context`: The generation context driving this post.
+
+#### `aips_integration_hook_bindings`
+Modifies the list of WordPress action hooks `AIPS_Integration_Event_Handler` registers automatically. Same shape as `aips_notification_hook_bindings`.
 
 ---
 

@@ -804,6 +804,25 @@ class AIPS_Admin_Assets {
      * Enqueue assets for the templates page.
      */
     private function enqueue_templates_assets() {
+            wp_enqueue_script(
+                'aips-admin-integrations',
+                AIPS_PLUGIN_URL . 'assets/js/admin-integrations.js',
+                array('jquery', 'aips-admin-script', 'aips-utilities-script', 'aips-templates-script'),
+                AIPS_VERSION,
+                true
+            );
+
+            wp_localize_script('aips-admin-integrations', 'aipsIntegrationsL10n', array(
+                'selectIntegration'       => __('Select an integration…', 'ai-post-scheduler'),
+                'selectIntegrationFirst'  => __('Select an integration first', 'ai-post-scheduler'),
+                'selectFieldGroup'        => __('Select a field group…', 'ai-post-scheduler'),
+                'selectGroupFirst'        => __('Select an integration and field group first.', 'ai-post-scheduler'),
+                'noneAvailable'           => __('No supported plugins detected on this site.', 'ai-post-scheduler'),
+                'noGroupsFound'           => __('No field groups found for this post type.', 'ai-post-scheduler'),
+                'promptPlaceholder'       => __('Optional: custom instructions for this field. Leave blank to use the field\'s own help text.', 'ai-post-scheduler'),
+                'unsupportedFieldType'    => __('This field type is not yet supported for AI generation.', 'ai-post-scheduler'),
+            ));
+
             wp_localize_script('aips-admin-script', 'aipsTemplatesL10n', array(
                 // Template wizard validation
                 'templateNameRequired'    => __('Template Name is required.', 'ai-post-scheduler'),

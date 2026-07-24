@@ -558,8 +558,55 @@ $is_embedded_templates_view = !empty($embedded);
                                 <?php esc_html_e('Template is active', 'ai-post-scheduler'); ?>
                             </label>
                         </div>
+
+                        <!-- Third-Party Plugin Integrations (bridge) -->
+                        <div class="aips-form-row aips-integrations-panel">
+                            <details class="aips-collapsible">
+                                <summary>
+                                    <span class="dashicons dashicons-admin-plugins"></span>
+                                    <?php esc_html_e('Third-Party Plugin Integrations (optional)', 'ai-post-scheduler'); ?>
+                                    <span class="aips-help-tooltip dashicons dashicons-editor-help" data-tooltip="<?php esc_attr_e('Generate content directly into fields owned by another plugin on this site, such as an Advanced Custom Fields (ACF) field group.', 'ai-post-scheduler'); ?>"></span>
+                                </summary>
+                                <div class="aips-collapsible-content" id="aips-integrations-panel-body">
+                                    <p class="description aips-integrations-unsaved-notice" style="display: none;">
+                                        <?php esc_html_e('Save this template first to configure plugin integrations for it.', 'ai-post-scheduler'); ?>
+                                    </p>
+                                    <div class="aips-integrations-config">
+                                        <div class="aips-form-columns">
+                                            <div class="aips-form-row">
+                                                <label for="aips-integration-select"><?php esc_html_e('Integration', 'ai-post-scheduler'); ?></label>
+                                                <select id="aips-integration-select">
+                                                    <option value=""><?php esc_html_e('Loading…', 'ai-post-scheduler'); ?></option>
+                                                </select>
+                                            </div>
+                                            <div class="aips-form-row">
+                                                <label for="aips-integration-group-select"><?php esc_html_e('Field Group', 'ai-post-scheduler'); ?></label>
+                                                <select id="aips-integration-group-select" disabled>
+                                                    <option value=""><?php esc_html_e('Select an integration first', 'ai-post-scheduler'); ?></option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <table class="aips-table aips-integration-fields-table" id="aips-integration-fields-table">
+                                            <thead>
+                                                <tr>
+                                                    <th><?php esc_html_e('Field', 'ai-post-scheduler'); ?></th>
+                                                    <th><?php esc_html_e('Type', 'ai-post-scheduler'); ?></th>
+                                                    <th><?php esc_html_e('Generate?', 'ai-post-scheduler'); ?></th>
+                                                    <th><?php esc_html_e('Generation Instructions', 'ai-post-scheduler'); ?></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="aips-integration-fields-tbody">
+                                            </tbody>
+                                        </table>
+                                        <button type="button" class="aips-btn aips-btn-secondary aips-btn-sm" id="aips-save-integration-mappings">
+                                            <?php esc_html_e('Save Field Mappings', 'ai-post-scheduler'); ?>
+                                        </button>
+                                    </div>
+                                </div>
+                            </details>
+                        </div>
                     </div>
-                    
+
                     <!-- Step 5: Post-Save Next Steps (shown after successful save) -->
                     <div class="aips-wizard-step-content aips-post-save-step" data-step="5" style="display: none;">
                         <div style="text-align: center; padding: 30px 20px;">
@@ -790,4 +837,18 @@ $is_embedded_templates_view = !empty($embedded);
             </div>
         </div>
     </div>
+
+    <script type="text/html" id="aips-tmpl-integration-field-row">
+        <tr class="aips-integration-field-row {{unsupported_class}}" data-field-key="{{field_key}}" data-native-type="{{native_type}}">
+            <td>{{label}}</td>
+            <td>{{native_type}}</td>
+            <td>
+                <input type="checkbox" class="aips-integration-field-enabled" {{checked_attr}} {{disabled_attr}}>
+            </td>
+            <td>
+                <textarea class="aips-integration-field-prompt regular-text" rows="2" {{disabled_attr}} placeholder="{{prompt_placeholder}}">{{prompt_value}}</textarea>
+                {{unsupported_note}}
+            </td>
+        </tr>
+    </script>
 </div>

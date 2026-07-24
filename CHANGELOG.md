@@ -1,3 +1,8 @@
+## [3.2.0] - 2026-07-24
+
+### Added
+- **Third-Party Plugin Bridge**: New `AIPS_Integration_Interface` contract, `AIPS_Integration_Registry`, and `AIPS_Integration_Manager` let AIPS generate content directly into fields owned by other plugins. Ships with an Advanced Custom Fields (ACF) adapter — map a template's fields to an ACF field group (with per-field custom prompts) in the Template editor's new "Third-Party Plugin Integrations" panel, and generated posts get those ACF fields populated automatically. Other plugins can register their own adapter via the `aips_integrations_registry` filter without any AIPS core changes.
+
 ## [3.0.1] - 2026-07-07
 
 ### Added

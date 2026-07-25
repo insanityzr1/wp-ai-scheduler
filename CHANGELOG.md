@@ -1,3 +1,8 @@
+## [3.3.0] - 2026-07-25
+
+### Added
+- **Per-Template Post Type**: Templates can now target any public WordPress post type (native or custom, including CPTs registered by other plugins) via a new "Post Type" selector in the Template editor. The choice is locked once the template is saved — it can't be changed on an existing template — since changing it later would orphan already-generated posts and any Integrations field mappings scoped to the old type. The Categories/Tags fields now hide themselves for post types that don't support those taxonomies, and the Integrations panel's ACF field-group picker is now scoped to the template's actual post type instead of showing every field group on the site.
+
 ## [3.2.0] - 2026-07-24
 
 ### Added

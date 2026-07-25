@@ -135,7 +135,8 @@
 			$.post(aipsAjax.ajaxUrl, {
 				action: 'aips_get_integration_schema',
 				nonce: aipsAjax.nonce,
-				integration_id: integrationId
+				integration_id: integrationId,
+				post_type: $('#template_post_type').val()
 			}, function (response) {
 				if (!response.success) {
 					AIPS.Utilities.showToast(response.data.message, 'error');

@@ -281,6 +281,23 @@ $is_embedded_templates_view = !empty($embedded);
                             <p class="description"><?php esc_html_e('Optional. Helps you remember the purpose of this template.', 'ai-post-scheduler'); ?></p>
                         </div>
 
+                        <div class="aips-form-row">
+                            <label for="template_post_type">
+                                <?php esc_html_e('Post Type', 'ai-post-scheduler'); ?>
+                                <span class="aips-help-tooltip dashicons dashicons-editor-help" data-tooltip="<?php esc_attr_e('Which WordPress post type this template generates. Includes custom post types registered by other plugins (e.g. ACF). This cannot be changed after the template is saved.', 'ai-post-scheduler'); ?>"></span>
+                            </label>
+                            <select id="template_post_type" name="post_type">
+                                <?php foreach ($selectable_post_types as $post_type_key => $post_type_info): ?>
+                                <option value="<?php echo esc_attr($post_type_key); ?>" <?php selected($post_type_key, 'post'); ?>>
+                                    <?php echo esc_html($post_type_info['label']); ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <p class="description" id="template_post_type_locked_notice" style="display: none;">
+                                <?php esc_html_e("Post type can't be changed after a template is created.", 'ai-post-scheduler'); ?>
+                            </p>
+                        </div>
+
                         <hr style="margin: 20px 0;">
 
                         <h3>
@@ -524,7 +541,7 @@ $is_embedded_templates_view = !empty($embedded);
                                 </select>
                             </div>
                             
-                            <div class="aips-form-row">
+                            <div class="aips-form-row" id="post_category_row">
                                 <label for="post_category"><?php esc_html_e('Categories', 'ai-post-scheduler'); ?></label>
                                 <select id="post_category" name="post_category[]" multiple size="5" style="min-height:100px;">
                                     <?php foreach ($categories as $cat): ?>
@@ -535,7 +552,7 @@ $is_embedded_templates_view = !empty($embedded);
                             </div>
                         </div>
                         
-                        <div class="aips-form-row">
+                        <div class="aips-form-row" id="post_tags_row">
                             <label for="post_tags"><?php esc_html_e('Tags', 'ai-post-scheduler'); ?></label>
                             <input type="text" id="post_tags" name="post_tags" class="regular-text" placeholder="<?php esc_attr_e('tag1, tag2, tag3', 'ai-post-scheduler'); ?>">
                             <p class="description"><?php esc_html_e('Comma-separated list of tags', 'ai-post-scheduler'); ?></p>

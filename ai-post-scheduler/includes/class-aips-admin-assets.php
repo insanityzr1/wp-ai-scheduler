@@ -842,6 +842,9 @@ class AIPS_Admin_Assets {
                 'exampleTopic'            => __('Example Topic', 'ai-post-scheduler'),
                 'failedToGeneratePreview' => __('Failed to generate preview. Please check that all required fields are filled.', 'ai-post-scheduler'),
                 'previewNetworkError'     => __('An error occurred while generating the preview. Please check your network connection and try again.', 'ai-post-scheduler'),
+                // Per-post-type category/tag taxonomy support, used to hide the
+                // Categories/Tags fields for post types that don't support them.
+                'postTypeTaxonomySupport' => AIPS_Utilities::get_selectable_post_types(),
             ));
     }
 

@@ -1,3 +1,8 @@
+## [3.5.1] - 2026-07-25
+
+### Changed
+- **Advanced Custom Meta Fields toggle for native WordPress Custom Fields**: protected/internal meta keys (`_`-prefixed) are no longer hard-rejected by the "WordPress Custom Fields" integration. They stay hidden from the fields dropdown by default, but a new "Show Advanced Custom Meta Fields" radio in the Template editor's Integrations panel lets an admin opt in to see and map them, and they can now be saved and written like any other field once selected.
+
 ## [3.5.0] - 2026-07-25
 
 ### Added

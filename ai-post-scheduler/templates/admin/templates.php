@@ -603,6 +603,17 @@ $is_embedded_templates_view = !empty($embedded);
                                                 </select>
                                             </div>
                                         </div>
+                                        <div class="aips-form-row aips-integration-field-visibility-toggle" id="aips-integration-field-visibility-toggle" style="display: none;">
+                                            <span class="aips-help-tooltip dashicons dashicons-editor-help" data-tooltip="<?php esc_attr_e('Protected/internal meta keys (starting with an underscore) are hidden by default since most of them are used internally by WordPress, themes, or other plugins. Only show them if you specifically need to generate into one.', 'ai-post-scheduler'); ?>"></span>
+                                            <label class="aips-radio-label">
+                                                <input type="radio" name="aips-integration-field-visibility" value="standard" checked>
+                                                <?php esc_html_e('Standard Fields', 'ai-post-scheduler'); ?>
+                                            </label>
+                                            <label class="aips-radio-label">
+                                                <input type="radio" name="aips-integration-field-visibility" value="advanced">
+                                                <?php esc_html_e('Show Advanced Custom Meta Fields', 'ai-post-scheduler'); ?>
+                                            </label>
+                                        </div>
                                         <table class="aips-table aips-integration-fields-table" id="aips-integration-fields-table">
                                             <thead>
                                                 <tr>

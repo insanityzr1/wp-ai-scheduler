@@ -71,6 +71,7 @@ class AIPS_Integrations_Controller {
 		$integration_id = isset($_POST['integration_id']) ? sanitize_key(wp_unslash($_POST['integration_id'])) : '';
 		$post_type = isset($_POST['post_type']) ? sanitize_key(wp_unslash($_POST['post_type'])) : null;
 		$group_id = isset($_POST['group_id']) ? sanitize_text_field(wp_unslash($_POST['group_id'])) : '';
+		$include_protected = !empty($_POST['include_protected']);
 
 		$adapter = AIPS_Integration_Registry::get($integration_id);
 
@@ -80,7 +81,7 @@ class AIPS_Integrations_Controller {
 		}
 
 		if ($group_id !== '') {
-			AIPS_Ajax_Response::success(array('fields' => $adapter->get_fields($group_id)));
+			AIPS_Ajax_Response::success(array('fields' => $adapter->get_fields($group_id, array('include_protected' => $include_protected))));
 			return;
 		}
 

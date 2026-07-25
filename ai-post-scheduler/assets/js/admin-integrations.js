@@ -58,6 +58,7 @@
 			$(document).on('click', '#aips-add-custom-field-row', this.onAddCustomFieldRowClick.bind(this));
 			$(document).on('change', '.aips-integration-field-key-select', this.onCustomFieldKeySelectChange.bind(this));
 			$(document).on('click', '.aips-remove-custom-field-row', this.onRemoveCustomFieldRowClick.bind(this));
+			$(document).on('change', 'input[name="aips-integration-field-visibility"]', this.onFieldVisibilityChange.bind(this));
 		},
 
 		onPanelToggle: function (e) {
@@ -156,6 +157,8 @@
 
 			this._supportsCustomFieldKeys = !!$selectedOption.data('supports-custom-field-keys');
 			$('#aips-add-custom-field-row').toggle(this._supportsCustomFieldKeys);
+			$('#aips-integration-field-visibility-toggle').toggle(this._supportsCustomFieldKeys);
+			$('input[name="aips-integration-field-visibility"][value="standard"]').prop('checked', true);
 			$('#aips-integration-fields-tbody').empty();
 
 			if (!integrationId) {
@@ -218,7 +221,8 @@
 				action: 'aips_get_integration_schema',
 				nonce: aipsAjax.nonce,
 				integration_id: integrationId,
-				group_id: groupId
+				group_id: groupId,
+				include_protected: this._includeProtectedFields()
 			}, function (response) {
 				if (!response.success) {
 					AIPS.Utilities.showToast(response.data.message, 'error');
@@ -240,6 +244,22 @@
 			}).fail(function () {
 				AIPS.Utilities.showToast(aipsAdminL10n.errorTryAgain, 'error');
 			});
+		},
+
+		/**
+		 * Whether protected/internal ('_'-prefixed) meta keys should be
+		 * included in the fields dropdown, per the "Show Advanced Custom
+		 * Meta Fields" radio toggle. Defaults to false (hidden) when the
+		 * toggle isn't present for the current integration.
+		 *
+		 * @return {boolean}
+		 */
+		_includeProtectedFields: function () {
+			return $('input[name="aips-integration-field-visibility"]:checked').val() === 'advanced';
+		},
+
+		onFieldVisibilityChange: function () {
+			this.onGroupChange();
 		},
 
 		_renderFieldRow: function (field) {

@@ -47,25 +47,34 @@ class AIPS_Integration_Native_Meta implements AIPS_Integration_Interface {
 		);
 	}
 
-	public function get_fields($group_id) {
+	public function get_fields($group_id, $args = array()) {
 		$post_type = (string) $group_id;
+		$include_protected = !empty($args['include_protected']);
 		$type_map = $this->get_supported_field_types();
 		$registered = get_registered_meta_keys('post', $post_type);
 		$fields = array();
 
-		foreach ($registered as $meta_key => $args) {
-			if (is_protected_meta($meta_key, 'post') || !$this->is_valid_field_key($meta_key)) {
+		foreach ($registered as $meta_key => $meta_args) {
+			if (!$this->is_valid_field_key($meta_key)) {
 				continue;
 			}
 
-			$native_type = isset($args['type']) ? $args['type'] : 'string';
+			// Protected/internal ('_'-prefixed) keys are hidden by default —
+			// the admin opts in via the Template editor's "Show Advanced
+			// Custom Meta Fields" toggle. Once shown/selected, they can be
+			// saved and written like any other field; see write_field_value().
+			if (!$include_protected && is_protected_meta($meta_key, 'post')) {
+				continue;
+			}
+
+			$native_type = isset($meta_args['type']) ? $meta_args['type'] : 'string';
 
 			$fields[] = array(
 				'key'          => $meta_key,
-				'label'        => !empty($args['description']) ? $args['description'] : $this->humanize_key($meta_key),
+				'label'        => !empty($meta_args['description']) ? $meta_args['description'] : $this->humanize_key($meta_key),
 				'native_type'  => $native_type,
 				'shape'        => isset($type_map[$native_type]) ? $type_map[$native_type] : '',
-				'instructions' => isset($args['description']) ? $args['description'] : '',
+				'instructions' => isset($meta_args['description']) ? $meta_args['description'] : '',
 			);
 		}
 
@@ -117,21 +126,15 @@ class AIPS_Integration_Native_Meta implements AIPS_Integration_Interface {
 	}
 
 	public function validate_field_key($field_key) {
+		// Protected/internal ('_'-prefixed) keys are intentionally allowed
+		// here: they're just hidden from get_fields() by default, opted into
+		// via the "Show Advanced Custom Meta Fields" toggle in the Template
+		// editor. Once an admin has explicitly selected or typed one, it can
+		// be saved and written like any other field.
 		if (!$this->is_valid_field_key($field_key)) {
 			return new WP_Error(
 				'invalid_meta_key',
 				__('Meta key may only contain letters, numbers, and underscores.', 'ai-post-scheduler')
-			);
-		}
-
-		if (is_protected_meta($field_key, 'post')) {
-			return new WP_Error(
-				'protected_meta_key',
-				sprintf(
-					/* translators: %s: meta key. */
-					__('"%s" is a protected/internal meta key and cannot be used.', 'ai-post-scheduler'),
-					$field_key
-				)
 			);
 		}
 

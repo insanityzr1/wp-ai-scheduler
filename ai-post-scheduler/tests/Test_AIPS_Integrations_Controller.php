@@ -167,7 +167,10 @@ class Test_AIPS_Integrations_Controller extends WP_UnitTestCase {
 		$this->assertSame('group_b', $mappings[0]->source_key);
 	}
 
-	public function test_save_field_mappings_rejects_protected_meta_key_for_native_meta() {
+	public function test_save_field_mappings_allows_protected_meta_key_for_native_meta() {
+		// Protected/internal keys are hidden from discovery by default but,
+		// once explicitly selected via the "Show Advanced Custom Meta
+		// Fields" toggle, must be saveable like any other field.
 		$controller = new AIPS_Integrations_Controller($this->repo);
 		$mappings = array(
 			array(
@@ -189,8 +192,10 @@ class Test_AIPS_Integrations_Controller extends WP_UnitTestCase {
 
 		$response = $this->run_ajax(array($controller, 'ajax_save_field_mappings'));
 
-		$this->assertFalse($response['success']);
-		$this->assertCount(0, $this->repo->get_by_template(12, false), 'Nothing should be persisted when validation fails.');
+		$this->assertTrue($response['success']);
+		$mappings_saved = $this->repo->get_by_template(12, false);
+		$this->assertCount(1, $mappings_saved);
+		$this->assertSame('_protected_key', $mappings_saved[0]->field_key);
 	}
 
 	public function test_get_field_mappings_rejects_missing_template_id() {

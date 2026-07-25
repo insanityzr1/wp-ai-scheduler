@@ -310,7 +310,7 @@ if (!class_exists('AIPS_Test_Stub_Manager_Integration')) {
 		public function get_field_groups($post_type = null) {
 			return array();
 		}
-		public function get_fields($group_id) {
+		public function get_fields($group_id, $args = array()) {
 			return isset(self::$fields_by_group[$group_id]) ? self::$fields_by_group[$group_id] : array();
 		}
 		public function get_supported_field_types() {

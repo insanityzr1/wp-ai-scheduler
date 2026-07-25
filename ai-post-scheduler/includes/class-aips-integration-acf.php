@@ -60,7 +60,7 @@ class AIPS_Integration_ACF implements AIPS_Integration_Interface {
 		return $result;
 	}
 
-	public function get_fields($group_id) {
+	public function get_fields($group_id, $args = array()) {
 		if (!$this->is_available()) {
 			return array();
 		}

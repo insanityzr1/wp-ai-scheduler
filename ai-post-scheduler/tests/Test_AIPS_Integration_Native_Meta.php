@@ -79,7 +79,7 @@ class Test_AIPS_Integration_Native_Meta extends WP_UnitTestCase {
 		$this->assertSame('Contact Phone Number', $fields['contact_phone_number']['label']);
 	}
 
-	public function test_get_fields_excludes_protected_meta_key() {
+	public function test_get_fields_excludes_protected_meta_key_by_default() {
 		$this->register_test_meta('_internal_flag', array(
 			'type'   => 'string',
 			'single' => true,
@@ -88,6 +88,17 @@ class Test_AIPS_Integration_Native_Meta extends WP_UnitTestCase {
 		$fields = $this->fields_by_key($this->adapter->get_fields('post'));
 
 		$this->assertArrayNotHasKey('_internal_flag', $fields);
+	}
+
+	public function test_get_fields_includes_protected_meta_key_when_requested() {
+		$this->register_test_meta('_internal_flag', array(
+			'type'   => 'string',
+			'single' => true,
+		));
+
+		$fields = $this->fields_by_key($this->adapter->get_fields('post', array('include_protected' => true)));
+
+		$this->assertArrayHasKey('_internal_flag', $fields);
 	}
 
 	public function test_get_supported_field_types_maps_registered_and_freeform_types() {
@@ -101,10 +112,11 @@ class Test_AIPS_Integration_Native_Meta extends WP_UnitTestCase {
 		$this->assertSame(AIPS_Integration_Interface::SHAPE_HTML, $type_map['freeform_html']);
 	}
 
-	public function test_validate_field_key_rejects_protected_key() {
-		$result = $this->adapter->validate_field_key('_secret');
-		$this->assertInstanceOf('WP_Error', $result);
-		$this->assertSame('protected_meta_key', $result->get_error_code());
+	public function test_validate_field_key_allows_protected_key() {
+		// Protected/internal keys are only hidden from discovery by default —
+		// once an admin has explicitly selected or typed one via the "Show
+		// Advanced Custom Meta Fields" toggle, it must be saveable.
+		$this->assertTrue($this->adapter->validate_field_key('_secret'));
 	}
 
 	public function test_validate_field_key_rejects_invalid_characters() {
@@ -135,14 +147,13 @@ class Test_AIPS_Integration_Native_Meta extends WP_UnitTestCase {
 		$this->assertTrue($result);
 	}
 
-	public function test_write_field_value_rejects_protected_key() {
+	public function test_write_field_value_writes_protected_key() {
 		$post_id = self::factory()->post->create();
 
 		$result = $this->adapter->write_field_value($post_id, '_secret_meta', 'x');
 
-		$this->assertInstanceOf('WP_Error', $result);
-		$this->assertSame('protected_meta_key', $result->get_error_code());
-		$this->assertSame('', get_post_meta($post_id, '_secret_meta', true));
+		$this->assertTrue($result);
+		$this->assertSame('x', get_post_meta($post_id, '_secret_meta', true));
 	}
 
 	public function test_write_field_value_rejects_invalid_post_id() {

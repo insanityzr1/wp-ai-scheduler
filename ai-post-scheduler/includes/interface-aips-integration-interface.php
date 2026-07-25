@@ -68,6 +68,11 @@ interface AIPS_Integration_Interface {
 	 * List the fields belonging to a schema group.
 	 *
 	 * @param string $group_id Group identifier as returned by get_field_groups().
+	 * @param array  $args     Optional, adapter-specific discovery options. Adapters
+	 *                         that don't recognise a given option ignore it. Currently
+	 *                         recognised: 'include_protected' (bool) — used by
+	 *                         AIPS_Integration_Native_Meta to include normally-hidden
+	 *                         protected/internal ('_'-prefixed) meta keys.
 	 * @return array<int, array{
 	 *     key: string,
 	 *     label: string,
@@ -76,7 +81,7 @@ interface AIPS_Integration_Interface {
 	 *     instructions: string,
 	 * }>
 	 */
-	public function get_fields($group_id);
+	public function get_fields($group_id, $args = array());
 
 	/**
 	 * Map of native field types this adapter understands to the generation

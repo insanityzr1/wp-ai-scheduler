@@ -95,7 +95,7 @@ if (!class_exists('AIPS_Test_Stub_Integration')) {
 		public function get_field_groups($post_type = null) {
 			return array();
 		}
-		public function get_fields($group_id) {
+		public function get_fields($group_id, $args = array()) {
 			return array();
 		}
 		public function get_supported_field_types() {

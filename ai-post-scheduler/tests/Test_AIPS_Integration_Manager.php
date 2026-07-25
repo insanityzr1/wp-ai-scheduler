@@ -326,5 +326,11 @@ if (!class_exists('AIPS_Test_Stub_Manager_Integration')) {
 			self::$last_write = array($post_id, $field_key, $value);
 			return true;
 		}
+		public function supports_custom_field_keys() {
+			return false;
+		}
+		public function validate_field_key($field_key) {
+			return true;
+		}
 	}
 }

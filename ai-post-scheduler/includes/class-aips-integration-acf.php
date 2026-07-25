@@ -148,6 +148,18 @@ class AIPS_Integration_ACF implements AIPS_Integration_Interface {
 		return true;
 	}
 
+	public function supports_custom_field_keys() {
+		// ACF's fields are always fully discoverable via acf_get_fields(); an
+		// admin never needs to hand-type an ACF field key.
+		return false;
+	}
+
+	public function validate_field_key($field_key) {
+		// Already vetted by discovery (get_fields() only ever returns real,
+		// currently-registered ACF field keys).
+		return true;
+	}
+
 	/**
 	 * Whether an ACF field group's location rules allow it on a post type.
 	 *

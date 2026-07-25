@@ -615,6 +615,10 @@ $is_embedded_templates_view = !empty($embedded);
                                             <tbody id="aips-integration-fields-tbody">
                                             </tbody>
                                         </table>
+                                        <button type="button" class="aips-btn aips-btn-secondary aips-btn-sm" id="aips-add-custom-field-row" style="display: none;">
+                                            <span class="dashicons dashicons-plus-alt2"></span>
+                                            <?php esc_html_e('Add Another Field', 'ai-post-scheduler'); ?>
+                                        </button>
                                         <button type="button" class="aips-btn aips-btn-secondary aips-btn-sm" id="aips-save-integration-mappings">
                                             <?php esc_html_e('Save Field Mappings', 'ai-post-scheduler'); ?>
                                         </button>
@@ -865,6 +869,34 @@ $is_embedded_templates_view = !empty($embedded);
             <td>
                 <textarea class="aips-integration-field-prompt regular-text" rows="2" {{disabled_attr}} placeholder="{{prompt_placeholder}}">{{prompt_value}}</textarea>
                 <p class="description" style="{{unsupported_note_style}}">{{unsupported_note_text}}</p>
+            </td>
+        </tr>
+    </script>
+
+    <!-- Growable "field slot" row for integrations where supports_custom_field_keys
+         is true (e.g. native WordPress custom fields): each row independently
+         picks its own field via a dropdown (populated in JS), with a "Custom
+         meta key…" escape hatch for a field that isn't in the discovered list. -->
+    <script type="text/html" id="aips-tmpl-integration-custom-field-row">
+        <tr class="aips-integration-custom-field-row">
+            <td class="aips-integration-field-key-cell">
+                <select class="aips-integration-field-key-select"></select>
+                <input type="text" class="aips-integration-custom-field-key-input regular-text" placeholder="{{customKeyPlaceholder}}" style="display:none;">
+            </td>
+            <td>
+                <select class="aips-integration-custom-field-shape-select" style="display:none;">
+                    <option value="freeform_short_text">{{shapeShortText}}</option>
+                    <option value="freeform_long_text">{{shapeLongText}}</option>
+                    <option value="freeform_html">{{shapeHtml}}</option>
+                </select>
+                <span class="aips-integration-field-native-type-display"></span>
+            </td>
+            <td>
+                <input type="checkbox" class="aips-integration-field-enabled" checked>
+            </td>
+            <td>
+                <textarea class="aips-integration-field-prompt regular-text" rows="2" placeholder="{{prompt_placeholder}}"></textarea>
+                <button type="button" class="aips-btn aips-btn-sm aips-btn-ghost aips-remove-custom-field-row">{{removeLabel}}</button>
             </td>
         </tr>
     </script>

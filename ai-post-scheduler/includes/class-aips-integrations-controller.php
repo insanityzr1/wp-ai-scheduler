@@ -49,8 +49,9 @@ class AIPS_Integrations_Controller {
 		$integrations = array();
 		foreach (AIPS_Integration_Registry::get_available() as $integration_id => $adapter) {
 			$integrations[] = array(
-				'id'    => $integration_id,
-				'label' => $adapter->get_label(),
+				'id'                        => $integration_id,
+				'label'                     => $adapter->get_label(),
+				'supports_custom_field_keys' => $adapter->supports_custom_field_keys(),
 			);
 		}
 
@@ -131,6 +132,27 @@ class AIPS_Integrations_Controller {
 		if (!is_array($mappings)) {
 			AIPS_Ajax_Response::invalid_request(__('Invalid mappings payload.', 'ai-post-scheduler'));
 			return;
+		}
+
+		// All rows in a single save belong to one integration; resolve its
+		// adapter once to validate every submitted field_key before saving
+		// anything, so a bad key (e.g. a hand-typed protected meta key) fails
+		// the whole request instead of silently persisting.
+		$adapter = !empty($mappings[0]['integration_id']) ? AIPS_Integration_Registry::get($mappings[0]['integration_id']) : null;
+
+		if ($adapter instanceof AIPS_Integration_Interface) {
+			foreach ($mappings as $mapping) {
+				if (empty($mapping['field_key'])) {
+					continue;
+				}
+
+				$valid = $adapter->validate_field_key($mapping['field_key']);
+
+				if (is_wp_error($valid)) {
+					AIPS_Ajax_Response::error($valid->get_error_message(), $valid->get_error_code());
+					return;
+				}
+			}
 		}
 
 		// All rows in a single save belong to one selected group. Retire any

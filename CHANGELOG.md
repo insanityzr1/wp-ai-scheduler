@@ -1,3 +1,8 @@
+## [3.5.0] - 2026-07-25
+
+### Added
+- **Native WordPress Custom Field support**: a new "WordPress Custom Fields" integration lets a Template generate content directly into plain post meta on any post type — native (`post`/`page`) or custom — with no ACF (or any other plugin) required. Fields registered via `register_post_meta()` are auto-discovered; the Template editor's Integrations panel also lets an admin hand-add any other meta key via a growable "+ Add Another Field" repeater, with protected/internal meta keys (`_`-prefixed) rejected both in the picker and on save.
+
 ## [3.4.0] - 2026-07-25
 
 ### Added

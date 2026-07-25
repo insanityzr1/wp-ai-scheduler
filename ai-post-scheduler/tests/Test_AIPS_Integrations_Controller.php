@@ -167,6 +167,32 @@ class Test_AIPS_Integrations_Controller extends WP_UnitTestCase {
 		$this->assertSame('group_b', $mappings[0]->source_key);
 	}
 
+	public function test_save_field_mappings_rejects_protected_meta_key_for_native_meta() {
+		$controller = new AIPS_Integrations_Controller($this->repo);
+		$mappings = array(
+			array(
+				'integration_id' => 'native_meta',
+				'source_key'     => 'post',
+				'field_key'      => '_protected_key',
+				'field_type'     => 'freeform_short_text',
+				'is_active'      => true,
+			),
+		);
+
+		$_POST = array(
+			'action'      => 'aips_save_field_mappings',
+			'nonce'       => wp_create_nonce('aips_ajax_nonce'),
+			'template_id' => 12,
+			'mappings'    => wp_json_encode($mappings),
+		);
+		$this->sync_request_from_post();
+
+		$response = $this->run_ajax(array($controller, 'ajax_save_field_mappings'));
+
+		$this->assertFalse($response['success']);
+		$this->assertCount(0, $this->repo->get_by_template(12, false), 'Nothing should be persisted when validation fails.');
+	}
+
 	public function test_get_field_mappings_rejects_missing_template_id() {
 		$controller = new AIPS_Integrations_Controller($this->repo);
 		$_POST = array(

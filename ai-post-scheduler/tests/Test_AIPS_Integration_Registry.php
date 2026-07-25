@@ -63,6 +63,17 @@ class Test_AIPS_Integration_Registry extends WP_UnitTestCase {
 		$available = AIPS_Integration_Registry::get_available();
 		$this->assertArrayHasKey('stub', $available);
 	}
+
+	public function test_get_registered_includes_core_native_meta_adapter() {
+		$registered = AIPS_Integration_Registry::get_registered();
+		$this->assertArrayHasKey('native_meta', $registered);
+		$this->assertSame('AIPS_Integration_Native_Meta', $registered['native_meta']);
+	}
+
+	public function test_native_meta_is_always_available() {
+		$available = AIPS_Integration_Registry::get_available();
+		$this->assertArrayHasKey('native_meta', $available);
+	}
 }
 
 if (!class_exists('AIPS_Test_Stub_Integration')) {
@@ -91,6 +102,12 @@ if (!class_exists('AIPS_Test_Stub_Integration')) {
 			return array();
 		}
 		public function write_field_value($post_id, $field_key, $value) {
+			return true;
+		}
+		public function supports_custom_field_keys() {
+			return false;
+		}
+		public function validate_field_key($field_key) {
 			return true;
 		}
 	}

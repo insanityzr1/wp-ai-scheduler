@@ -177,6 +177,11 @@ Fires immediately before the content prompt is constructed.
 
 ### Integrations (Third-Party Plugin Bridge)
 
+Despite the name, this framework isn't limited to third-party plugins —
+`native_meta` (`AIPS_Integration_Native_Meta`) ships as a core adapter that
+generates into plain WordPress post meta ("custom fields") on any post
+type, no plugin required.
+
 #### `aips_before_build_integration_field_prompt`
 Fires immediately before the fallback single-field prompt for a mapped third-party field (e.g. an ACF field) is constructed. Only used when the batched prompt call fails and the manager falls back to one call per field — see `aips_before_build_integration_batch_prompt` for the normal (batched) path.
 

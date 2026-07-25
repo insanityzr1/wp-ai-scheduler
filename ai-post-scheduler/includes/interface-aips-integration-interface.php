@@ -95,4 +95,25 @@ interface AIPS_Integration_Interface {
 	 * @return bool|WP_Error True on success, WP_Error on failure.
 	 */
 	public function write_field_value($post_id, $field_key, $value);
+
+	/**
+	 * Whether the admin can hand-add a field key that wasn't returned by
+	 * get_fields() (e.g. an unregistered native WordPress meta key), rather
+	 * than only picking from the discovered list. Adapters whose fields are
+	 * always fully discoverable (e.g. ACF) return false.
+	 *
+	 * @return bool
+	 */
+	public function supports_custom_field_keys();
+
+	/**
+	 * Validate a field key before it's saved as a mapping or written to.
+	 * Adapters whose keys are already vetted by discovery (e.g. ACF) can
+	 * always return true; adapters that accept hand-typed keys (e.g. native
+	 * WordPress meta) should reject unsafe or malformed ones here.
+	 *
+	 * @param string $field_key Field identifier.
+	 * @return true|WP_Error
+	 */
+	public function validate_field_key($field_key);
 }

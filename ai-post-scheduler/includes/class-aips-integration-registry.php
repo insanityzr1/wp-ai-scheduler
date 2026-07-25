@@ -28,7 +28,8 @@ class AIPS_Integration_Registry {
 	 * @var array<string, string>
 	 */
 	private static $map = array(
-		'acf' => 'AIPS_Integration_ACF',
+		'acf'         => 'AIPS_Integration_ACF',
+		'native_meta' => 'AIPS_Integration_Native_Meta',
 	);
 
 	/**

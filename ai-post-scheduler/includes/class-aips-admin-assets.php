@@ -821,6 +821,14 @@ class AIPS_Admin_Assets {
                 'noGroupsFound'           => __('No field groups found for this post type.', 'ai-post-scheduler'),
                 'promptPlaceholder'       => __('Optional: custom instructions for this field. Leave blank to use the field\'s own help text.', 'ai-post-scheduler'),
                 'unsupportedFieldType'    => __('This field type is not yet supported for AI generation.', 'ai-post-scheduler'),
+                'selectFieldPlaceholder'  => __('Select a field…', 'ai-post-scheduler'),
+                'customFieldKeyOption'    => __('Custom meta key…', 'ai-post-scheduler'),
+                'customKeyPlaceholder'    => __('e.g. contact_phone_number', 'ai-post-scheduler'),
+                'invalidCustomKey'        => __('Meta key may only contain letters, numbers, and underscores.', 'ai-post-scheduler'),
+                'shapeShortText'          => __('Short Text', 'ai-post-scheduler'),
+                'shapeLongText'           => __('Long Text', 'ai-post-scheduler'),
+                'shapeHtml'               => __('HTML', 'ai-post-scheduler'),
+                'removeField'             => __('Remove', 'ai-post-scheduler'),
             ));
 
             wp_localize_script('aips-admin-script', 'aipsTemplatesL10n', array(

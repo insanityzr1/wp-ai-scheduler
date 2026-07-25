@@ -1,3 +1,11 @@
+## [3.4.0] - 2026-07-25
+
+### Added
+- **Post Type Awareness in History & Content**: `aips_history` now records the post type of every post it generates (backfilled for existing rows via a one-time migration). The History page and the Content page (Generated Posts / Partial Generations / Pending Review tabs) all gained a "Type" column and a post type filter, so a mixed library of `post` and custom-post-type content stays fully navigable.
+
+### Fixed
+- **History link hidden on custom post types**: The "View AI History" link/row-action was incorrectly hidden on any post type other than `post`, even when AIPS generated that post. It now shows correctly for any post type.
+
 ## [3.3.0] - 2026-07-25
 
 ### Added

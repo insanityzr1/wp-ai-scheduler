@@ -886,6 +886,9 @@ class AIPS_Admin_Assets {
                 'runNow'                         => __('Run Now', 'ai-post-scheduler'),
                 'cancel'                         => __('Cancel', 'ai-post-scheduler'),
                 'yesRunNow'                      => __('Yes, run now', 'ai-post-scheduler'),
+                'runNowChoice'                   => __('How should this manual run affect the schedule?', 'ai-post-scheduler'),
+                'runNowIndependent'              => __('Run now, independently from schedule', 'ai-post-scheduler'),
+                'runNowAndAdvance'               => __('Run next scheduled run now and advance', 'ai-post-scheduler'),
                 // Single schedule delete
                 'deleteScheduleConfirm'          => __('Are you sure you want to delete this schedule?', 'ai-post-scheduler'),
                 // Bulk schedule selection/delete

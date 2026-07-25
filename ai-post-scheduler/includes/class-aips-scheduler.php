@@ -443,10 +443,11 @@ class AIPS_Scheduler implements AIPS_Cron_Generation_Handler {
      *
      * @param int      $schedule_id      The schedule ID.
      * @param int|null $quantity_override Optional number of posts to generate, overriding the template's post_quantity.
+     * @param bool     $advance_schedule Whether this run consumes the next scheduled occurrence.
      * @return int|WP_Error Post ID on success, or WP_Error on failure.
      */
-    public function run_schedule_now($schedule_id, $quantity_override = null) {
-        return $this->processor->process_single_schedule($schedule_id, $quantity_override);
+    public function run_schedule_now($schedule_id, $quantity_override = null, $advance_schedule = true) {
+        return $this->processor->process_single_schedule($schedule_id, $quantity_override, $advance_schedule);
     }
 
     /**

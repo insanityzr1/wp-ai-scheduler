@@ -148,4 +148,33 @@ class AIPS_Integration_Mappings_Repository {
 	public function delete_by_template($template_id) {
 		return $this->wpdb->delete($this->table_name, array('template_id' => absint($template_id)), array('%d')) !== false;
 	}
+
+	/**
+	 * Retire mappings left over from a previously-selected schema group.
+	 *
+	 * A template's saved mappings for one integration should always reflect
+	 * exactly one selected group (e.g. one ACF field group) at a time. Call
+	 * this before saving a new batch of mappings so switching groups doesn't
+	 * leave the old group's rows active alongside the new one — otherwise
+	 * both groups' fields would be generated on every post.
+	 *
+	 * @param int    $template_id    Template ID.
+	 * @param string $integration_id Integration identifier (e.g. 'acf').
+	 * @param string $source_key     The group identifier being kept.
+	 * @return bool
+	 */
+	public function delete_stale_group_mappings($template_id, $integration_id, $source_key) {
+		$template_id = absint($template_id);
+
+		if (!$template_id) {
+			return false;
+		}
+
+		return $this->wpdb->query($this->wpdb->prepare(
+			"DELETE FROM {$this->table_name} WHERE template_id = %d AND integration_id = %s AND source_key != %s",
+			$template_id,
+			sanitize_key($integration_id),
+			sanitize_text_field($source_key)
+		)) !== false;
+	}
 }

@@ -214,7 +214,12 @@
 				prompt_value: saved.custom_prompt || field.instructions || '',
 				prompt_placeholder: aipsIntegrationsL10n.promptPlaceholder,
 				unsupported_class: supported ? '' : 'aips-integration-field-unsupported',
-				unsupported_note: supported ? '' : '<p class="description">' + aipsIntegrationsL10n.unsupportedFieldType + '</p>'
+				// Plain text only — AIPS.Templates.render() HTML-escapes every
+				// value, so the note is a static <p> in the row template with
+				// its text/visibility driven by these two tokens rather than
+				// injected as a raw HTML string.
+				unsupported_note_style: supported ? 'display:none;' : '',
+				unsupported_note_text: supported ? '' : aipsIntegrationsL10n.unsupportedFieldType
 			});
 		},
 

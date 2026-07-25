@@ -178,10 +178,17 @@ Fires immediately before the content prompt is constructed.
 ### Integrations (Third-Party Plugin Bridge)
 
 #### `aips_before_build_integration_field_prompt`
-Fires immediately before the prompt for a single mapped third-party field (e.g. an ACF field) is constructed.
+Fires immediately before the fallback single-field prompt for a mapped third-party field (e.g. an ACF field) is constructed. Only used when the batched prompt call fails and the manager falls back to one call per field — see `aips_before_build_integration_batch_prompt` for the normal (batched) path.
 
 *   **Arguments:**
     *   `array $field_def`: Field definition (`key`, `label`, `native_type`, `instructions`).
+    *   `AIPS_Generation_Context $context`: The generation context driving this post.
+
+#### `aips_before_build_integration_batch_prompt`
+Fires immediately before the batched prompt covering every generatable mapped field for one integration is constructed. This is the normal generation path — all mapped fields are generated in a single AI call rather than one call per field.
+
+*   **Arguments:**
+    *   `array $items`: List of `{mapping, field_def}` pairs, one per field in the batch.
     *   `AIPS_Generation_Context $context`: The generation context driving this post.
 
 #### `aips_integration_fields_applied`
@@ -224,15 +231,20 @@ add_filter('aips_integrations_registry', function ($map) {
 ```
 
 #### `aips_integration_field_prompt`
-Filters the generation prompt built for a single mapped field.
+Filters the fallback single-field prompt (used only when the batched call fails).
 
 *   **Arguments:**
     *   `string $prompt`: The constructed prompt string.
     *   `array $field_def`: Field definition (`key`, `label`, `native_type`, `instructions`).
     *   `AIPS_Generation_Context $context`: The generation context driving this post.
 
-#### `aips_integration_hook_bindings`
-Modifies the list of WordPress action hooks `AIPS_Integration_Event_Handler` registers automatically. Same shape as `aips_notification_hook_bindings`.
+#### `aips_integration_batch_prompt`
+Filters the batched prompt covering every generatable mapped field for one integration — the normal generation path.
+
+*   **Arguments:**
+    *   `string $prompt`: The constructed prompt string.
+    *   `array $items`: List of `{mapping, field_def}` pairs, one per field in the batch.
+    *   `AIPS_Generation_Context $context`: The generation context driving this post.
 
 ---
 

@@ -119,6 +119,21 @@ class AIPS_Integration_ACF implements AIPS_Integration_Interface {
 			return new WP_Error('invalid_post', __('Invalid post ID.', 'ai-post-scheduler'));
 		}
 
+		// update_field() writes raw postmeta under $field_key when it doesn't
+		// resolve to a real field, silently "succeeding" for a mapping whose
+		// field was since deleted/renamed in ACF. Verify it still exists first
+		// so a stale mapping surfaces as an error instead of orphaned meta.
+		if (function_exists('acf_get_field') && !acf_get_field($field_key)) {
+			return new WP_Error(
+				'acf_field_not_found',
+				sprintf(
+					/* translators: %s: ACF field key. */
+					__('ACF field %s no longer exists.', 'ai-post-scheduler'),
+					$field_key
+				)
+			);
+		}
+
 		if (!update_field($field_key, $value, $post_id)) {
 			return new WP_Error(
 				'acf_write_failed',

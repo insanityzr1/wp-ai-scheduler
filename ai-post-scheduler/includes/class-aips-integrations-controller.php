@@ -133,6 +133,13 @@ class AIPS_Integrations_Controller {
 			return;
 		}
 
+		// All rows in a single save belong to one selected group. Retire any
+		// mappings left over from a previously-selected group for this
+		// integration so switching groups doesn't leave both active.
+		if (!empty($mappings[0]['integration_id']) && isset($mappings[0]['source_key'])) {
+			$this->repo->delete_stale_group_mappings($template_id, $mappings[0]['integration_id'], $mappings[0]['source_key']);
+		}
+
 		foreach ($mappings as $mapping) {
 			if (empty($mapping['integration_id']) || empty($mapping['field_key'])) {
 				continue;

@@ -32,6 +32,14 @@ if (!function_exists('update_field')) {
 	}
 }
 
+if (!function_exists('acf_get_field')) {
+	function acf_get_field($field_key) {
+		return in_array($field_key, $GLOBALS['aips_test_acf_known_field_keys'], true)
+			? array('key' => $field_key)
+			: false;
+	}
+}
+
 class Test_AIPS_Integration_ACF extends WP_UnitTestCase {
 
 	/** @var AIPS_Integration_ACF */
@@ -69,6 +77,7 @@ class Test_AIPS_Integration_ACF extends WP_UnitTestCase {
 
 		$GLOBALS['aips_test_acf_write_should_fail'] = false;
 		$GLOBALS['aips_test_acf_written'] = array();
+		$GLOBALS['aips_test_acf_known_field_keys'] = array('field_headline', 'field_body', 'field_team', 'field_color');
 	}
 
 	public function test_is_available_true_when_acf_functions_exist() {
@@ -134,5 +143,12 @@ class Test_AIPS_Integration_ACF extends WP_UnitTestCase {
 		$result = $this->adapter->write_field_value(0, 'field_headline', 'value');
 		$this->assertInstanceOf('WP_Error', $result);
 		$this->assertSame('invalid_post', $result->get_error_code());
+	}
+
+	public function test_write_field_value_returns_wp_error_for_deleted_or_renamed_field() {
+		$result = $this->adapter->write_field_value(123, 'field_no_longer_exists', 'value');
+		$this->assertInstanceOf('WP_Error', $result);
+		$this->assertSame('acf_field_not_found', $result->get_error_code());
+		$this->assertArrayNotHasKey('field_no_longer_exists', isset($GLOBALS['aips_test_acf_written'][123]) ? $GLOBALS['aips_test_acf_written'][123] : array());
 	}
 }

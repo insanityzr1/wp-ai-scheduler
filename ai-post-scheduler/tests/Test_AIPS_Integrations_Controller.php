@@ -118,6 +118,55 @@ class Test_AIPS_Integrations_Controller extends WP_UnitTestCase {
 		$this->assertSame('field_headline', $get_response['data']['mappings'][0]['field_key']);
 	}
 
+	public function test_switching_field_group_retires_previous_group_mappings() {
+		$controller = new AIPS_Integrations_Controller($this->repo);
+
+		$group_a_mappings = array(
+			array(
+				'integration_id' => 'acf',
+				'source_key'     => 'group_a',
+				'field_key'      => 'field_a1',
+				'field_type'     => 'text',
+				'is_active'      => true,
+			),
+		);
+		$_POST = array(
+			'action'      => 'aips_save_field_mappings',
+			'nonce'       => wp_create_nonce('aips_ajax_nonce'),
+			'template_id' => 11,
+			'mappings'    => wp_json_encode($group_a_mappings),
+		);
+		$this->sync_request_from_post();
+		$this->run_ajax(array($controller, 'ajax_save_field_mappings'));
+
+		$this->assertCount(1, $this->repo->get_by_template(11, false));
+
+		// Switch to a different field group for the same integration and save.
+		$group_b_mappings = array(
+			array(
+				'integration_id' => 'acf',
+				'source_key'     => 'group_b',
+				'field_key'      => 'field_b1',
+				'field_type'     => 'text',
+				'is_active'      => true,
+			),
+		);
+		$_POST = array(
+			'action'      => 'aips_save_field_mappings',
+			'nonce'       => wp_create_nonce('aips_ajax_nonce'),
+			'template_id' => 11,
+			'mappings'    => wp_json_encode($group_b_mappings),
+		);
+		$this->sync_request_from_post();
+		$save_response = $this->run_ajax(array($controller, 'ajax_save_field_mappings'));
+
+		$this->assertTrue($save_response['success']);
+		$mappings = $this->repo->get_by_template(11, false);
+		$this->assertCount(1, $mappings, 'Group A\'s mapping should have been retired when Group B was saved.');
+		$this->assertSame('field_b1', $mappings[0]->field_key);
+		$this->assertSame('group_b', $mappings[0]->source_key);
+	}
+
 	public function test_get_field_mappings_rejects_missing_template_id() {
 		$controller = new AIPS_Integrations_Controller($this->repo);
 		$_POST = array(

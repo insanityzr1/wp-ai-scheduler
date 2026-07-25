@@ -992,6 +992,12 @@
                         if (response.data && response.data.template_id) {
                             $('#template_id').val(response.data.template_id);
                             AIPS.lastSavedTemplateId = response.data.template_id;
+
+                            // post_type is write-once server-side as of this save;
+                            // lock the field so the UI doesn't imply it's still changeable.
+                            $('#template_post_type').prop('disabled', true);
+                            $('#template_post_type_locked_notice').show();
+                            AIPS.toggleTemplatePostTypeFields();
                         }
 
                         AIPS.Utilities.showToast(aipsTemplatesL10n.draftSaved, 'success');

@@ -864,7 +864,7 @@ $is_embedded_templates_view = !empty($embedded);
             </td>
             <td>
                 <textarea class="aips-integration-field-prompt regular-text" rows="2" {{disabled_attr}} placeholder="{{prompt_placeholder}}">{{prompt_value}}</textarea>
-                {{unsupported_note}}
+                <p class="description" style="{{unsupported_note_style}}">{{unsupported_note_text}}</p>
             </td>
         </tr>
     </script>

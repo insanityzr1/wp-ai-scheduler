@@ -178,6 +178,21 @@ class AIPS_Ability_Service {
 			}
 		}
 
+		// WordPress Abilities API (WP 6.9+/7.0). This is the canonical source for
+		// core- and plugin-registered abilities, so it takes precedence over any
+		// AI-engine-specific provider. It cannot use the function-pair candidate
+		// model below: wp_get_abilities() returns WP_Ability objects and each is
+		// invoked with wp_get_ability($slug)->execute($input), so there is no
+		// global invoke function to pair -- the invoke path is a bound method.
+		if (function_exists('wp_get_abilities') && function_exists('wp_get_ability')) {
+			$this->provider = array(
+				'name'   => 'wordpress_abilities',
+				'list'   => 'wp_get_abilities',
+				'invoke' => array($this, 'invoke_wp_ability'),
+			);
+			return $this->provider;
+		}
+
 		global $mwai;
 		$provider = $this->provider_from_candidate($mwai, 'global_mwai');
 		if (!is_wp_error($provider)) {
@@ -185,11 +200,12 @@ class AIPS_Ability_Service {
 			return $provider;
 		}
 
+		// AI-engine-specific fallbacks for sites without the WordPress Abilities
+		// API. The former wp_get_abilities/wp_list_abilities + wp_invoke_ability
+		// and WP_Abilities entries were removed: those symbols never shipped, so
+		// they could never match and only masked the real API handled above.
 		$candidates = array(
-			array('function', 'wp_get_abilities', 'wp_invoke_ability', 'wordpress_abilities'),
-			array('function', 'wp_list_abilities', 'wp_invoke_ability', 'wordpress_abilities'),
 			array('function', 'mwai_get_abilities', 'mwai_invoke_ability', 'mwai_abilities'),
-			array('class', 'WP_Abilities', array('get_instance', 'list_abilities'), array('get_instance', 'invoke'), 'WP_Abilities'),
 			array('class', 'Meow_MWAI_Abilities', array('instance', 'list_available'), array('instance', 'invoke'), 'Meow_MWAI_Abilities'),
 		);
 
@@ -202,6 +218,56 @@ class AIPS_Ability_Service {
 		}
 
 		return new WP_Error('ability_provider_missing', __('No ability provider is available.', 'ai-post-scheduler'));
+	}
+
+	/**
+	 * Invoke a WordPress Abilities API ability by slug.
+	 *
+	 * Bridges the plugin's (slug, payload, options) provider contract onto the
+	 * WordPress API, which invokes per-ability via wp_get_ability()->execute().
+	 * execute() runs input validation and the permission check internally and
+	 * returns the result or a WP_Error, which normalize_response() then handles.
+	 *
+	 * @param string $slug    Ability slug.
+	 * @param array  $payload Ability input payload.
+	 * @param array  $options Invocation options (unused by the WP API).
+	 * @return mixed|WP_Error
+	 */
+	private function invoke_wp_ability($slug, $payload, $options = array()) {
+		$ability = wp_get_ability($slug);
+
+		if (!$ability) {
+			/* translators: %s: ability slug */
+			return new WP_Error('ability_not_found', sprintf(__('Ability "%s" is not registered.', 'ai-post-scheduler'), $slug));
+		}
+
+		return $ability->execute($payload);
+	}
+
+	/**
+	 * Convert a WP_Ability object into the plugin's raw ability array shape.
+	 *
+	 * wp_get_abilities() returns WP_Ability objects whose data is exposed only
+	 * through getters, so get_object_vars() cannot read it. Each getter is
+	 * guarded with method_exists() so a future/partial WP_Ability implementation
+	 * degrades gracefully rather than fataling.
+	 *
+	 * @param object $ability WP_Ability instance.
+	 * @return array
+	 */
+	private function wp_ability_to_array($ability) {
+		$meta = method_exists($ability, 'get_meta') ? (array) $ability->get_meta() : array();
+
+		return array(
+			'slug'          => (string) $ability->get_name(),
+			'label'         => method_exists($ability, 'get_label') ? (string) $ability->get_label() : '',
+			'description'   => method_exists($ability, 'get_description') ? (string) $ability->get_description() : '',
+			'input_schema'  => method_exists($ability, 'get_input_schema') ? (array) $ability->get_input_schema() : array(),
+			'output_schema' => method_exists($ability, 'get_output_schema') ? (array) $ability->get_output_schema() : array(),
+			'category'      => isset($meta['category']) ? (string) $meta['category'] : '',
+			'provider'      => 'wordpress',
+			'metadata'      => $meta,
+		);
 	}
 
 	/**
@@ -276,6 +342,10 @@ class AIPS_Ability_Service {
 			if (is_string($ability)) {
 				$slug = $this->normalize_slug($ability);
 				$ability = array('slug' => $slug);
+			} elseif (is_object($ability) && method_exists($ability, 'get_name')) {
+				// WP_Ability (WordPress Abilities API): its data lives behind
+				// getters, so get_object_vars() would return nothing usable.
+				$ability = $this->wp_ability_to_array($ability);
 			} elseif (is_object($ability)) {
 				$ability = get_object_vars($ability);
 			}

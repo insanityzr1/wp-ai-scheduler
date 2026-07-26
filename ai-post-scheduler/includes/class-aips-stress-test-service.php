@@ -828,14 +828,7 @@ class AIPS_Stress_Test_Service {
      * @return int[]
      */
     private function get_test_post_ids() {
-        return get_posts(array(
-            'post_type'        => 'any',
-            'post_status'      => 'any',
-            'numberposts'      => 200,
-            'fields'           => 'ids',
-            'meta_key'         => self::TEST_POST_META,
-            'suppress_filters' => false,
-        ));
+        return $this->collect_test_ids('any', self::TEST_POST_META);
     }
 
     /**
@@ -844,14 +837,43 @@ class AIPS_Stress_Test_Service {
      * @return int[]
      */
     private function get_test_attachment_ids() {
-        return get_posts(array(
-            'post_type'        => 'attachment',
-            'post_status'      => 'any',
-            'numberposts'      => 200,
-            'fields'           => 'ids',
-            'meta_key'         => self::TEST_ATTACHMENT_META,
-            'suppress_filters' => false,
-        ));
+        return $this->collect_test_ids('attachment', self::TEST_ATTACHMENT_META);
+    }
+
+    /**
+     * Collect all marked object IDs in batches.
+     *
+     * @param string $post_type Post type to query.
+     * @param string $meta_key  Meta key marker.
+     * @return int[]
+     */
+    private function collect_test_ids($post_type, $meta_key) {
+        $ids = array();
+        $offset = 0;
+        $batch_size = 200;
+
+        while (true) {
+            $batch = get_posts(array(
+                'post_type'        => $post_type,
+                'post_status'      => 'any',
+                'numberposts'      => $batch_size,
+                'offset'           => $offset,
+                'orderby'          => 'ID',
+                'order'            => 'ASC',
+                'fields'           => 'ids',
+                'meta_key'         => $meta_key,
+                'suppress_filters' => false,
+            ));
+
+            if (empty($batch)) {
+                break;
+            }
+
+            $ids = array_merge($ids, $batch);
+            $offset += count($batch);
+        }
+
+        return $ids;
     }
 
     /**

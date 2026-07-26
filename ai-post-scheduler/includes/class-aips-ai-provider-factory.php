@@ -99,14 +99,27 @@ class AIPS_AI_Provider_Factory {
     }
 
     /**
-     * Whether at least one AI provider is currently available.
+     * Whether the active provider for this request is currently available.
      *
-     * Provider-agnostic replacement for ad hoc class_exists('Meow_MWAI_Core')
-     * presence checks in dependency notices, dashboards, and wizards.
+     * This follows the same selection path AIPS_AI_Service uses (explicit option
+     * if set, otherwise auto-detect). UI readiness checks should reflect whether
+     * the currently selected provider can actually serve requests.
      *
      * @return bool
      */
     public static function has_available_provider(): bool {
+        return self::create()->is_available();
+    }
+
+    /**
+     * Whether any registered provider is available, regardless of selection.
+     *
+     * Useful for diagnostics UIs that want to show if at least one backend could
+     * work after changing settings.
+     *
+     * @return bool
+     */
+    public static function has_any_available_provider(): bool {
         return !empty(self::available_providers());
     }
 

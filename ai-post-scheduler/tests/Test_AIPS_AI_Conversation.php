@@ -30,6 +30,19 @@ class Test_AIPS_AI_Conversation extends WP_UnitTestCase {
 		$this->assertTrue($conversation->is_empty());
 	}
 
+	public function test_add_exchange_rejects_when_transcript_ends_on_user_turn() {
+		$conversation = new AIPS_AI_Conversation();
+
+		$this->assertTrue($conversation->add_user('First prompt.'));
+		$this->assertFalse($conversation->add_exchange('Second prompt.', 'Second response.'));
+		$this->assertTrue($conversation->add_model('First response.'));
+
+		$turns = $conversation->get_turns();
+		$this->assertCount(2, $turns);
+		$this->assertSame('First prompt.', $turns[0]['text']);
+		$this->assertSame('First response.', $turns[1]['text']);
+	}
+
 	public function test_consecutive_same_role_turns_are_rejected() {
 		$conversation = new AIPS_AI_Conversation();
 

@@ -2,10 +2,8 @@
 /**
  * Tests provider-agnostic availability checks.
  *
- * Verifies AIPS_AI_Provider_Factory::has_available_provider() and the surfaces
- * that were previously hard-coded to class_exists('Meow_MWAI_Core') — a site
- * running only the WordPress AI Client must not be reported as missing its AI
- * backend.
+ * Verifies active-provider readiness checks and the surfaces that were
+ * previously hard-coded to class_exists('Meow_MWAI_Core').
  *
  * @package AI_Post_Scheduler
  * @subpackage Tests
@@ -54,6 +52,18 @@ class Test_AIPS_Provider_Availability extends WP_UnitTestCase {
         $aips_wp_ai_client_test_builder = new WP_Error('no_connector', 'Nothing configured.');
 
         $this->assertFalse(AIPS_AI_Provider_Factory::has_available_provider());
+    }
+
+    public function test_has_available_provider_reflects_selected_provider_readiness() {
+        global $mwai;
+
+        $mwai = null;
+        $this->make_ready_wp_ai_client();
+
+        update_option('aips_ai_provider', 'meow');
+
+        $this->assertFalse(AIPS_AI_Provider_Factory::has_available_provider());
+        $this->assertTrue(AIPS_AI_Provider_Factory::has_any_available_provider());
     }
 
     public function test_campaign_warnings_omit_missing_provider_when_wp_ai_client_ready() {

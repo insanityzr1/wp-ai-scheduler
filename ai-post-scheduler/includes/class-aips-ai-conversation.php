@@ -66,8 +66,15 @@ class AIPS_AI_Conversation {
             return false;
         }
 
-        $this->turns[] = array('role' => self::ROLE_USER, 'text' => $user_text);
-        $this->turns[] = array('role' => self::ROLE_MODEL, 'text' => $model_text);
+        if (!$this->add_user($user_text)) {
+            return false;
+        }
+
+        if (!$this->add_model($model_text)) {
+            // Roll back the user turn if the model turn cannot be recorded.
+            array_pop($this->turns);
+            return false;
+        }
 
         return true;
     }

@@ -152,9 +152,9 @@ class AIPS_Generator {
             );
         }
 
-        // Forward the request type so AIPS_AI_Service can calculate maxTokens correctly.
+        // Forward the request type so AIPS_AI_Service can calculate max_tokens correctly.
         // Only set it when the caller has not already provided an explicit token override.
-        if (!isset($options['maxTokens']) && !isset($options['max_tokens'])) {
+        if (!isset($options['max_tokens'])) {
             $options['request_type'] = $log_type;
         }
 

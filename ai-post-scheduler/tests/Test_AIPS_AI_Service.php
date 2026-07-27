@@ -226,7 +226,7 @@ class Test_AIPS_AI_Service extends WP_UnitTestCase {
         if (!$this->service->is_available()) {
             $options = array(
                 'model' => 'gpt-4',
-                'maxTokens' => 500,
+                'max_tokens' => 500,
                 'temperature' => 0.8,
             );
             
@@ -249,7 +249,7 @@ class Test_AIPS_AI_Service extends WP_UnitTestCase {
         if (!$this->service->is_available()) {
             $options = array(
                 'model' => 'gpt-4',
-                'maxTokens' => 500,
+                'max_tokens' => 500,
                 'temperature' => 0.6,
                 'context' => 'These are supplemental instructions.',
                 'instructions' => 'Always stay concise.',
@@ -319,9 +319,9 @@ class Test_AIPS_AI_Service extends WP_UnitTestCase {
     }
 
     /**
-     * Test that maxTokens passed directly overrides the built-in default of 2000.
+     * Test that max_tokens passed directly overrides the calculated default.
      */
-    public function test_prepare_options_maxTokens_overrides_default() {
+    public function test_prepare_options_max_tokens_overrides_default() {
         global $mwai;
         $original_mwai = $mwai;
 
@@ -331,19 +331,19 @@ class Test_AIPS_AI_Service extends WP_UnitTestCase {
 
         try {
             $service = new AIPS_AI_Service();
-            $result  = $service->generate_text('Prompt', array('maxTokens' => 5000));
+            $result  = $service->generate_text('Prompt', array('max_tokens' => 5000));
 
             $this->assertNotInstanceOf('WP_Error', $result, 'Expected successful generation, got WP_Error.');
-            $this->assertSame(5000, $capture->params['maxTokens'], 'maxTokens should override the 2000 default.');
+            $this->assertSame(5000, $capture->params['maxTokens'], 'The Meow adapter should receive the max_tokens override.');
         } finally {
             $mwai = $original_mwai;
         }
     }
 
     /**
-     * Test that legacy max_tokens is normalized to maxTokens and forwarded to the engine.
+     * Test that canonical max_tokens is translated for Meow AI Engine.
      */
-    public function test_prepare_options_legacy_max_tokens_accepted() {
+    public function test_prepare_options_max_tokens_translated_for_meow() {
         global $mwai;
         $original_mwai = $mwai;
 
@@ -356,7 +356,7 @@ class Test_AIPS_AI_Service extends WP_UnitTestCase {
             $result  = $service->generate_text('Prompt', array('max_tokens' => 3000));
 
             $this->assertNotInstanceOf('WP_Error', $result, 'Expected successful generation, got WP_Error.');
-            $this->assertSame(3000, $capture->params['maxTokens'], 'Legacy max_tokens should be normalized to maxTokens.');
+            $this->assertSame(3000, $capture->params['maxTokens'], 'The Meow adapter should translate max_tokens to its native key.');
         } finally {
             $mwai = $original_mwai;
         }
@@ -407,14 +407,14 @@ class Test_AIPS_AI_Service extends WP_UnitTestCase {
     }
 
     /**
-     * Test that maxTokens is dynamically calculated when no token option is supplied.
+     * Test that max_tokens is dynamically calculated when no token option is supplied.
      *
-     * With no explicit maxTokens and no request_type, the 'content' type sizing is used.
+     * With no explicit max_tokens and no request_type, the 'content' type sizing is used.
      * Calculation: output_tokens + 25% buffer, capped at aips_max_tokens_limit (16000).
-     * maxTokens is an output-only cap on every supported backend, so the prompt
+     * max_tokens is an output-only cap, so the prompt
      * length is not part of it: output_tokens = 4000 (content); result = 5000.
      */
-    public function test_prepare_options_default_maxTokens_used_when_not_specified() {
+    public function test_prepare_options_default_max_tokens_used_when_not_specified() {
         global $mwai;
         $original_mwai = $mwai;
 
@@ -427,22 +427,22 @@ class Test_AIPS_AI_Service extends WP_UnitTestCase {
             $result  = $service->generate_text('Prompt');
 
             $this->assertNotInstanceOf('WP_Error', $result, 'Expected successful generation, got WP_Error.');
-            $this->assertArrayHasKey('maxTokens', $capture->params, 'maxTokens must always be set in params.');
-            $this->assertIsInt($capture->params['maxTokens'], 'maxTokens must be an integer.');
-            $this->assertGreaterThan(0, $capture->params['maxTokens'], 'maxTokens must be a positive integer.');
-            // maxTokens is an output-only cap, so the prompt length is not a factor:
+            $this->assertArrayHasKey('maxTokens', $capture->params, 'The Meow-native token parameter must always be set.');
+            $this->assertIsInt($capture->params['maxTokens'], 'The Meow-native token parameter must be an integer.');
+            $this->assertGreaterThan(0, $capture->params['maxTokens'], 'The Meow-native token parameter must be positive.');
+            // max_tokens is an output-only cap, so the prompt length is not a factor:
             // result = output_tokens + ceil(output_tokens * 0.25).
             $output_tokens = (int) get_option('aips_max_tokens_content', 4000);
             $buffer        = (int) ceil($output_tokens * 0.25);
             $expected      = $output_tokens + $buffer;
-            $this->assertSame($expected, $capture->params['maxTokens'], 'Dynamic maxTokens should size the output budget only.');
+            $this->assertSame($expected, $capture->params['maxTokens'], 'Dynamic max_tokens should size the output budget only.');
         } finally {
             $mwai = $original_mwai;
         }
     }
 
     /**
-     * Test that title request_type produces title-sized maxTokens.
+     * Test that title request_type produces title-sized max_tokens.
      */
     public function test_calculate_max_tokens_title_type() {
         global $mwai;
@@ -462,14 +462,14 @@ class Test_AIPS_AI_Service extends WP_UnitTestCase {
             $buffer        = (int) ceil($output_tokens * 0.25);
             $expected      = $output_tokens + $buffer;
 
-            $this->assertSame($expected, $capture->params['maxTokens'], 'Title request_type should produce title-sized maxTokens.');
+            $this->assertSame($expected, $capture->params['maxTokens'], 'Title request_type should produce title-sized max_tokens.');
         } finally {
             $mwai = $original_mwai;
         }
     }
 
     /**
-     * Test that excerpt request_type produces excerpt-sized maxTokens.
+     * Test that excerpt request_type produces excerpt-sized max_tokens.
      */
     public function test_calculate_max_tokens_excerpt_type() {
         global $mwai;
@@ -489,7 +489,7 @@ class Test_AIPS_AI_Service extends WP_UnitTestCase {
             $buffer        = (int) ceil($output_tokens * 0.25);
             $expected      = $output_tokens + $buffer;
 
-            $this->assertSame($expected, $capture->params['maxTokens'], 'Excerpt request_type should produce excerpt-sized maxTokens.');
+            $this->assertSame($expected, $capture->params['maxTokens'], 'Excerpt request_type should produce excerpt-sized max_tokens.');
         } finally {
             $mwai = $original_mwai;
         }
@@ -602,7 +602,7 @@ class Test_AIPS_AI_Service extends WP_UnitTestCase {
 
     /**
      * Test that a zero or empty per-type token option is clamped to 1 so
-     * maxTokens is always a positive integer (never zero or negative).
+     * max_tokens is always a positive integer (never zero or negative).
      */
     public function test_calculate_max_tokens_zero_content_setting_clamped_to_one() {
         global $mwai;
@@ -626,7 +626,7 @@ class Test_AIPS_AI_Service extends WP_UnitTestCase {
             $buffer        = (int) ceil($output_tokens * 0.25);
             $expected      = $output_tokens + $buffer;
 
-            $this->assertGreaterThan(0, $capture->params['maxTokens'], 'maxTokens must be positive even when per-type setting is 0.');
+            $this->assertGreaterThan(0, $capture->params['maxTokens'], 'max_tokens must be positive even when per-type setting is 0.');
             $this->assertSame($expected, $capture->params['maxTokens'], 'Zero content setting should be clamped to 1 for the output token budget.');
         } finally {
             $mwai = $original_mwai;
@@ -657,7 +657,7 @@ class Test_AIPS_AI_Service extends WP_UnitTestCase {
             $service = new AIPS_AI_Service();
             $service->generate_text('Some prompt', array('request_type' => 'content'));
 
-            $this->assertSame(100, $capture->params['maxTokens'], 'maxTokens should be capped at aips_max_tokens_limit.');
+            $this->assertSame(100, $capture->params['maxTokens'], 'max_tokens should be capped at aips_max_tokens_limit.');
         } finally {
             $mwai = $original_mwai;
             if ($original_limit === false) {

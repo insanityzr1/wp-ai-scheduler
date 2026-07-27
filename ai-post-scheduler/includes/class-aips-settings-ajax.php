@@ -95,7 +95,7 @@ class AIPS_Settings_AJAX {
 
 		$prompt  = 'Say "Hello World" in 2 words.';
 		$options = array(
-			'maxTokens' => 20,
+			'max_tokens' => 20,
 		);
 		$history = $this->history_service->create(
 			'settings_connection_test',

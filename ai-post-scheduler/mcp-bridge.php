@@ -1710,7 +1710,7 @@ class AIPS_MCP_Bridge {
 		
 		try {
 			$result = $ai_service->generate_text($test_prompt, array(
-				'maxTokens' => 50,
+				'max_tokens' => 50,
 				'temperature' => 0.7
 			));
 			

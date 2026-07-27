@@ -77,7 +77,7 @@ class Test_AIPS_Settings_Ajax extends WP_UnitTestCase {
 
 		$this->assertCount(1, $ai_service->calls);
 		$this->assertSame('Say "Hello World" in 2 words.', $ai_service->calls[0]['prompt']);
-		$this->assertSame(array('maxTokens' => 20), $ai_service->calls[0]['options']);
+		$this->assertSame(array('max_tokens' => 20), $ai_service->calls[0]['options']);
 
 		$this->assertCount(1, $history_service->created);
 		$this->assertSame('settings_connection_test', $history_service->created[0]['type']);

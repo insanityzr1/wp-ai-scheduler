@@ -585,7 +585,7 @@ class AIPS_Settings_UI {
      *
      * Ensures the saved value is a positive integer (≥ 1). An empty submission or
      * a value of zero would silently remove the output token budget and cause the
-     * AI to receive an unexpectedly tiny maxTokens value, so we clamp to 1.
+     * AI to receive an unexpectedly tiny max_tokens value, so we clamp to 1.
      *
      * @param mixed $value Raw input value.
      * @return int Sanitized token budget (minimum 1).

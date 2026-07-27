@@ -210,7 +210,7 @@ class AIPS_WP_AI_Client_Provider implements AIPS_AI_Provider_Interface {
             $builder = $this->chain($builder, 'using_temperature', (float) $params['temperature']);
         }
 
-        $max_tokens = isset($params['max_tokens']) ? $params['max_tokens'] : (isset($params['maxTokens']) ? $params['maxTokens'] : null);
+        $max_tokens = isset($params['max_tokens']) ? $params['max_tokens'] : null;
 
         if ($max_tokens !== null) {
             $builder = $this->chain($builder, 'using_max_tokens', (int) $max_tokens);

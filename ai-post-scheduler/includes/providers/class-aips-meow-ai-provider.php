@@ -89,8 +89,6 @@ class AIPS_Meow_AI_Provider implements AIPS_AI_Provider_Interface {
 
         if (isset($params['max_tokens'])) {
             $native['maxTokens'] = $params['max_tokens'];
-        } elseif (isset($params['maxTokens'])) {
-            $native['maxTokens'] = $params['maxTokens'];
         }
 
         if (isset($params['temperature'])) {

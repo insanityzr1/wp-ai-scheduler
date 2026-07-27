@@ -80,11 +80,9 @@ class AIPS_Meow_AI_Provider implements AIPS_AI_Provider_Interface {
             $native['model'] = $params['model'];
         }
 
-        // env_id (canonical) → envId (Meow). Tolerate a legacy 'envId' too.
+        // Translate canonical env_id to Meow's native envId parameter.
         if (!empty($params['env_id'])) {
             $native['envId'] = $params['env_id'];
-        } elseif (!empty($params['envId'])) {
-            $native['envId'] = $params['envId'];
         }
 
         if (isset($params['max_tokens'])) {
@@ -191,15 +189,14 @@ class AIPS_Meow_AI_Provider implements AIPS_AI_Provider_Interface {
         }
 
         // simpleJsonQuery supports only a limited parameter set (model, env_id).
-        $native = $this->map_params($params);
         $json_params = array();
 
-        if (!empty($native['model'])) {
-            $json_params['model'] = $native['model'];
+        if (!empty($params['model'])) {
+            $json_params['model'] = $params['model'];
         }
 
-        if (!empty($native['envId'])) {
-            $json_params['env_id'] = $native['envId'];
+        if (!empty($params['env_id'])) {
+            $json_params['env_id'] = $params['env_id'];
         }
 
         $result = $ai->simpleJsonQuery($prompt, $json_params);

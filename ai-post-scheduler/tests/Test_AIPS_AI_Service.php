@@ -363,9 +363,9 @@ class Test_AIPS_AI_Service extends WP_UnitTestCase {
     }
 
     /**
-     * Test that legacy env_id is normalized to envId and forwarded to the engine.
+     * Test that canonical env_id is translated for Meow AI Engine.
      */
-    public function test_prepare_options_legacy_env_id_accepted() {
+    public function test_prepare_options_env_id_translated_for_meow() {
         global $mwai;
         $original_mwai = $mwai;
 
@@ -375,32 +375,10 @@ class Test_AIPS_AI_Service extends WP_UnitTestCase {
 
         try {
             $service = new AIPS_AI_Service();
-            $result  = $service->generate_text('Prompt', array('env_id' => 'legacy-env'));
+            $result  = $service->generate_text('Prompt', array('env_id' => 'configured-env'));
 
             $this->assertNotInstanceOf('WP_Error', $result, 'Expected successful generation, got WP_Error.');
-            $this->assertSame('legacy-env', $capture->params['envId'], 'Legacy env_id should be normalized to envId.');
-        } finally {
-            $mwai = $original_mwai;
-        }
-    }
-
-    /**
-     * Test that envId passed directly is forwarded to the engine unchanged.
-     */
-    public function test_prepare_options_envId_direct_accepted() {
-        global $mwai;
-        $original_mwai = $mwai;
-
-        $capture = new stdClass();
-        $capture->params = null;
-        $mwai = $this->make_text_query_mock($capture);
-
-        try {
-            $service = new AIPS_AI_Service();
-            $result  = $service->generate_text('Prompt', array('envId' => 'direct-env'));
-
-            $this->assertNotInstanceOf('WP_Error', $result, 'Expected successful generation, got WP_Error.');
-            $this->assertSame('direct-env', $capture->params['envId'], 'envId should be forwarded as-is.');
+            $this->assertSame('configured-env', $capture->params['envId'], 'The Meow adapter should translate env_id to its native key.');
         } finally {
             $mwai = $original_mwai;
         }

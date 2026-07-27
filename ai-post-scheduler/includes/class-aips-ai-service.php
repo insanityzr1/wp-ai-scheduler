@@ -761,11 +761,6 @@ class AIPS_AI_Service implements AIPS_AI_Service_Interface {
 
         $options = wp_parse_args($options);
 
-        // Accept legacy 'envId' from callers; canonicalize to 'env_id'.
-        if (isset($options['envId']) && !isset($options['env_id'])) {
-            $options['env_id'] = $options['envId'];
-        }
-
         $options = wp_parse_args($options, $default_options);
         $params  = array();
 

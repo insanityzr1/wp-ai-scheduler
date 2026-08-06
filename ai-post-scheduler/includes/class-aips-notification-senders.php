@@ -403,6 +403,87 @@ class AIPS_Notification_Senders {
 	}
 
 	/**
+	 * Send a post-generated notification.
+	 *
+	 * Fires unconditionally for every successfully generated post, unlike
+	 * manual_generation_completed/post_ready_for_review which are conditional
+	 * on creation method / post status.
+	 *
+	 * @param array $payload Notification payload.
+	 * @return void
+	 */
+	public function post_generated( array $payload ) {
+		$post_id           = !empty($payload['post_id']) ? absint($payload['post_id']) : 0;
+		$post              = $post_id ? get_post($post_id) : null;
+		$post_title        = ($post && !empty($post->post_title)) ? $post->post_title : __('Untitled', 'ai-post-scheduler');
+		$source_label      = !empty($payload['source_label']) ? $payload['source_label'] : __('Unknown', 'ai-post-scheduler');
+		$post_status       = !empty($payload['post_status']) ? $payload['post_status'] : '';
+		$post_status_label = !empty($payload['post_status_label']) ? $payload['post_status_label'] : __('Unknown', 'ai-post-scheduler');
+
+		$title   = sprintf(__('Post generated: %s', 'ai-post-scheduler'), $post_title);
+		$message = sprintf(
+			/* translators: 1: source label (Template/Author) 2: post title 3: post status label */
+			__('%1$s generated post "%2$s" (%3$s).', 'ai-post-scheduler'),
+			$source_label,
+			$post_title,
+			$post_status_label
+		);
+
+		$edit_url = $post_id ? esc_url_raw(get_edit_post_link($post_id, 'raw')) : '';
+		$view_url = '';
+		if ($post) {
+			$view_url = ('publish' === $post_status) ? get_permalink($post_id) : get_preview_post_link($post);
+			$view_url = $view_url ? esc_url_raw($view_url) : '';
+		}
+
+		$post_excerpt = $post && !empty($post->post_excerpt)
+			? $post->post_excerpt
+			: ($post ? wp_trim_words(wp_strip_all_tags($post->post_content), 55) : '');
+
+		$post_content_html = $post ? wp_kses_post($post->post_content) : '';
+
+		$featured_image_row = '';
+		if ($post_id) {
+			$thumbnail_id = get_post_thumbnail_id($post_id);
+			if ($thumbnail_id) {
+				$image_url = get_the_post_thumbnail_url($post_id, 'large');
+				if ($image_url) {
+					$featured_image_row = '<tr><td style="padding:0;">'
+						. '<img src="' . esc_url($image_url) . '" alt="' . esc_attr($post_title) . '" style="width:100%;max-width:640px;height:auto;display:block;" />'
+						. '</td></tr>';
+				}
+			}
+		}
+
+		$vars = array(
+			'{{site_name}}'          => esc_html(get_bloginfo('name')),
+			'{{source_label}}'       => esc_html($source_label),
+			'{{post_status_label}}'  => esc_html($post_status_label),
+			'{{post_title}}'         => esc_html($post_title),
+			'{{post_excerpt}}'       => esc_html($post_excerpt),
+			'{{post_content}}'       => $post_content_html,
+			'{{featured_image_row}}' => $featured_image_row,
+			'{{edit_url}}'           => esc_url($edit_url),
+			'{{view_url}}'           => esc_url($view_url),
+		);
+
+		call_user_func(
+			$this->dispatcher,
+			'post_generated',
+			array(
+				'title'         => $title,
+				'message'       => $message,
+				'url'           => $edit_url,
+				'level'         => 'info',
+				'meta'          => $payload,
+				'dedupe_key'    => !empty($payload['dedupe_key'])    ? $payload['dedupe_key']          : ('post_generated_' . $post_id),
+				'dedupe_window' => !empty($payload['dedupe_window']) ? (int) $payload['dedupe_window'] : 60,
+				'vars'          => $vars,
+			)
+		);
+	}
+
+	/**
 	 * Send a daily digest summary notification.
 	 *
 	 * @param array $payload Summary payload.

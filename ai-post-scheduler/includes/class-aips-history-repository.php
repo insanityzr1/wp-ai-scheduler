@@ -240,7 +240,6 @@ class AIPS_History_Repository implements AIPS_History_Repository_Interface {
             'template_id' => 0,
             'campaign_id' => 0,
             'author_id' => 0,
-            'correlation_id' => '',
             'domain' => '',
             'actor' => '',
             'date_from' => '',
@@ -332,11 +331,6 @@ class AIPS_History_Repository implements AIPS_History_Repository_Interface {
         if (!empty($args['author_id'])) {
             $where_clauses[] = "h.author_id = %d";
             $where_args[] = $args['author_id'];
-        }
-
-        if (!empty($args['correlation_id'])) {
-            $where_clauses[] = "h.correlation_id = %s";
-            $where_args[] = sanitize_text_field($args['correlation_id']);
         }
 
         if (!empty($args['domain'])) {
@@ -858,6 +852,7 @@ class AIPS_History_Repository implements AIPS_History_Repository_Interface {
             'schedule_lifecycle',
             'template_lifecycle',
             'campaign_lifecycle',
+            'notification_sent',
         );
     }
 

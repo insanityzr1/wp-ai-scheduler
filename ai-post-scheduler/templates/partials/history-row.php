@@ -29,13 +29,17 @@ if (!defined('ABSPATH')) {
         <?php elseif (!empty($item->template_id)): ?>
         <span class="aips-history-subtitle"><?php echo esc_html(sprintf(__('Template #%d (deleted)', 'ai-post-scheduler'), $item->template_id)); ?></span>
         <?php endif; ?>
+        <?php if ($item->status === 'failed' && $item->error_message): ?>
+        <div class="aips-error-message" style="font-size: 12px; color: #dc3232; margin-top: 4px;"><?php echo esc_html($item->error_message); ?></div>
+        <?php endif; ?>
+    </td>
+    <td class="column-type">
         <?php if (!empty($item->creation_method)): ?>
         <span class="aips-badge aips-badge-neutral aips-creation-method-badge">
             <?php echo esc_html(AIPS_History::get_creation_method_label($item->creation_method)); ?>
         </span>
-        <?php endif; ?>
-        <?php if ($item->status === 'failed' && $item->error_message): ?>
-        <div class="aips-error-message" style="font-size: 12px; color: #dc3232; margin-top: 4px;"><?php echo esc_html($item->error_message); ?></div>
+        <?php else: ?>
+        <span class="aips-meta-text">&mdash;</span>
         <?php endif; ?>
     </td>
     <td class="column-status">
@@ -98,7 +102,7 @@ if (!defined('ABSPATH')) {
                    class="aips-row-action-item"
                    target="_blank"
                    rel="noopener noreferrer">
-                    <?php esc_html_e('View Post', 'ai-post-scheduler'); ?>
+                    <?php esc_html_e('View Topic', 'ai-post-scheduler'); ?>
                 </a>
                 <?php endif; ?>
                 <?php if ($item->status === 'failed' && $item->template_id): ?>

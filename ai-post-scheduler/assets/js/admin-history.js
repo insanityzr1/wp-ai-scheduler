@@ -509,9 +509,6 @@
 		/** @type {string} Actor filter value (cron, manual, etc.) */
 		actorFilter: '',
 
-		/** @type {string} Correlation ID filter for request tracing */
-		correlationId: '',
-
 		/** @type {string} Date range filter start (YYYY-MM-DD format) */
 		dateFrom: '',
 
@@ -549,7 +546,6 @@
 			this.statusFilter = $('#aips-filter-status').val() || '';
 			this.domainFilter = $('#aips-filter-domain').val() || '';
 			this.actorFilter = $('#aips-filter-actor').val() || '';
-			this.correlationId = $('#aips-filter-correlation').val() || '';
 			this.dateFrom = $('#aips-filter-date-from').val() || '';
 			this.dateTo = $('#aips-filter-date-to').val() || '';
 			this.searchQuery  = $('#aips-history-search-input').val() || '';
@@ -604,9 +600,6 @@
 
 			// Retry failed generation
 			$(document).on('click', '.aips-retry-generation', this.retryGeneration.bind(this));
-
-			// Clear history (failed / all)
-			$(document).on('click', '.aips-clear-history', this.clearHistory.bind(this));
 
 			/* --- Reload & Pagination Events --- */
 			// Reload button
@@ -1281,62 +1274,6 @@
 		},
 
 		/* ========================================================================
-		 * Clear History
-		 * ======================================================================== */
-
-		/**
-		 * Clear history by status (or all) after an accessible confirmation dialog.
-		 *
-		 * @param {Event} e - Click event from an `.aips-clear-history` element.
-		 */
-		clearHistory: function (e) {
-			e.preventDefault();
-
-			var status = $(e.currentTarget).data('status');
-			var msg    = status
-				? (aipsHistoryL10n.confirmClearStatus || 'Clear all history entries with this status? This cannot be undone.')
-				: (aipsHistoryL10n.confirmClearAll   || 'Clear all history? This cannot be undone.');
-
-			var self = this;
-
-			AIPS.Utilities.confirm(msg, 'Notice', [
-				{ label: aipsHistoryL10n.cancelLabel    || 'No, cancel', className: 'aips-btn aips-btn-primary' },
-				{ label: aipsHistoryL10n.confirmClearLabel || 'Yes, clear', className: 'aips-btn aips-btn-danger-solid', action: function () {
-					$.ajax({
-						url: aipsAjax.ajaxUrl,
-						type: 'POST',
-						data: {
-							action: 'aips_clear_history',
-							nonce: aipsAjax.nonce,
-							status: status
-						},
-						success: function (response) {
-							if (response.success) {
-								AIPS.Utilities.showToast(
-									response.data && response.data.message
-										? response.data.message
-										: (aipsHistoryL10n.clearedSuccess || 'History cleared.'),
-									'success'
-								);
-								self.reload();
-							} else {
-								AIPS.Utilities.showToast(
-									response.data && response.data.message
-										? response.data.message
-										: (aipsHistoryL10n.errorClearing || 'Error clearing history.'),
-									'error'
-								);
-							}
-						},
-						error: function () {
-							AIPS.Utilities.showToast(aipsHistoryL10n.errorClearing || 'Error clearing history.', 'error');
-						}
-					});
-				}}
-			]);
-		},
-
-		/* ========================================================================
 		 * Reload, Pagination, Filters & Search
 		 * ======================================================================== */
 
@@ -1395,7 +1332,6 @@
 					search: self.searchQuery,
 					domain: self.domainFilter,
 					actor: self.actorFilter,
-					correlation_id: self.correlationId,
 					date_from: self.dateFrom,
 					date_to: self.dateTo,
 					paged: paged
@@ -1501,13 +1437,12 @@
 			this.statusFilter = $('#aips-filter-status').val() || '';
 			this.domainFilter = $('#aips-filter-domain').val() || '';
 			this.actorFilter = $('#aips-filter-actor').val() || '';
-			this.correlationId = $('#aips-filter-correlation').val() || '';
 			this.dateFrom = $('#aips-filter-date-from').val() || '';
 			this.dateTo = $('#aips-filter-date-to').val() || '';
 
 			// Reflect change in the URL without reloading.
 			var url = new URL(window.location.href);
-			[['status', this.statusFilter], ['domain', this.domainFilter], ['actor', this.actorFilter], ['correlation_id', this.correlationId], ['date_from', this.dateFrom], ['date_to', this.dateTo]].forEach(function (entry) {
+			[['status', this.statusFilter], ['domain', this.domainFilter], ['actor', this.actorFilter], ['date_from', this.dateFrom], ['date_to', this.dateTo]].forEach(function (entry) {
 				if (entry[1]) {
 					url.searchParams.set(entry[0], entry[1]);
 				} else {
@@ -1614,7 +1549,6 @@
 			form.append($('<input type="hidden" name="search">').val(this.searchQuery));
 			form.append($('<input type="hidden" name="domain">').val(this.domainFilter));
 			form.append($('<input type="hidden" name="actor">').val(this.actorFilter));
-			form.append($('<input type="hidden" name="correlation_id">').val(this.correlationId));
 			form.append($('<input type="hidden" name="date_from">').val(this.dateFrom));
 			form.append($('<input type="hidden" name="date_to">').val(this.dateTo));
 			$('body').append(form);

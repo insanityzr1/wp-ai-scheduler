@@ -30,7 +30,6 @@ class AIPS_History {
         $this->repository = new AIPS_History_Repository();
         
         add_action('wp_ajax_aips_bulk_delete_history', array($this, 'ajax_bulk_delete_history'));
-        add_action('wp_ajax_aips_clear_history', array($this, 'ajax_clear_history'));
         add_action('wp_ajax_aips_export_history', array($this, 'ajax_export_history'));
         add_action('wp_ajax_aips_get_history_details', array($this, 'ajax_get_history_details'));
         add_action('wp_ajax_aips_get_history_logs', array($this, 'ajax_get_history_logs'));
@@ -125,27 +124,6 @@ class AIPS_History {
     }
 
     /**
-     * AJAX handler to clear history, optionally filtered by status.
-     *
-     * @return void
-     */
-    public function ajax_clear_history() {
-        if ( ! check_ajax_referer('aips_ajax_nonce', 'nonce', false) ) {
-            AIPS_Ajax_Response::error(__('Invalid nonce.', 'ai-post-scheduler'));
-        }
-
-        if (!current_user_can('manage_options')) {
-            AIPS_Ajax_Response::permission_denied();
-        }
-
-        $status = isset($_POST['status']) ? sanitize_text_field(wp_unslash($_POST['status'])) : '';
-
-        $this->clear_history($status);
-
-        AIPS_Ajax_Response::success(array(), __('History cleared successfully.', 'ai-post-scheduler'));
-    }
-
-    /**
      * AJAX handler to export history records as CSV.
      *
      * @return void
@@ -163,7 +141,6 @@ class AIPS_History {
         $search_query = isset($_POST['search']) ? sanitize_text_field(wp_unslash($_POST['search'])) : '';
         $domain_filter = isset($_POST['domain']) ? sanitize_key(wp_unslash($_POST['domain'])) : '';
         $actor_filter = isset($_POST['actor']) ? sanitize_key(wp_unslash($_POST['actor'])) : '';
-        $correlation_id = isset($_POST['correlation_id']) ? sanitize_text_field(wp_unslash($_POST['correlation_id'])) : '';
         $date_from = isset($_POST['date_from']) ? sanitize_text_field(wp_unslash($_POST['date_from'])) : '';
         $date_to = isset($_POST['date_to']) ? sanitize_text_field(wp_unslash($_POST['date_to'])) : '';
 
@@ -179,7 +156,6 @@ class AIPS_History {
             'search' => $search_query,
             'domain' => $domain_filter,
             'actor' => $actor_filter,
-            'correlation_id' => $correlation_id,
             'date_from' => $date_from,
             'date_to' => $date_to,
         ));
@@ -206,7 +182,7 @@ class AIPS_History {
             'Date',
             'Title',
             'Status',
-            'Template',
+            'History Type',
             'Post ID',
             'Error Message'
         ));
@@ -218,7 +194,7 @@ class AIPS_History {
                     $item->created_at,
                     $this->sanitize_csv_cell($item->generated_title),
                     $item->status,
-                    $this->sanitize_csv_cell($item->template_name),
+                    $this->sanitize_csv_cell(self::get_creation_method_label((string) $item->creation_method)),
                     $item->post_id,
                     $this->sanitize_csv_cell($item->error_message)
                 ));
@@ -1241,7 +1217,6 @@ class AIPS_History {
         $search_query = isset($_POST['search']) ? sanitize_text_field(wp_unslash($_POST['search'])) : '';
         $domain_filter = isset($_POST['domain']) ? sanitize_key(wp_unslash($_POST['domain'])) : '';
         $actor_filter = isset($_POST['actor']) ? sanitize_key(wp_unslash($_POST['actor'])) : '';
-        $correlation_id = isset($_POST['correlation_id']) ? sanitize_text_field(wp_unslash($_POST['correlation_id'])) : '';
         $date_from = isset($_POST['date_from']) ? sanitize_text_field(wp_unslash($_POST['date_from'])) : '';
         $date_to = isset($_POST['date_to']) ? sanitize_text_field(wp_unslash($_POST['date_to'])) : '';
         $paged = isset($_POST['paged']) ? max(1, absint($_POST['paged'])) : 1;
@@ -1252,7 +1227,6 @@ class AIPS_History {
             'search' => $search_query,
             'domain' => $domain_filter,
             'actor' => $actor_filter,
-            'correlation_id' => $correlation_id,
             'date_from' => $date_from,
             'date_to' => $date_to,
             'fields' => 'list',
@@ -1370,22 +1344,6 @@ class AIPS_History {
     }
 
     /**
-     * Clear history records, optionally filtered by status.
-     *
-     * @param string $status Status filter.
-     * @return mixed
-     */
-    public function clear_history($status = '') {
-        do_action('aips_history_before_delete', $status);
-
-        $result = $this->repository->delete_by_status($status);
-
-        do_action('aips_history_deleted', $status);
-
-        return $result;
-    }
-
-    /**
      * Render pagination HTML for history table (used by template and AJAX).
      *
      * @param array  $history       History result with total, pages, current_page.
@@ -1434,7 +1392,6 @@ class AIPS_History {
         $search_query = isset($_GET['s']) ? sanitize_text_field(wp_unslash($_GET['s'])) : '';
         $domain_filter = isset($_GET['domain']) ? sanitize_key(wp_unslash($_GET['domain'])) : '';
         $actor_filter = isset($_GET['actor']) ? sanitize_key(wp_unslash($_GET['actor'])) : '';
-        $correlation_id = isset($_GET['correlation_id']) ? sanitize_text_field(wp_unslash($_GET['correlation_id'])) : '';
         $date_from = isset($_GET['date_from']) ? sanitize_text_field(wp_unslash($_GET['date_from'])) : '';
         $date_to = isset($_GET['date_to']) ? sanitize_text_field(wp_unslash($_GET['date_to'])) : '';
 
@@ -1444,7 +1401,6 @@ class AIPS_History {
             'search' => $search_query,
             'domain' => $domain_filter,
             'actor' => $actor_filter,
-            'correlation_id' => $correlation_id,
             'date_from' => $date_from,
             'date_to' => $date_to,
             'fields' => 'list',

@@ -383,6 +383,21 @@
     min-width: 200px;
 }
 
+.aips-date-range-group {
+    display: flex;
+    align-items: center;
+    gap: var(--aips-space-1);
+}
+
+.aips-date-range-group .aips-form-input {
+    width: 130px;
+    min-width: 0;
+}
+
+.aips-date-range-sep {
+    color: var(--aips-gray-400, #a7aaad);
+}
+
 /* Pagination tablenav inside content panels.
    Override WordPress float-based layout with flexbox:
    count on the left, pagination links on the right. */

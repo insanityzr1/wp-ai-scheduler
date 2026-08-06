@@ -420,20 +420,29 @@ class AIPS_Notification_Senders {
 		$post_status       = !empty($payload['post_status']) ? $payload['post_status'] : '';
 		$post_status_label = !empty($payload['post_status_label']) ? $payload['post_status_label'] : __('Unknown', 'ai-post-scheduler');
 
-		$title   = sprintf(__('Post generated: %s', 'ai-post-scheduler'), $post_title);
+		$title   = $post_title;
 		$message = sprintf(
-			/* translators: 1: source label (Template/Author) 2: post title 3: post status label */
-			__('%1$s generated post "%2$s" (%3$s).', 'ai-post-scheduler'),
+			/* translators: 1: source label (Template/Author) 2: post status label */
+			__('%1$s — %2$s', 'ai-post-scheduler'),
 			$source_label,
-			$post_title,
 			$post_status_label
 		);
 
 		$edit_url = $post_id ? esc_url_raw(get_edit_post_link($post_id, 'raw')) : '';
-		$view_url = '';
-		if ($post) {
-			$view_url = ('publish' === $post_status) ? get_permalink($post_id) : get_preview_post_link($post);
-			$view_url = $view_url ? esc_url_raw($view_url) : '';
+
+		// Preview links carry a nonce tied to the current user/session at creation
+		// time. Post generation is frequently unauthenticated (cron/scheduled/bulk
+		// jobs), and even when it isn't, this URL is consumed later — by whoever
+		// opens the email — not synchronously by its creator. A baked-in preview
+		// nonce will not validate for that later viewer, so non-published posts
+		// route to the edit screen instead, where a fresh Preview button is
+		// generated for whoever is actually looking at it.
+		$view_url = $edit_url;
+		if ($post && 'publish' === $post_status) {
+			$permalink = get_permalink($post_id);
+			if ($permalink) {
+				$view_url = esc_url_raw($permalink);
+			}
 		}
 
 		$post_excerpt = $post && !empty($post->post_excerpt)

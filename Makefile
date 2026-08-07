@@ -1,7 +1,21 @@
 # Makefile for AI Post Scheduler Docker Development Environment
 # Provides convenient shortcuts for common Docker operations
 
-.PHONY: help build up down restart logs shell wp-shell db-shell clean rebuild install test test-coverage reload-php xdebug-log-follow sync-wp-core
+.PHONY: help build up down restart logs shell wp-shell db-shell clean rebuild install test test-coverage reload-php xdebug-log-follow sync-wp-core \
+	qa-build qa-up qa-seed qa-down qa-list qa-logs qa-shell qa-urls
+
+# --- QA build arguments ------------------------------------------------------
+# PRS   comma or space separated pull request ids, e.g. PRS=1887,1888
+# DB    database mode for qa-up: seed | keep | fresh | clone:<key>
+# FILE  path to a production .sql/.sql.gz dump to cache as the seed
+# PR    set to 1 to also open a draft pull request for the build
+# FORCE set to 1 to rebuild an existing build from a fresh main
+# PURGE set to 1 to delete volumes and worktree on qa-down
+QA_DB_ARG := $(if $(DB),--db $(DB),)
+QA_FILE_ARG := $(if $(FILE),--file $(FILE),)
+QA_PR_ARG := $(if $(PR),--pr,)
+QA_FORCE_ARG := $(if $(FORCE),--force,)
+QA_PURGE_ARG := $(if $(PURGE),--purge,)
 
 # Default target
 .DEFAULT_GOAL := help
@@ -188,3 +202,40 @@ sync-wp-core: ## Sync /var/www/html from web container into ./.docker/wp-html fo
 	@echo "$(BLUE)Syncing WordPress files from container...$(NC)"
 	bash ./scripts/sync-wp-core.sh
 	@echo "$(GREEN)Sync complete.$(NC)"
+
+# =============================================================================
+# QA builds — bundle N open PRs onto one branch and run it on production data
+# =============================================================================
+
+require-prs:
+	@test -n "$(PRS)" || { \
+		echo "$(RED)PRS is required, e.g. make $(MAKECMDGOALS) PRS=1887,1888$(NC)"; \
+		exit 1; \
+	}
+
+qa-build: require-prs ## Bundle PRs onto a fresh qa-build branch (PRS=, PR=1, FORCE=1)
+	bash ./scripts/qa-build.sh --prs "$(PRS)" $(QA_PR_ARG) $(QA_FORCE_ARG)
+
+qa-up: require-prs ## Start a QA build's isolated stack (PRS=, DB=seed|keep|fresh|clone:key)
+	bash ./scripts/qa-up.sh --prs "$(PRS)" $(QA_DB_ARG)
+
+qa-seed: require-prs ## Load the production dump into a QA build (PRS=, FILE=dump.sql)
+	bash ./scripts/qa-seed.sh --prs "$(PRS)" $(QA_FILE_ARG)
+
+qa-down: ## Stop a QA build (PRS=, PURGE=1 to delete volumes and worktree, or ALL=1)
+	bash ./scripts/qa-down.sh $(if $(ALL),--all,--prs "$(PRS)") $(QA_PURGE_ARG)
+
+qa-list: ## List all QA builds with ports, state and bundled PRs
+	@bash ./scripts/qa-list.sh
+
+qa-logs: require-prs ## Follow logs for a QA build (PRS=)
+	bash ./scripts/qa-compose.sh --prs "$(PRS)" -- logs -f
+
+qa-shell: require-prs ## Open a shell in a QA build's web container (PRS=)
+	bash ./scripts/qa-compose.sh --prs "$(PRS)" -- exec web bash
+
+qa-db-shell: require-prs ## Open a MySQL shell in a QA build's database (PRS=)
+	bash ./scripts/qa-compose.sh --prs "$(PRS)" -- exec db mysql -u wordpress -pwordpress wordpress
+
+qa-urls: ## Show URLs for every QA build
+	@bash ./scripts/qa-list.sh

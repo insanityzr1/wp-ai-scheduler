@@ -8,7 +8,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 ?>
-<tr>
+<tr class="aips-history-row aips-view-history-logs" data-id="<?php echo esc_attr($item->id); ?>" tabindex="0" aria-label="<?php echo esc_attr(sprintf(__('Open details for %s', 'ai-post-scheduler'), AIPS_History::get_display_title($item))); ?>">
     <th scope="row" class="check-column">
         <label class="screen-reader-text" for="cb-select-<?php echo esc_attr($item->id); ?>">
             <?php esc_html_e('Select Item', 'ai-post-scheduler'); ?>
@@ -29,17 +29,8 @@ if (!defined('ABSPATH')) {
         <?php elseif (!empty($item->template_id)): ?>
         <span class="aips-history-subtitle"><?php echo esc_html(sprintf(__('Template #%d (deleted)', 'ai-post-scheduler'), $item->template_id)); ?></span>
         <?php endif; ?>
-        <?php if ($item->status === 'failed' && $item->error_message): ?>
-        <div class="aips-error-message" style="font-size: 12px; color: #dc3232; margin-top: 4px;"><?php echo esc_html($item->error_message); ?></div>
-        <?php endif; ?>
-    </td>
-    <td class="column-type">
-        <?php if (!empty($item->creation_method)): ?>
-        <span class="aips-badge aips-badge-neutral aips-creation-method-badge">
-            <?php echo esc_html(AIPS_History::get_creation_method_label($item->creation_method)); ?>
-        </span>
-        <?php else: ?>
-        <span class="aips-meta-text">&mdash;</span>
+        <?php if (!empty($item->latest_message)): ?>
+        <span class="aips-history-latest-message"><?php echo esc_html(wp_trim_words((string) $item->latest_message, 14)); ?></span>
         <?php endif; ?>
     </td>
     <td class="column-status">
@@ -67,18 +58,24 @@ if (!defined('ABSPATH')) {
             <span class="dashicons dashicons-<?php echo esc_attr($icon); ?>"></span>
             <?php echo esc_html(ucfirst($item->status)); ?>
         </span>
+        <?php if ($item->error_count > 0 || $item->warning_count > 0): ?>
+            <span class="aips-history-issue-counts">
+                <?php if ($item->error_count > 0): ?><span class="aips-history-count-error"><?php echo esc_html(sprintf(_n('%d error', '%d errors', $item->error_count, 'ai-post-scheduler'), $item->error_count)); ?></span><?php endif; ?>
+                <?php if ($item->warning_count > 0): ?><span><?php echo esc_html(sprintf(_n('%d warning', '%d warnings', $item->warning_count, 'ai-post-scheduler'), $item->warning_count)); ?></span><?php endif; ?>
+            </span>
+        <?php endif; ?>
+    </td>
+    <td class="column-type">
+        <strong><?php echo !empty($item->creation_method) ? esc_html(AIPS_History::get_creation_method_label($item->creation_method)) : '&mdash;'; ?></strong>
+        <span class="aips-history-activity-meta">
+            <?php if (!empty($item->duration_label)): ?><span><?php echo esc_html($item->duration_label); ?></span><?php endif; ?>
+            <?php if ($item->ai_call_count > 0): ?><span><?php echo esc_html(sprintf(_n('%d AI call', '%d AI calls', $item->ai_call_count, 'ai-post-scheduler'), $item->ai_call_count)); ?></span><?php endif; ?>
+        </span>
     </td>
     <td class="column-date">
-        <span class="aips-meta-text"><?php echo esc_html($item->formatted_date); ?></span>
-    </td>
-    <td class="column-actions">
+        <time class="aips-meta-text" datetime="<?php echo esc_attr(wp_date('c', (int) $item->created_at)); ?>" title="<?php echo esc_attr($item->formatted_date); ?>"><?php echo esc_html($item->relative_date); ?></time>
         <div class="cell-actions">
             <div class="aips-row-action-group">
-                <button type="button"
-                        class="aips-btn aips-btn-sm aips-btn-secondary aips-view-history-logs"
-                        data-id="<?php echo esc_attr($item->id); ?>">
-                    <?php esc_html_e('View Logs', 'ai-post-scheduler'); ?>
-                </button>
                 <button type="button"
                         class="aips-btn aips-btn-sm aips-btn-secondary aips-row-action-overflow-toggle"
                         aria-haspopup="true"

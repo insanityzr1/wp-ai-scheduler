@@ -16,6 +16,7 @@
 # OPTIONS
 #   --prs <list>    Comma or space separated PR ids (also accepted positionally)
 #   --base <ref>    Base branch to build from (default: main)
+#   --port <n>      Pin the WordPress port (default: a random free one)
 #   --pr            Push the branch and open a draft pull request for the build
 #   --push          Push the branch without opening a pull request
 #   --force         Rebuild a build that already exists
@@ -31,6 +32,7 @@ source "$SCRIPT_DIR/qa-lib.sh"
 
 PRS_INPUT=""
 BASE_BRANCH="$QA_BASE_BRANCH"
+WP_PORT_INPUT=""
 CREATE_PR=0
 DO_PUSH=0
 FORCE=0
@@ -59,6 +61,14 @@ parse_args() {
 			;;
 		--base=*)
 			BASE_BRANCH="${1#*=}"
+			shift
+			;;
+		--port)
+			WP_PORT_INPUT="$2"
+			shift 2
+			;;
+		--port=*)
+			WP_PORT_INPUT="${1#*=}"
 			shift
 			;;
 		--pr)
@@ -229,11 +239,21 @@ main() {
 		echo "${already[*]:-}"
 	)"
 
-	local port_index
-	if qa_state_exists "$key"; then
-		port_index="$(sed -n 's/^QA_PORT_INDEX=//p' "$(qa_state_file "$key")" | head -n1)"
+	# Ports are assigned once and kept across rebuilds, so a build's URL stays
+	# put — unless --port explicitly asks for a different one.
+	local wp_port db_port pma_port xdebug_port
+	if qa_state_exists "$key" && [[ -z "$WP_PORT_INPUT" ]]; then
+		local existing
+		existing="$(qa_state_file "$key")"
+		wp_port="$(sed -n 's/^QA_WP_PORT=//p' "$existing" | head -n1)"
+		db_port="$(sed -n 's/^QA_DB_PORT=//p' "$existing" | head -n1)"
+		pma_port="$(sed -n 's/^QA_PMA_PORT=//p' "$existing" | head -n1)"
+		xdebug_port="$(sed -n 's/^QA_XDEBUG_PORT=//p' "$existing" | head -n1)"
 	fi
-	[[ -n "${port_index:-}" ]] || port_index="$(qa_allocate_port_index "$key")"
+
+	if [[ -z "${wp_port:-}" ]]; then
+		read -r wp_port db_port pma_port xdebug_port < <(qa_allocate_ports "$key" "$WP_PORT_INPUT")
+	fi
 
 	qa_save_state "$key" \
 		"QA_KEY=$key" \
@@ -242,11 +262,10 @@ main() {
 		"QA_BASE=$BASE_BRANCH" \
 		"QA_PROJECT=$project" \
 		"QA_SRC=$src_dir" \
-		"QA_PORT_INDEX=$port_index" \
-		"QA_WP_PORT=$((QA_WP_PORT_BASE + port_index))" \
-		"QA_DB_PORT=$((QA_DB_PORT_BASE + port_index))" \
-		"QA_PMA_PORT=$((QA_PMA_PORT_BASE + port_index))" \
-		"QA_XDEBUG_PORT=$((QA_XDEBUG_PORT_BASE + port_index))" \
+		"QA_WP_PORT=$wp_port" \
+		"QA_DB_PORT=$db_port" \
+		"QA_PMA_PORT=$pma_port" \
+		"QA_XDEBUG_PORT=$xdebug_port" \
 		"QA_MERGED=$merged_csv" \
 		"QA_SKIPPED=$skipped_csv" \
 		"QA_ALREADY=$already_csv" \
@@ -280,6 +299,11 @@ main() {
 		[[ "$HAS_GH" -eq 1 ]] || qa_die "--pr needs an authenticated GitHub CLI (run: gh auth login)"
 		create_draft_pr "$key" "$prs" "$branch" "$merged_csv" "$skipped_csv" "$already_csv"
 	fi
+
+	# After any push, so the pushed branch matches the merge result exactly
+	# rather than carrying regenerated autoloader files.
+	qa_provision_vendor "$src_dir"
+	qa_set_state "$key" QA_VENDOR_PROVISIONED "1"
 
 	echo
 	qa_ok "Build ready. Start it with: make qa-up PRS=$prs"

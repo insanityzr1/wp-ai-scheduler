@@ -35,6 +35,7 @@
 #   --build <key>         Existing build key, e.g. 1887-1888
 #   --db <mode>           Database mode, see above
 #   --uploads-mode <mode> Media mode, see above
+#   --port <n>            Move this build to a specific WordPress port
 #   --rebuild             Rebuild the shared QA web image first
 #   --no-auto-build       Fail instead of creating the branch when it is missing
 #   -h, --help            Show this help
@@ -46,12 +47,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=scripts/qa-lib.sh
 source "$SCRIPT_DIR/qa-lib.sh"
 
-QA_IMAGE="wp-ai-scheduler-qa:latest"
-
 PRS_INPUT=""
 BUILD_KEY=""
 DB_MODE=""
 UPLOADS_MODE=""
+WP_PORT_INPUT=""
 REBUILD=0
 AUTO_BUILD=1
 
@@ -69,6 +69,8 @@ parse_args() {
 		--db=*) DB_MODE="${1#*=}" && shift ;;
 		--uploads-mode) UPLOADS_MODE="$2" && shift 2 ;;
 		--uploads-mode=*) UPLOADS_MODE="${1#*=}" && shift ;;
+		--port) WP_PORT_INPUT="$2" && shift 2 ;;
+		--port=*) WP_PORT_INPUT="${1#*=}" && shift ;;
 		--rebuild) REBUILD=1 && shift ;;
 		--no-auto-build) AUTO_BUILD=0 && shift ;;
 		-h | --help)
@@ -175,6 +177,15 @@ main() {
 	[[ -d "$QA_SRC" ]] ||
 		qa_die "worktree missing at $QA_SRC — rebuild with: make qa-build PRS=$QA_PRS FORCE=1"
 
+	# Must settle before `compose up`, since it decides what gets published.
+	PREVIOUS_WP_PORT="$QA_WP_PORT"
+	if [[ -n "$WP_PORT_INPUT" && "$WP_PORT_INPUT" != "$QA_WP_PORT" ]]; then
+		QA_WP_PORT="$(qa_pick_port "$QA_WP_PORT_MIN" "$QA_WP_PORT_MAX" \
+			"$QA_KEY" "$WP_PORT_INPUT" "WordPress port")"
+		qa_set_state "$QA_KEY" QA_WP_PORT "$QA_WP_PORT"
+		qa_warn "WordPress port reassigned ${PREVIOUS_WP_PORT} -> ${QA_WP_PORT}"
+	fi
+
 	qa_info "Starting QA build ${QA_GREEN}${QA_BRANCH}${QA_NC}"
 	qa_dim "  project    : ${QA_PROJECT}"
 	qa_dim "  ports      : wp ${QA_WP_PORT} · db ${QA_DB_PORT} · pma ${QA_PMA_PORT} · xdebug ${QA_XDEBUG_PORT}"
@@ -185,6 +196,13 @@ main() {
 	echo
 
 	ensure_image
+
+	# Builds created before this was wired in, or whose worktree was rebuilt
+	# by hand, still need a runtime-correct autoloader.
+	if [[ "${QA_VENDOR_PROVISIONED:-}" != "1" ]]; then
+		qa_provision_vendor "$QA_SRC"
+		qa_set_state "$QA_KEY" QA_VENDOR_PROVISIONED "1"
+	fi
 
 	# A vanilla install has to start from empty core *and* database: wp-config.php
 	# survives in the core volume and would make the entrypoint skip installation.
@@ -210,7 +228,28 @@ main() {
 			--from-build "${DB_MODE#clone:}" --uploads-mode "$UPLOADS_MODE"
 		;;
 	keep | fresh)
-		qa_wp_full plugin activate ai-post-scheduler >/dev/null 2>&1 || true
+		# A reassigned port leaves the previous one baked into siteurl/home and
+		# into post content. Seed and clone rewrite URLs themselves; keep/fresh
+		# have to be fixed up here.
+		if [[ "$QA_WP_PORT" != "$PREVIOUS_WP_PORT" ]]; then
+			qa_info "Rewriting stored site URLs for the new port..."
+			qa_wp option update home "http://localhost:${QA_WP_PORT}" >/dev/null 2>&1 || true
+			qa_wp option update siteurl "http://localhost:${QA_WP_PORT}" >/dev/null 2>&1 || true
+			qa_wp search-replace "http://localhost:${PREVIOUS_WP_PORT}" \
+				"http://localhost:${QA_WP_PORT}" \
+				--all-tables --skip-columns=guid --report-changed-only >/dev/null 2>&1 || true
+		fi
+
+		# The entrypoint normally activates the plugin already; this is the
+		# safety net for when it could not. Never swallow a failure here — a
+		# silent one looks like a healthy stack with the plugin quietly missing.
+		if qa_wp_full plugin is-active ai-post-scheduler >/dev/null 2>&1; then
+			qa_ok "plugin active"
+		elif qa_wp_full plugin activate ai-post-scheduler 2>&1 | sed 's/^/    /'; then
+			qa_ok "plugin activated"
+		else
+			qa_warn "plugin activation failed — see the output above"
+		fi
 
 		# Media registered (or switched to copy mode) after this build was first
 		# seeded still belongs here — but only fill an empty uploads directory,

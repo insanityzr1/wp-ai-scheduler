@@ -75,9 +75,10 @@ make qa-list                               # every build, its ports and state
 make qa-down PRS=1887,1888 PURGE=1         # stop and delete
 ```
 
-Each build runs in its own compose project on offset ports (8100+, 3400+, 8300+), so QA
-builds coexist with `make up` on 8080 and with each other. A PR that conflicts is skipped
-and reported rather than failing the bundle. See `docs/QA_BUILDS.md`.
+Each build runs in its own compose project on a random free port (WordPress 8100-8299,
+pinnable with `PORT=`), so QA builds coexist with `make up` on 8080 and with each other.
+A PR that conflicts is skipped and reported rather than failing the bundle.
+See `docs/QA_BUILDS.md`.
 
 Performance benchmarks:
 

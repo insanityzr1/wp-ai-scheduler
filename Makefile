@@ -10,6 +10,7 @@
 # FILE  path to a production .sql/.sql.gz dump to cache as the seed
 # UPLOADS       path to production media (directory, .zip, .tar.gz) to cache
 # UPLOADS_MODE  copy (default, isolated) | mount (shared) | skip
+# PORT  pin the WordPress port; omitted means a random free one
 # PR    set to 1 to also open a draft pull request for the build
 # FORCE set to 1 to rebuild an existing build from a fresh main
 # PURGE set to 1 to delete volumes and worktree on qa-down
@@ -17,6 +18,7 @@ QA_DB_ARG := $(if $(DB),--db $(DB),)
 QA_FILE_ARG := $(if $(FILE),--file $(FILE),)
 QA_UPLOADS_ARG := $(if $(UPLOADS),--uploads $(UPLOADS),)
 QA_UPLOADS_MODE_ARG := $(if $(UPLOADS_MODE),--uploads-mode $(UPLOADS_MODE),)
+QA_PORT_ARG := $(if $(PORT),--port $(PORT),)
 QA_PR_ARG := $(if $(PR),--pr,)
 QA_FORCE_ARG := $(if $(FORCE),--force,)
 QA_PURGE_ARG := $(if $(PURGE),--purge,)
@@ -217,11 +219,11 @@ require-prs:
 		exit 1; \
 	}
 
-qa-build: require-prs ## Bundle PRs onto a fresh qa-build branch (PRS=, PR=1, FORCE=1)
-	bash ./scripts/qa-build.sh --prs "$(PRS)" $(QA_PR_ARG) $(QA_FORCE_ARG)
+qa-build: require-prs ## Bundle PRs onto a fresh qa-build branch (PRS=, PR=1, FORCE=1, PORT=)
+	bash ./scripts/qa-build.sh --prs "$(PRS)" $(QA_PR_ARG) $(QA_FORCE_ARG) $(QA_PORT_ARG)
 
-qa-up: require-prs ## Start a QA build's isolated stack (PRS=, DB=seed|keep|fresh|clone:key)
-	bash ./scripts/qa-up.sh --prs "$(PRS)" $(QA_DB_ARG) $(QA_UPLOADS_MODE_ARG)
+qa-up: require-prs ## Start a QA build's isolated stack (PRS=, DB=seed|keep|fresh|clone:key, PORT=)
+	bash ./scripts/qa-up.sh --prs "$(PRS)" $(QA_DB_ARG) $(QA_UPLOADS_MODE_ARG) $(QA_PORT_ARG)
 
 qa-seed: require-prs ## Load production DB + media into a QA build (PRS=, FILE=dump.sql, UPLOADS=uploads.zip)
 	bash ./scripts/qa-seed.sh --prs "$(PRS)" $(QA_FILE_ARG) $(QA_UPLOADS_ARG) $(QA_UPLOADS_MODE_ARG)

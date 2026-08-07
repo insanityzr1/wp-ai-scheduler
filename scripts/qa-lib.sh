@@ -24,18 +24,28 @@
 # URL-encoded (%2C) on github.com; set QA_ID_SEPARATOR=- for hyphens instead.
 : "${QA_ID_SEPARATOR:=,}"
 
-# Base ports. Each build claims the same index across all four ranges, so
-# build #0 gets 8100/3400/8300/9100 and build #1 gets 8101/3401/8301/9101.
-# These sit clear of the main dev stack (8080/3307/8082/9003).
-: "${QA_WP_PORT_BASE:=8100}"
-: "${QA_DB_PORT_BASE:=3400}"
-: "${QA_PMA_PORT_BASE:=8300}"
-: "${QA_XDEBUG_PORT_BASE:=9100}"
-: "${QA_PORT_RANGE:=100}"
+# Port ranges, one per service and deliberately non-overlapping. A build draws
+# a random free port from each range and remembers it, so builds created at
+# different times do not queue up behind each other on adjacent numbers and a
+# torn-down build's port is not immediately handed to the next one. Pass an
+# explicit WordPress port with --port when you want a stable, memorable URL.
+# All four ranges sit clear of the main dev stack (8080/3307/8082/9003).
+: "${QA_WP_PORT_MIN:=8100}"
+: "${QA_WP_PORT_MAX:=8299}"
+: "${QA_PMA_PORT_MIN:=8300}"
+: "${QA_PMA_PORT_MAX:=8399}"
+: "${QA_DB_PORT_MIN:=3400}"
+: "${QA_DB_PORT_MAX:=3499}"
+: "${QA_XDEBUG_PORT_MIN:=9100}"
+: "${QA_XDEBUG_PORT_MAX:=9199}"
 
 : "${QA_DIR_NAME:=.qa-builds}"
 : "${QA_BASE_BRANCH:=main}"
 : "${QA_REMOTE:=origin}"
+
+# One image shared by every QA build; only the bind-mounted plugin source and
+# the database differ between them.
+: "${QA_IMAGE:=wp-ai-scheduler-qa:latest}"
 
 # -----------------------------------------------------------------------------
 # Output
@@ -195,9 +205,9 @@ qa_port_free() {
 	return 0
 }
 
-# Ports already claimed by other builds' state files, so two builds never
-# collide even while both are stopped.
-qa_claimed_indexes() {
+# Ports already recorded by other builds, so two builds never collide even
+# while both are stopped and nothing is listening.
+qa_claimed_ports() {
 	local self="$1"
 	local key file
 
@@ -206,34 +216,68 @@ qa_claimed_indexes() {
 		[[ "$key" != "$self" ]] || continue
 		file="$(qa_state_file "$key")"
 		[[ -f "$file" ]] || continue
-		sed -n 's/^QA_PORT_INDEX=//p' "$file"
+		sed -n 's/^QA_\(WP\|DB\|PMA\|XDEBUG\)_PORT=//p' "$file"
 	done < <(qa_list_keys)
 }
 
-# Find the lowest index whose four ports are all free and unclaimed.
-qa_allocate_port_index() {
-	local self="$1"
+# Pick a free port from a range. With a preferred port, validate and use it;
+# otherwise sample the range at random, falling back to a linear scan so a
+# crowded range still resolves rather than failing by bad luck.
+qa_pick_port() {
+	local min="$1" max="$2" self="$3" preferred="${4:-}" label="${5:-port}"
 	local -a claimed
-	mapfile -t claimed < <(qa_claimed_indexes "$self")
+	mapfile -t claimed < <(qa_claimed_ports "$self")
 
-	local i taken c
-	for ((i = 0; i < QA_PORT_RANGE; i++)); do
-		taken=0
+	_qa_claimed() {
+		local candidate="$1" c
 		for c in "${claimed[@]:-}"; do
-			[[ "$c" == "$i" ]] && taken=1 && break
+			[[ "$c" == "$candidate" ]] && return 0
 		done
-		[[ "$taken" -eq 0 ]] || continue
+		return 1
+	}
 
-		if qa_port_free "$((QA_WP_PORT_BASE + i))" &&
-			qa_port_free "$((QA_DB_PORT_BASE + i))" &&
-			qa_port_free "$((QA_PMA_PORT_BASE + i))" &&
-			qa_port_free "$((QA_XDEBUG_PORT_BASE + i))"; then
-			printf '%s' "$i"
+	if [[ -n "$preferred" ]]; then
+		[[ "$preferred" =~ ^[0-9]+$ ]] && [[ "$preferred" -ge 1 && "$preferred" -le 65535 ]] ||
+			qa_die "invalid $label '$preferred' (expected 1-65535)"
+		_qa_claimed "$preferred" &&
+			qa_die "$label $preferred is already assigned to another QA build (see 'make qa-list')"
+		qa_port_free "$preferred" ||
+			qa_die "$label $preferred is already in use on this machine"
+		printf '%s' "$preferred"
+		return 0
+	fi
+
+	local span=$((max - min + 1))
+	local attempt port
+	for ((attempt = 0; attempt < 60; attempt++)); do
+		port=$((min + RANDOM % span))
+		if ! _qa_claimed "$port" && qa_port_free "$port"; then
+			printf '%s' "$port"
 			return 0
 		fi
 	done
 
-	qa_die "no free port slot found in the first $QA_PORT_RANGE offsets — tear down an old build with 'make qa-down'"
+	for ((port = min; port <= max; port++)); do
+		if ! _qa_claimed "$port" && qa_port_free "$port"; then
+			printf '%s' "$port"
+			return 0
+		fi
+	done
+
+	qa_die "no free $label available in ${min}-${max} — tear down an old build with 'make qa-down'"
+}
+
+# Assign this build's four ports, echoing them as WP DB PMA XDEBUG.
+qa_allocate_ports() {
+	local self="$1" preferred_wp="${2:-}"
+
+	# Trailing newline matters: callers use `read`, which reports failure on an
+	# unterminated line and would abort them under `set -e`.
+	printf '%s %s %s %s\n' \
+		"$(qa_pick_port "$QA_WP_PORT_MIN" "$QA_WP_PORT_MAX" "$self" "$preferred_wp" "WordPress port")" \
+		"$(qa_pick_port "$QA_DB_PORT_MIN" "$QA_DB_PORT_MAX" "$self" "" "database port")" \
+		"$(qa_pick_port "$QA_PMA_PORT_MIN" "$QA_PMA_PORT_MAX" "$self" "" "phpMyAdmin port")" \
+		"$(qa_pick_port "$QA_XDEBUG_PORT_MIN" "$QA_XDEBUG_PORT_MAX" "$self" "" "Xdebug port")"
 }
 
 # -----------------------------------------------------------------------------
@@ -302,7 +346,24 @@ qa_wait_for_db() {
 qa_wait_for_wp() {
 	qa_info "Waiting for WordPress to finish provisioning..."
 
-	for _ in $(seq 1 90); do
+	# Apache is started by CMD, which only runs once the entrypoint has finished
+	# installing core and activating the plugin. A listening port is therefore
+	# the signal that provisioning is complete. Polling `wp core is-installed`
+	# alone is not: it returns true partway through the entrypoint, so callers
+	# race the activation the entrypoint is still doing.
+	local listening=0 _
+	for _ in $(seq 1 120); do
+		if ! qa_port_free "$QA_WP_PORT"; then
+			listening=1
+			break
+		fi
+		sleep 2
+	done
+
+	[[ "$listening" -eq 1 ]] ||
+		qa_die "WordPress did not start serving on port ${QA_WP_PORT} in time (try: make qa-logs PRS=$QA_PRS)"
+
+	for _ in $(seq 1 30); do
 		if qa_compose exec -T web wp core is-installed \
 			--path=/var/www/html --skip-plugins --skip-themes --allow-root >/dev/null 2>&1; then
 			qa_ok "WordPress ready"
@@ -311,7 +372,7 @@ qa_wait_for_wp() {
 		sleep 2
 	done
 
-	qa_die "WordPress did not become ready in time (try: make qa-logs PRS=$QA_PRS)"
+	qa_die "WordPress is serving but not installed (try: make qa-logs PRS=$QA_PRS)"
 }
 
 # WP-CLI inside the build's web container. --skip-plugins/--skip-themes keeps
@@ -355,3 +416,43 @@ qa_git_retry() {
 }
 
 qa_has_gh() { command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; }
+
+# -----------------------------------------------------------------------------
+# Plugin autoloader
+# -----------------------------------------------------------------------------
+
+# A fresh worktree carries only the autoloader files the repo commits, and those
+# were generated *with* dev requirements — autoload_real.php requires
+# myclabs/deep-copy, a PHPUnit transitive that only exists after `composer
+# install`. Loading the plugin from an unprovisioned worktree therefore fatals.
+#
+# Regenerating with --no-dev fixes it, needs no network (the plugin has no
+# runtime requirements beyond PHP itself), and is what the build should run
+# anyway.
+qa_provision_vendor() {
+	local src="$1"
+	local plugin_dir="${src}/ai-post-scheduler"
+
+	[[ -f "${plugin_dir}/composer.json" ]] || return 0
+
+	if command -v composer >/dev/null 2>&1; then
+		if (cd "$plugin_dir" && composer dump-autoload --no-dev --no-interaction --quiet) 2>/dev/null; then
+			qa_ok "plugin autoloader regenerated (--no-dev)"
+			return 0
+		fi
+		qa_warn "host composer could not regenerate the autoloader — trying the QA image"
+	fi
+
+	if docker image inspect "$QA_IMAGE" >/dev/null 2>&1; then
+		if docker run --rm -v "${plugin_dir}:/app" -w /app \
+			-e COMPOSER_ALLOW_SUPERUSER=1 --entrypoint composer \
+			"$QA_IMAGE" dump-autoload --no-dev --no-interaction --quiet 2>/dev/null; then
+			qa_ok "plugin autoloader regenerated in the QA image (--no-dev)"
+			return 0
+		fi
+	fi
+
+	qa_warn "could not regenerate the plugin autoloader; activation will fatal. Fix with:"
+	qa_warn "  (cd ${plugin_dir} && composer dump-autoload --no-dev)"
+	return 0
+}

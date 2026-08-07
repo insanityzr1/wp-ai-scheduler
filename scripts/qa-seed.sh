@@ -262,6 +262,40 @@ repair_table_prefix() {
 		qa_wp config set table_prefix "$prefix" >/dev/null
 	fi
 	qa_ok "table prefix: ${prefix}"
+
+	repair_prefixed_keys "$prefix"
+}
+
+# WordPress derives a handful of option and usermeta keys from the table
+# prefix. A dump whose tables were renamed without renaming those keys — what a
+# naive prefix migration produces — leaves every user with no role at all, which
+# surfaces much later as a confusing permissions problem. Detect and repair it.
+repair_prefixed_keys() {
+	local prefix="$1"
+	local roles_option old_prefix key
+
+	roles_option="$(qa_compose exec -T db mysql -N -B -u wordpress -pwordpress \
+		-e "SELECT option_name FROM wordpress.${prefix}options WHERE option_name LIKE '%user_roles' LIMIT 1;" 2>/dev/null | tr -d '\r')"
+
+	[[ -n "$roles_option" ]] || return 0
+	[[ "$roles_option" != "${prefix}user_roles" ]] || return 0
+
+	old_prefix="${roles_option%user_roles}"
+	qa_warn "dump's role/capability keys use '${old_prefix}' but its tables use '${prefix}' — repairing"
+
+	qa_compose exec -T db mysql -u wordpress -pwordpress wordpress \
+		-e "UPDATE ${prefix}options SET option_name='${prefix}user_roles' WHERE option_name='${old_prefix}user_roles';" \
+		>/dev/null 2>&1 || qa_warn "could not rename the user_roles option"
+
+	# Only the keys WordPress itself derives from the prefix. Renaming anything
+	# that merely starts with the old prefix would clobber unrelated plugin data.
+	for key in capabilities user_level user-settings user-settings-time dashboard_quick_press_last_post_id; do
+		qa_compose exec -T db mysql -u wordpress -pwordpress wordpress \
+			-e "UPDATE ${prefix}usermeta SET meta_key='${prefix}${key}' WHERE meta_key='${old_prefix}${key}';" \
+			>/dev/null 2>&1 || true
+	done
+
+	qa_ok "role and capability keys repointed to '${prefix}'"
 }
 
 rewrite_urls() {
@@ -319,8 +353,10 @@ ensure_local_admin() {
 
 activate_plugin() {
 	qa_info "Activating ai-post-scheduler so its migrations run against the real data..."
-	if qa_wp_full plugin activate ai-post-scheduler 2>&1 | sed 's/^/    /'; then
-		qa_ok "plugin active"
+	if qa_wp_full plugin is-active ai-post-scheduler >/dev/null 2>&1; then
+		qa_ok "plugin already active"
+	elif qa_wp_full plugin activate ai-post-scheduler 2>&1 | sed 's/^/    /'; then
+		qa_ok "plugin activated"
 	else
 		qa_warn "plugin activation reported an error — see output above"
 	fi
@@ -364,8 +400,9 @@ main() {
 	parse_args "$@"
 
 	cd "$(qa_repo_root)"
-	qa_require_docker
 
+	# Caching a dump or a media export is pure local file work — it must not
+	# require a running Docker daemon.
 	if [[ -n "$SEED_INPUT" ]]; then
 		register_seed "$SEED_INPUT"
 	fi
@@ -385,6 +422,8 @@ main() {
 		BUILD_KEY="$(qa_key_from_prs "$(qa_normalize_prs "$PRS_INPUT")")"
 	fi
 
+	# Everything past this point talks to containers.
+	qa_require_docker
 	qa_load_state "$BUILD_KEY"
 
 	# Settle the uploads mode before touching the stack: 'mount' changes the

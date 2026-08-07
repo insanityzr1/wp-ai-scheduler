@@ -19,7 +19,7 @@ make qa-seed PRS=1887,1888 FILE=~/Downloads/devstacktips.sql UPLOADS=~/Downloads
 make qa-build PRS=1887,1888
 make qa-up    PRS=1887,1888
 
-# -> http://localhost:8100/wp-admin  (admin / admin)
+# -> prints the build's URL, e.g. http://localhost:8137/wp-admin  (admin / admin)
 ```
 
 `make qa-build` and `make qa-up` can be collapsed — `qa-up` creates the build
@@ -64,6 +64,12 @@ What it does:
 2. Creates the branch in a **git worktree** under `.qa-builds/`. Your own
    checkout, current branch and staged changes are never touched.
 3. Merges each PR in ascending id order with `--no-ff`.
+   After merging it runs `composer dump-autoload --no-dev` in the worktree. The
+   autoloader files the repo commits are generated *with* dev requirements, so
+   `autoload_real.php` requires `myclabs/deep-copy` — a PHPUnit transitive that
+   only exists after `composer install`. A fresh worktree has only the committed
+   stubs, so without this the plugin fatals on activation. Regenerating needs no
+   network, since the plugin has no runtime requirements beyond PHP itself.
 4. **A PR that conflicts is aborted and skipped**, and the build continues. One
    bad PR never costs you the whole bundle — the summary tells you which landed:
 
@@ -89,16 +95,36 @@ Everything else works without it.
 
 Each build gets its own compose project, so its containers, network, database
 and WordPress core are separate from the dev stack on 8080 **and** from every
-other QA build. Ports are allocated once and remembered in `build.env`:
+other QA build.
 
-| Service | Dev stack | QA build 0 | QA build 1 |
-|---|---|---|---|
-| WordPress | 8080 | 8100 | 8101 |
-| MySQL | 3307 | 3400 | 3401 |
-| phpMyAdmin | 8082 | 8300 | 8301 |
-| Xdebug | 9003 | 9100 | 9101 |
+Each build draws a **random free port** from a per-service range, records it in
+`build.env`, and keeps it for the life of the build — restarting a build returns
+it to the same URL.
 
-So `make up` and two QA builds can all run at once, and you can compare them
+| Service | Dev stack | QA build range |
+|---|---|---|
+| WordPress | 8080 | 8100–8299 |
+| phpMyAdmin | 8082 | 8300–8399 |
+| MySQL | 3307 | 3400–3499 |
+| Xdebug | 9003 | 9100–9199 |
+
+Ports are random rather than sequential so that builds created and torn down
+over time do not keep reusing the same few numbers — a stale browser tab or
+bookmark pointing at a build you deleted will simply fail to connect instead of
+quietly loading a *different* build on the port it inherited.
+
+When you want a stable, memorable URL, pin it:
+
+```bash
+make qa-build PRS=1887,1888 PORT=8150     # at creation
+make qa-up    PRS=1887,1888 PORT=8150     # or move an existing build
+```
+
+Moving an existing build rewrites its stored `siteurl`/`home` and post content
+to the new port, so it stays browsable. A port already assigned to another build
+or in use on the machine is refused rather than silently reassigned.
+
+So `make up` and several QA builds can all run at once, and you can compare them
 side by side in different browser tabs.
 
 ```bash
@@ -168,6 +194,7 @@ predictable ways. `qa-seed.sh` repairs each one:
 | Dump has `CREATE DATABASE` / `USE` and imports into the wrong schema | Strips those statements while caching, and reports how many |
 | Dump uses a non-`wp_` table prefix | Detects the prefix from the shipped `*options` table and rewrites `wp-config.php` |
 | Every URL still points at production | Reads the dump's own `siteurl`, then `wp search-replace` to this build's port, serialization-safe and skipping `guid` |
+| Role/capability keys disagree with the table prefix | Repoints `{prefix}user_roles` and the prefix-derived usermeta keys, which otherwise leaves every user with no role |
 | No local password for any production user | Creates or resets an `admin` / `admin` administrator |
 
 It then activates the plugin so `AIPS_DB_Migrations::check_and_run()` executes

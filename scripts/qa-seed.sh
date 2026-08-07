@@ -5,6 +5,9 @@
 #   # register (or refresh) the cached production dump, then seed a build
 #   ./scripts/qa-seed.sh --prs 1887,1888 --file ~/Downloads/devstacktips.sql
 #
+#   # register production media too, so imported posts keep their images
+#   ./scripts/qa-seed.sh --prs 1887,1888 --uploads ~/Downloads/uploads.zip
+#
 #   # re-seed from the already-cached dump
 #   ./scripts/qa-seed.sh --prs 1887,1888
 #
@@ -13,7 +16,7 @@
 #
 # The dump you export from production is cached once at .qa-builds/_seed/prod.sql
 # and reused by every later build, so you only re-export when you want fresher
-# data.
+# data. Media is cached alongside it at .qa-builds/_seed/uploads/.
 #
 # After importing, the script repairs everything that makes a production dump
 # unusable locally:
@@ -24,13 +27,16 @@
 #   * activates the plugin so its migrations run against the real data
 #
 # OPTIONS
-#   --prs <list>        PR ids identifying the build (or --build <key>)
-#   --build <key>       Build key, e.g. 1887-1888
-#   --file <path>       Register this .sql/.sql.gz as the cached seed, then use it
-#   --from-build <key>  Clone from another build's database ('dev' = main stack)
-#   --old-url <url>     Override the source URL instead of auto-detecting it
-#   --no-admin          Skip creating the local admin user
-#   -h, --help          Show this help
+#   --prs <list>          PR ids identifying the build (or --build <key>)
+#   --build <key>         Build key, e.g. 1887-1888
+#   --file <path>         Register this .sql/.sql.gz as the cached seed, then use it
+#   --uploads <path>      Register production media (directory, .zip, .tar.gz)
+#   --uploads-mode <mode> copy (default, isolated) | mount (shared) | skip
+#   --uploads-only        Apply media only; leave the database untouched
+#   --from-build <key>    Clone from another build's database ('dev' = main stack)
+#   --old-url <url>       Override the source URL instead of auto-detecting it
+#   --no-admin            Skip creating the local admin user
+#   -h, --help            Show this help
 # =============================================================================
 
 set -euo pipefail
@@ -46,6 +52,9 @@ source "$SCRIPT_DIR/qa-lib.sh"
 PRS_INPUT=""
 BUILD_KEY=""
 SEED_INPUT=""
+UPLOADS_INPUT=""
+UPLOADS_MODE=""
+UPLOADS_ONLY=0
 FROM_BUILD=""
 OLD_URL=""
 MAKE_ADMIN=1
@@ -61,6 +70,11 @@ parse_args() {
 		--build=*) BUILD_KEY="${1#*=}" && shift ;;
 		--file) SEED_INPUT="$2" && shift 2 ;;
 		--file=*) SEED_INPUT="${1#*=}" && shift ;;
+		--uploads) UPLOADS_INPUT="$2" && shift 2 ;;
+		--uploads=*) UPLOADS_INPUT="${1#*=}" && shift ;;
+		--uploads-mode) UPLOADS_MODE="$2" && shift 2 ;;
+		--uploads-mode=*) UPLOADS_MODE="${1#*=}" && shift ;;
+		--uploads-only) UPLOADS_ONLY=1 && shift ;;
 		--from-build) FROM_BUILD="$2" && shift 2 ;;
 		--from-build=*) FROM_BUILD="${1#*=}" && shift ;;
 		--old-url) OLD_URL="$2" && shift 2 ;;
@@ -112,6 +126,107 @@ register_seed() {
 		"$input" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"$(qa_seed_dir)/seed.env"
 
 	qa_ok "seed cached ($(du -h "$dest" | cut -f1))"
+}
+
+# -----------------------------------------------------------------------------
+# Media registration
+#
+# Accepts a directory or an archive. Export from production however is easiest:
+# a zip from your host's file manager, or `tar czf uploads.tar.gz wp-content/uploads`.
+# -----------------------------------------------------------------------------
+register_uploads() {
+	local input="$1"
+	local dest tmp root
+
+	dest="$(qa_uploads_dir)"
+	mkdir -p "$(qa_seed_dir)"
+
+	if [[ -d "$input" ]]; then
+		root="$input"
+	elif [[ -f "$input" ]]; then
+		tmp="$(mktemp -d)"
+		qa_info "Extracting media archive..."
+		case "$input" in
+		*.zip)
+			command -v unzip >/dev/null 2>&1 || qa_die "unzip is required to read $input"
+			unzip -q "$input" -d "$tmp" || qa_die "failed to extract $input"
+			;;
+		*.tar.gz | *.tgz) tar xzf "$input" -C "$tmp" || qa_die "failed to extract $input" ;;
+		*.tar) tar xf "$input" -C "$tmp" || qa_die "failed to extract $input" ;;
+		*) qa_die "unsupported media archive '$input' (expected a directory, .zip, .tar.gz or .tar)" ;;
+		esac
+
+		# Archives are commonly rooted at uploads/ or wp-content/uploads/ rather
+		# than at the year folders themselves.
+		if [[ -d "$tmp/wp-content/uploads" ]]; then
+			root="$tmp/wp-content/uploads"
+		elif [[ -d "$tmp/uploads" ]]; then
+			root="$tmp/uploads"
+		else
+			root="$tmp"
+		fi
+	else
+		qa_die "media path not found: $input"
+	fi
+
+	# WordPress stores media in year folders; their absence usually means the
+	# archive was rooted somewhere unexpected and the copy would be useless.
+	if ! ls -d "$root"/[12][0-9][0-9][0-9] >/dev/null 2>&1; then
+		qa_warn "no year folders (e.g. 2025/) directly under '$root' — double-check the archive layout"
+	fi
+
+	qa_info "Caching production media -> ${QA_DIR_NAME}/_seed/uploads"
+	rm -rf "$dest"
+	mkdir -p "$dest"
+	cp -a "$root/." "$dest/" || qa_die "failed to cache media"
+	[[ -n "${tmp:-}" ]] && rm -rf "$tmp"
+
+	qa_ok "media cached ($(du -sh "$dest" | cut -f1))"
+}
+
+# Put the cached media where this build's WordPress will find it.
+#
+#   copy   duplicate into the build's own uploads volume — isolated and
+#          writable, so generated media stays with the build it belongs to
+#   mount  bind the shared cache in instead (handled by qa_compose via a third
+#          compose overlay); nothing to copy here
+#   skip   leave the build's uploads empty
+apply_uploads() {
+	local mode="$1"
+	local src container
+
+	src="$(qa_uploads_dir)"
+
+	case "$mode" in
+	skip)
+		return 0
+		;;
+	mount)
+		qa_ok "media: shared mount from ${QA_DIR_NAME}/_seed/uploads (writes are visible to every mount-mode build)"
+		return 0
+		;;
+	copy) ;;
+	*) qa_die "invalid uploads mode '$mode' (expected copy, mount or skip)" ;;
+	esac
+
+	qa_has_uploads || {
+		qa_warn "no cached media — imported posts will show broken images. Register some with: make qa-seed PRS=${QA_PRS} UPLOADS=/path/to/uploads.zip"
+		return 0
+	}
+
+	container="${QA_PROJECT}-web"
+	local size
+	size="$(du -sh "$src" | cut -f1)"
+	qa_info "Copying ${size} of media into the build (mode: copy)..."
+	qa_dim "  large libraries copy per build — use UPLOADS_MODE=mount to share one copy instead"
+
+	docker cp "$src/." "${container}:/var/www/html/wp-content/uploads" ||
+		qa_die "failed to copy media into ${container}"
+
+	docker exec "$container" chown -R www-data:www-data /var/www/html/wp-content/uploads ||
+		qa_warn "could not chown uploads — WordPress may not be able to write new media"
+
+	qa_ok "media copied"
 }
 
 # -----------------------------------------------------------------------------
@@ -255,10 +370,15 @@ main() {
 		register_seed "$SEED_INPUT"
 	fi
 
+	if [[ -n "$UPLOADS_INPUT" ]]; then
+		register_uploads "$UPLOADS_INPUT"
+	fi
+
 	if [[ -z "$BUILD_KEY" ]]; then
 		[[ -n "${PRS_INPUT// /}" ]] || {
-			# Registering a seed without a target build is a valid standalone action.
-			[[ -n "$SEED_INPUT" ]] && exit 0
+			# Registering a seed or media without a target build is a valid
+			# standalone action.
+			[[ -n "$SEED_INPUT" || -n "$UPLOADS_INPUT" ]] && exit 0
 			usage
 			qa_die "no build selected (--prs or --build)"
 		}
@@ -267,8 +387,33 @@ main() {
 
 	qa_load_state "$BUILD_KEY"
 
-	qa_compose ps -q db >/dev/null 2>&1 && [[ -n "$(qa_compose ps -q db)" ]] ||
+	# Settle the uploads mode before touching the stack: 'mount' changes the
+	# web container's volumes, so it has to be in effect before the container
+	# is used, not after.
+	local previous_mode="${QA_UPLOADS_MODE:-}"
+	[[ -n "$UPLOADS_MODE" ]] || UPLOADS_MODE="${previous_mode:-copy}"
+	export QA_UPLOADS_MODE="$UPLOADS_MODE"
+
+	# A media-only refresh needs the web container; anything touching the
+	# database needs the database.
+	local required_service="db"
+	[[ "$UPLOADS_ONLY" -eq 0 ]] || required_service="web"
+	[[ -n "$(qa_compose ps -q "$required_service" 2>/dev/null)" ]] ||
 		qa_die "build '${BUILD_KEY}' is not running — start it with: make qa-up PRS=${QA_PRS}"
+
+	if [[ "$UPLOADS_MODE" != "$previous_mode" ]] &&
+		{ [[ "$UPLOADS_MODE" == "mount" ]] || [[ "$previous_mode" == "mount" ]]; }; then
+		qa_info "Uploads mode changed (${previous_mode:-unset} -> ${UPLOADS_MODE}) — recreating the web container"
+		qa_compose up -d web
+	fi
+
+	qa_set_state "$QA_KEY" QA_UPLOADS_MODE "$UPLOADS_MODE"
+
+	# Refreshing media without touching the database.
+	if [[ "$UPLOADS_ONLY" -eq 1 ]]; then
+		apply_uploads "$UPLOADS_MODE"
+		exit 0
+	fi
 
 	qa_wait_for_db
 
@@ -284,6 +429,7 @@ main() {
 
 	repair_table_prefix
 	rewrite_urls "http://localhost:${QA_WP_PORT}"
+	apply_uploads "$UPLOADS_MODE"
 	[[ "$MAKE_ADMIN" -eq 1 ]] && ensure_local_admin
 	activate_plugin
 

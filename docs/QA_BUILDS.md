@@ -12,8 +12,8 @@ answer.
 ## Quick start
 
 ```bash
-# One-time: export the DevStackTips database and cache it as the seed
-make qa-seed PRS=1887,1888 FILE=~/Downloads/devstacktips.sql
+# One-time: export the DevStackTips database and media, and cache them
+make qa-seed PRS=1887,1888 FILE=~/Downloads/devstacktips.sql UPLOADS=~/Downloads/uploads.zip
 
 # Build the bundle and run it
 make qa-build PRS=1887,1888
@@ -175,8 +175,64 @@ against real data — which is often the most valuable thing the whole setup
 buys you — and warns about plugins the dump had active that are not installed
 locally.
 
-> Uploads are not copied. Media in the imported content will 404 unless you
-> separately sync `wp-content/uploads`.
+---
+
+## Production media
+
+Imported posts reference media by URL, so without the real `wp-content/uploads`
+every image 404s. Register media the same way you register the dump — export it
+from production as a directory or archive, then cache it once:
+
+```bash
+make qa-seed PRS=1887,1888 UPLOADS=~/Downloads/uploads.zip
+```
+
+Directories, `.zip`, `.tar.gz` and `.tar` are all accepted, and the archive may
+be rooted at `wp-content/uploads/`, `uploads/`, or the year folders themselves —
+all three normalize to the same cached layout at `.qa-builds/_seed/uploads/`.
+You are warned if no year folders (`2025/`, `2024/`, …) turn up where expected,
+which usually means the archive was rooted somewhere unexpected.
+
+### Media modes
+
+`make qa-up UPLOADS_MODE=<mode>` decides how a build gets that media.
+
+| Mode | Effect |
+|---|---|
+| `copy` | **Default.** Duplicate the cached media into the build's own uploads volume |
+| `mount` | Bind the shared cache in directly — one copy on disk for all builds |
+| `skip` | Leave uploads empty |
+
+`copy` is the default because it is the only mode where media a build
+*generates* stays with that build. The plugin writes new attachments during
+generation; under `copy` those land in the build's own volume, and the cached
+production copy stays pristine.
+
+`mount` exists because production media libraries are routinely tens of
+gigabytes and copying that per build is real disk. The trade-off is real too:
+the mount is read-write, so anything a build writes lands in the shared cache
+and is visible to every other build in mount mode.
+
+```bash
+make qa-up PRS=1887,1888 UPLOADS_MODE=mount   # large library, share one copy
+```
+
+Switching modes on an existing build recreates its web container so the new
+mount takes effect. Switching back to `copy` restores the build's own volume
+with whatever it had generated — the copy merges over it rather than wiping it.
+
+### Refreshing media alone
+
+If you register media after a build was already seeded, apply it without
+touching the database:
+
+```bash
+make qa-uploads PRS=1887,1888
+make qa-uploads PRS=1887,1888 UPLOADS=~/Downloads/uploads-fresh.zip
+```
+
+`make qa-up` also fills in media on its own when a build's uploads directory is
+still empty, but it will never overwrite media a build already has.
 
 ---
 
@@ -208,11 +264,12 @@ Docker stack that already existed.
 | `scripts/qa-lib.sh` | Shared naming, state, port allocation, compose wrapper |
 | `scripts/qa-build.sh` | Branch + merge + conflict report + optional draft PR |
 | `scripts/qa-up.sh` | Start a build's stack, resolve the database mode |
-| `scripts/qa-seed.sh` | Cache and import the production dump, repair it |
+| `scripts/qa-seed.sh` | Cache and import the production dump and media, repair it |
 | `scripts/qa-down.sh` | Stop or purge a build |
 | `scripts/qa-list.sh` | Show all builds |
 | `scripts/qa-compose.sh` | Arbitrary compose command against one build |
 | `docker-compose.qa.yml` | Overlay: container names, plugin mount from worktree |
+| `docker-compose.qa-uploads.yml` | Third overlay, applied only in `mount` media mode |
 
 `docker-compose.yml` reads `WP_PORT`, `MYSQL_PORT`, `PHPMYADMIN_PORT` and
 `XDEBUG_PORT` (defaulting to 8080/3307/8082/9003, unchanged) so QA stacks can

@@ -115,6 +115,8 @@ qa_src_dir() { printf '%s/%s/src' "$(qa_root_dir)" "$1"; }
 qa_state_file() { printf '%s/%s/build.env' "$(qa_root_dir)" "$1"; }
 qa_seed_dir() { printf '%s/_seed' "$(qa_root_dir)"; }
 qa_seed_file() { printf '%s/prod.sql' "$(qa_seed_dir)"; }
+qa_uploads_dir() { printf '%s/uploads' "$(qa_seed_dir)"; }
+qa_has_uploads() { [[ -d "$(qa_uploads_dir)" ]] && [[ -n "$(ls -A "$(qa_uploads_dir)" 2>/dev/null)" ]]; }
 
 # -----------------------------------------------------------------------------
 # Build state
@@ -244,18 +246,31 @@ qa_compose() {
 	local root
 	root="$(qa_repo_root)"
 
+	local -a files=(
+		-f "$root/docker-compose.yml"
+		-f "$root/docker-compose.qa.yml"
+	)
+
+	# In 'mount' uploads mode the shared media cache replaces this build's
+	# uploads volume, which needs a third overlay. Every command for the build
+	# must carry it, otherwise compose sees a changed mount and recreates the
+	# container — so it is driven by persisted state, not by a flag.
+	if [[ "${QA_UPLOADS_MODE:-}" == "mount" ]] && qa_has_uploads; then
+		files+=(-f "$root/docker-compose.qa-uploads.yml")
+	fi
+
 	# WP_PORT/MYSQL_PORT/PHPMYADMIN_PORT/XDEBUG_PORT are what docker-compose.yml
 	# actually reads; shell values take precedence over any repo-root .env.
 	QA_PROJECT="$QA_PROJECT" \
 		QA_SRC="$QA_SRC" \
+		QA_UPLOADS_SRC="$(qa_uploads_dir)" \
 		WP_PORT="$QA_WP_PORT" \
 		MYSQL_PORT="$QA_DB_PORT" \
 		PHPMYADMIN_PORT="$QA_PMA_PORT" \
 		XDEBUG_PORT="$QA_XDEBUG_PORT" \
 		docker compose \
 		-p "$QA_PROJECT" \
-		-f "$root/docker-compose.yml" \
-		-f "$root/docker-compose.qa.yml" \
+		"${files[@]}" \
 		"$@"
 }
 

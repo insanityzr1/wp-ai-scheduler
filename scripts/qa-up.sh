@@ -23,13 +23,21 @@
 #   no database, cached seed exists  -> seed
 #   no database, no cached seed      -> fresh
 #
+# MEDIA (--uploads-mode)
+#   copy    Duplicate the cached production media into this build (default).
+#           Isolated and writable, so media the build generates stays with it.
+#   mount   Bind the shared cached media in instead. One copy on disk for all
+#           builds, but writes are visible to every mount-mode build.
+#   skip    Leave uploads empty; imported posts will show broken images.
+#
 # OPTIONS
-#   --prs <list>       PR ids (also accepted positionally)
-#   --build <key>      Existing build key, e.g. 1887-1888
-#   --db <mode>        Database mode, see above
-#   --rebuild          Rebuild the shared QA web image first
-#   --no-auto-build    Fail instead of creating the branch when it is missing
-#   -h, --help         Show this help
+#   --prs <list>          PR ids (also accepted positionally)
+#   --build <key>         Existing build key, e.g. 1887-1888
+#   --db <mode>           Database mode, see above
+#   --uploads-mode <mode> Media mode, see above
+#   --rebuild             Rebuild the shared QA web image first
+#   --no-auto-build       Fail instead of creating the branch when it is missing
+#   -h, --help            Show this help
 # =============================================================================
 
 set -euo pipefail
@@ -43,6 +51,7 @@ QA_IMAGE="wp-ai-scheduler-qa:latest"
 PRS_INPUT=""
 BUILD_KEY=""
 DB_MODE=""
+UPLOADS_MODE=""
 REBUILD=0
 AUTO_BUILD=1
 
@@ -58,6 +67,8 @@ parse_args() {
 		--build=*) BUILD_KEY="${1#*=}" && shift ;;
 		--db) DB_MODE="$2" && shift 2 ;;
 		--db=*) DB_MODE="${1#*=}" && shift ;;
+		--uploads-mode) UPLOADS_MODE="$2" && shift 2 ;;
+		--uploads-mode=*) UPLOADS_MODE="${1#*=}" && shift ;;
 		--rebuild) REBUILD=1 && shift ;;
 		--no-auto-build) AUTO_BUILD=0 && shift ;;
 		-h | --help)
@@ -124,6 +135,27 @@ resolve_db_mode() {
 	fi
 }
 
+# Must run before `compose up`: 'mount' changes the web container's volume set,
+# and qa_compose only adds the uploads overlay when QA_UPLOADS_MODE says so.
+resolve_uploads_mode() {
+	if [[ -z "$UPLOADS_MODE" ]]; then
+		UPLOADS_MODE="${QA_UPLOADS_MODE:-copy}"
+	fi
+
+	case "$UPLOADS_MODE" in
+	copy | mount | skip) ;;
+	*) qa_die "invalid --uploads-mode '$UPLOADS_MODE' (expected copy, mount or skip)" ;;
+	esac
+
+	export QA_UPLOADS_MODE="$UPLOADS_MODE"
+
+	if [[ "$UPLOADS_MODE" != "skip" ]] && ! qa_has_uploads; then
+		qa_dim "  media      : none cached (register with UPLOADS=/path/to/uploads.zip)"
+	else
+		qa_dim "  media      : ${UPLOADS_MODE}"
+	fi
+}
+
 ensure_image() {
 	if [[ "$REBUILD" -eq 1 ]] || ! docker image inspect "$QA_IMAGE" >/dev/null 2>&1; then
 		qa_info "Building the shared QA web image (${QA_IMAGE})..."
@@ -149,6 +181,7 @@ main() {
 	[[ -n "${QA_SKIPPED:-}" ]] && qa_warn "this build skipped conflicting PR(s): ${QA_SKIPPED}"
 
 	resolve_db_mode
+	resolve_uploads_mode
 	echo
 
 	ensure_image
@@ -169,18 +202,30 @@ main() {
 	case "$DB_MODE" in
 	seed)
 		echo
-		bash "$SCRIPT_DIR/qa-seed.sh" --build "$QA_KEY"
+		bash "$SCRIPT_DIR/qa-seed.sh" --build "$QA_KEY" --uploads-mode "$UPLOADS_MODE"
 		;;
 	clone:*)
 		echo
-		bash "$SCRIPT_DIR/qa-seed.sh" --build "$QA_KEY" --from-build "${DB_MODE#clone:}"
+		bash "$SCRIPT_DIR/qa-seed.sh" --build "$QA_KEY" \
+			--from-build "${DB_MODE#clone:}" --uploads-mode "$UPLOADS_MODE"
 		;;
 	keep | fresh)
 		qa_wp_full plugin activate ai-post-scheduler >/dev/null 2>&1 || true
+
+		# Media registered (or switched to copy mode) after this build was first
+		# seeded still belongs here — but only fill an empty uploads directory,
+		# never overwrite media the build already has.
+		if [[ "$DB_MODE" == "keep" && "$UPLOADS_MODE" == "copy" ]] && qa_has_uploads &&
+			[[ -z "$(qa_compose exec -T web sh -c 'ls -A /var/www/html/wp-content/uploads 2>/dev/null | head -1' 2>/dev/null | tr -d '\r')" ]]; then
+			echo
+			bash "$SCRIPT_DIR/qa-seed.sh" --build "$QA_KEY" \
+				--uploads-mode "$UPLOADS_MODE" --uploads-only
+		fi
 		;;
 	esac
 
 	qa_set_state "$QA_KEY" QA_DB_MODE "$DB_MODE"
+	qa_set_state "$QA_KEY" QA_UPLOADS_MODE "$UPLOADS_MODE"
 	qa_set_state "$QA_KEY" QA_LAST_UP "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 	echo

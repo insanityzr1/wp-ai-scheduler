@@ -67,7 +67,7 @@ Local URLs (Docker): WordPress `http://localhost:8080` · Admin `http://localhos
 QA builds — bundle N open PRs onto one branch and run it on a copy of production data:
 
 ```bash
-make qa-seed PRS=1887,1888 FILE=dump.sql   # cache a production dump (once)
+make qa-seed PRS=1887,1888 FILE=dump.sql UPLOADS=uploads.zip   # cache prod DB + media (once)
 make qa-build PRS=1887,1888                # branch off main, merge the PRs
 make qa-build PRS=1887,1888 PR=1           # ...and open a draft PR for the bundle
 make qa-up PRS=1887,1888                   # isolated stack on its own ports

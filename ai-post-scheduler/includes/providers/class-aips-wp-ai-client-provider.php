@@ -81,7 +81,10 @@ class AIPS_WP_AI_Client_Provider implements AIPS_AI_Provider_Interface {
             $cache = new WeakMap();
         }
 
-        if (isset($cache[$this])) {
+        // offsetExists() must be used instead of isset() because isset() returns
+        // false for null values even when the key exists, causing the unavailable
+        // provider path (stored null) to be re-probed on every call.
+        if ($cache->offsetExists($this)) {
             return $cache[$this];
         }
 
@@ -89,8 +92,8 @@ class AIPS_WP_AI_Client_Provider implements AIPS_AI_Provider_Interface {
             $cache[$this] = null;
             return null;
         }
-        
-        $builder = wp_ai_client_prompt(null);
+
+        $builder = wp_ai_client_prompt('');
         $cache[$this] = is_wp_error($builder) ? null : $builder;
 
         return $cache[$this];
@@ -210,7 +213,7 @@ class AIPS_WP_AI_Client_Provider implements AIPS_AI_Provider_Interface {
             $builder = $this->chain($builder, 'using_temperature', (float) $params['temperature']);
         }
 
-        $max_tokens = isset($params['max_tokens']) ? $params['max_tokens'] : null;
+        $max_tokens = isset($params['max_tokens']) ? $params['max_tokens'] : (isset($params['maxTokens']) ? $params['maxTokens'] : null);
 
         if ($max_tokens !== null) {
             $builder = $this->chain($builder, 'using_max_tokens', (int) $max_tokens);

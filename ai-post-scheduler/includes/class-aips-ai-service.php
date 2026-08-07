@@ -130,7 +130,7 @@ class AIPS_AI_Service implements AIPS_AI_Service_Interface {
 
         $log_context = array(
             'model' => isset($params['model']) ? $params['model'] : '',
-            'max_tokens' => isset($params['max_tokens']) ? $params['max_tokens'] : '',
+            'max_tokens' => isset($params['maxTokens']) ? $params['maxTokens'] : ( isset($params['max_tokens']) ? $params['max_tokens'] : '' ),
             'temperature' => isset($params['temperature']) ? $params['temperature'] : '',
             'prompt_length' => is_string($prompt) ? strlen($prompt) : 0,
             'has_prompt' => !empty($prompt),
@@ -362,19 +362,10 @@ class AIPS_AI_Service implements AIPS_AI_Service_Interface {
         }
 
         $params = $this->prepare_options($options, $prompt);
-        $current_max_tokens = isset($params['max_tokens']) ? (int) $params['max_tokens'] : 0;
-
-        // Reasoning-capable models may count hidden reasoning against the output
-        // budget. A small JSON response can otherwise be cut off before the model
-        // emits the opening token, leaving the extractor nothing to parse.
-        if ($current_max_tokens < 2048) {
-            $params['max_tokens'] = 2048;
-            $options['max_tokens'] = 2048;
-        }
 
         $log_context = array(
             'model'         => isset($params['model']) ? $params['model'] : '',
-            'max_tokens'    => isset($params['max_tokens']) ? $params['max_tokens'] : '',
+            'max_tokens'    => isset($params['maxTokens']) ? $params['maxTokens'] : (isset($params['max_tokens']) ? $params['max_tokens'] : ''),
             'temperature'   => isset($params['temperature']) ? $params['temperature'] : '',
             'prompt_length' => is_string($prompt) ? strlen($prompt) : 0,
             'has_prompt'    => !empty($prompt),
@@ -395,42 +386,15 @@ class AIPS_AI_Service implements AIPS_AI_Service_Interface {
 
         $result = $this->resilience_service->execute_safely(function() use ($prompt, $options, $params) {
             try {
-                $text_response = '';
-                $extract_result = null;
+                $text_response = $this->provider->generate_text($prompt, $params);
 
-                for ($attempt = 0; $attempt < 2; $attempt++) {
-                    $text_response = $this->provider->generate_text($prompt, $params);
-
-                    if (!$text_response || empty($text_response)) {
-                        $error = new WP_Error('empty_response', __('AI Engine returned an empty response.', 'ai-post-scheduler'));
-                        $this->log_call('json', $prompt, $options, $error);
-                        return $error;
-                    }
-
-                    $extract_result = $this->extract_json_fragment((string) $text_response);
-
-                    if (
-                        0 === $attempt
-                        && is_wp_error($extract_result)
-                        && 'json_extract_truncated' === $extract_result->get_error_code()
-                    ) {
-                        $current_max_tokens = isset($params['max_tokens']) ? (int) $params['max_tokens'] : 0;
-                        $retry_max_tokens = max(2048, $current_max_tokens * 2);
-
-                        $params['max_tokens'] = $retry_max_tokens;
-                        $options['max_tokens'] = $retry_max_tokens;
-
-                        $this->logger->log('Text-based JSON response was truncated; retrying with a larger output budget.', 'warning', array(
-                            'response_preview' => substr((string) $text_response, 0, 220),
-                            'previous_max_tokens' => $current_max_tokens,
-                            'retry_max_tokens' => $retry_max_tokens,
-                        ));
-
-                        continue;
-                    }
-
-                    break;
+                if (!$text_response || empty($text_response)) {
+                    $error = new WP_Error('empty_response', __('AI Engine returned an empty response.', 'ai-post-scheduler'));
+                    $this->log_call('json', $prompt, $options, $error);
+                    return $error;
                 }
+
+                $extract_result = $this->extract_json_fragment((string) $text_response);
 
                 if (is_wp_error($extract_result)) {
                     $error = new WP_Error('json_parse_error', $extract_result->get_error_message());
@@ -567,7 +531,7 @@ class AIPS_AI_Service implements AIPS_AI_Service_Interface {
             }
         }
 
-        return new WP_Error('json_extract_truncated', __('JSON appears truncated before closing token.', 'ai-post-scheduler'));
+        return new WP_Error('json_extract_failed', __('JSON appears truncated before closing token.', 'ai-post-scheduler'));
     }
 
     /**
@@ -578,7 +542,8 @@ class AIPS_AI_Service implements AIPS_AI_Service_Interface {
      */
     private function sanitize_json_candidate($candidate) {
         return preg_replace_callback(
-            '/"((?:[^"\\\\]|\\\\.)*)"/',
+            '/"((?:[^"\\\\]|\\\\.)*)"/'
+            ,
             function ($m) {
                 $inner = $m[1];
                 $inner = str_replace("\r", '\\r', $inner);
@@ -624,21 +589,8 @@ class AIPS_AI_Service implements AIPS_AI_Service_Interface {
             try {
                 $image_url = $this->provider->generate_image($prompt, $params);
 
-                if (!$image_url || empty($image_url)) {
-                    $error = new WP_Error('empty_response', __('AI Engine returned an empty response for image generation.', 'ai-post-scheduler'));
-
-                    $this->log_call('image', $prompt, $options, $error);
-
-                    return $error;
-                }
-
-                // Handle array response (some AI engines return arrays)
-                if (is_array($image_url) && !empty($image_url[0])) {
-                    $image_url = $image_url[0];
-                }
-
                 if (empty($image_url)) {
-                    $error = new WP_Error('no_image_url', __('No image URL in AI response.', 'ai-post-scheduler'));
+                    $error = new WP_Error('empty_response', __('AI Engine returned an empty response for image generation.', 'ai-post-scheduler'));
 
                     $this->log_call('image', $prompt, $options, $error);
 
@@ -679,12 +631,12 @@ class AIPS_AI_Service implements AIPS_AI_Service_Interface {
     }
     
     /**
-     * Calculate the appropriate max_tokens value for an AI request.
+     * Calculate the appropriate maxTokens for an AI request.
      *
-     * max_tokens is an output-only cap on every backend the plugin supports. Each
-     * provider adapter maps it to the backend's native parameter. The budget is
-     * therefore derived purely from the expected output size for the request
-     * type, plus a 25% safety buffer, capped at the
+     * maxTokens is an output-only cap on every backend the plugin supports (Meow
+     * forwards it verbatim; the WordPress AI Client maps it to the model config's
+     * maxTokens). The budget is therefore derived purely from the expected output
+     * size for the request type, plus a 25% safety buffer, capped at the
      * configured aips_max_tokens_limit setting.
      *
      * The prompt length is deliberately NOT part of this figure. Adding it made a
@@ -697,7 +649,7 @@ class AIPS_AI_Service implements AIPS_AI_Service_Interface {
      * @param string|int $type   Request type: 'title', 'excerpt', 'content', or a
      *                           custom integer expected-output token count. Unknown
      *                           string types fall back to 'content' sizing.
-     * @return int The calculated max_tokens value (always ≥ 1).
+     * @return int The calculated maxTokens value (always >= 1).
      */
     private function calculate_max_tokens($prompt, $type = 'content') {
         // Determine the expected output token requirement for this request type.
@@ -743,7 +695,7 @@ class AIPS_AI_Service implements AIPS_AI_Service_Interface {
      * Prepare and normalize AI generation options.
      *
      * Merges user-provided options with defaults from plugin settings.
-     * When the caller has not explicitly set max_tokens, the value is calculated
+     * When the caller has not explicitly set maxTokens, the value is calculated
      * dynamically via calculate_max_tokens() based on the prompt and request type.
      *
      * @param array  $options User-provided options.
@@ -761,6 +713,11 @@ class AIPS_AI_Service implements AIPS_AI_Service_Interface {
 
         $options = wp_parse_args($options);
 
+        // Accept legacy 'envId' from callers; canonicalize to 'env_id'.
+        if (isset($options['envId']) && !isset($options['env_id'])) {
+            $options['env_id'] = $options['envId'];
+        }
+
         $options = wp_parse_args($options, $default_options);
         $params  = array();
 
@@ -776,6 +733,9 @@ class AIPS_AI_Service implements AIPS_AI_Service_Interface {
         // calculate dynamically based on the prompt and request type.
         if (isset($options['max_tokens'])) {
             $params['max_tokens'] = $options['max_tokens'];
+        } elseif (isset($options['maxTokens'])) {
+            // Backward compatibility for legacy callers using camelCase.
+            $params['max_tokens'] = $options['maxTokens'];
         } else {
             $type                 = isset($options['request_type']) ? $options['request_type'] : 'content';
             $params['max_tokens'] = $this->calculate_max_tokens($prompt, $type);

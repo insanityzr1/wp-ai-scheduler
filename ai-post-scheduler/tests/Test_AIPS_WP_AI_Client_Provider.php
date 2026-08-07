@@ -421,4 +421,33 @@ class Test_AIPS_WP_AI_Client_Provider extends WP_UnitTestCase {
 
         $this->assertSame($data_uri, $result);
     }
+
+    public function test_probe_call_passes_empty_string_not_null_to_wp_ai_client_prompt() {
+        global $aips_wp_ai_client_test_builder;
+
+        $builder = new AIPS_Test_WP_AI_Client_Builder();
+        $aips_wp_ai_client_test_builder = $builder;
+
+        $provider = new AIPS_WP_AI_Client_Provider();
+        $provider->is_available(); // triggers create_prompt_builder()
+
+        // The test stub captures the argument via set_prompt(). A null would cause
+        // a PHP 8 TypeError on any non-nullable string parameter in the real function.
+        $this->assertSame('', $builder->prompt, 'Probe must pass empty string, not null.');
+    }
+
+    public function test_unavailable_null_is_cached_and_not_re_probed_on_subsequent_calls() {
+        global $aips_wp_ai_client_test_builder;
+
+        // First probe: builder creation fails → null stored in WeakMap.
+        $aips_wp_ai_client_test_builder = new WP_Error('no_connector', 'No connector.');
+        $provider = new AIPS_WP_AI_Client_Provider();
+        $this->assertFalse($provider->is_available());
+
+        // Swap to a working builder. Without the offsetExists fix (i.e. using isset),
+        // the null would not be seen as a cache hit and the provider would re-probe,
+        // find the new builder, and incorrectly return true.
+        $aips_wp_ai_client_test_builder = new AIPS_Test_WP_AI_Client_Builder();
+        $this->assertFalse($provider->is_available(), 'Cached null must be honoured; provider must not re-probe.');
+    }
 }

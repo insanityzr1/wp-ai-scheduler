@@ -2786,6 +2786,23 @@
 
             if (!id || !type) { return; }
 
+            AIPS.Utilities.confirm(
+                aipsScheduleL10n.runNowChoice || 'How should this manual run affect the schedule?',
+                aipsScheduleL10n.runNow || 'Run Now',
+                [
+                    { label: aipsScheduleL10n.cancel || 'Cancel', className: 'aips-btn aips-btn-secondary' },
+                    { label: aipsScheduleL10n.runNowIndependent || 'Run now, independently from schedule', className: 'aips-btn aips-btn-secondary', action: function() {
+                        AIPS.executeUnifiedRunNow($btn, id, type, false);
+                    }},
+                    { label: aipsScheduleL10n.runNowAndAdvance || 'Run next scheduled run now and advance', className: 'aips-btn aips-btn-primary', action: function() {
+                        AIPS.executeUnifiedRunNow($btn, id, type, true);
+                    }}
+                ]
+            );
+        },
+
+        /** Execute a unified schedule using the selected schedule-advance mode. */
+        executeUnifiedRunNow: function($btn, id, type, advanceSchedule) {
             AIPS.Utilities.setButtonLoading($btn, '<span class="dashicons dashicons-update aips-spin"></span>', { isHtml: true });
 
             $.ajax({
@@ -2795,7 +2812,8 @@
                     action: 'aips_unified_run_now',
                     nonce: aipsAjax.nonce,
                     id: id,
-                    type: type
+                    type: type,
+                    advance_schedule: advanceSchedule ? 1 : 0
                 },
                 success: function(response) {
                     if (response.success) {

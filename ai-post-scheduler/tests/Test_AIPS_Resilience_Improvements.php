@@ -476,32 +476,45 @@ class Test_AIPS_Resilience_Improvements extends WP_UnitTestCase {
 	// -----------------------------------------------------------------------
 
 	/**
-	 * Create a resilience service with the local rate limiter ENABLED and
-	 * already exhausted (one request already recorded against a 1-request
-	 * window), plus circuit breaker/retry disabled so only the rate-limit
-	 * gate is under test.
+	 * Create a resilience service with the local rate limiter ENABLED (a
+	 * $max_requests-per-$period window), plus circuit breaker/retry disabled so
+	 * only the rate-limit gate is under test.
 	 *
-	 * @param int $period Rate limit window, in seconds.
+	 * @param int $period       Rate limit window, in seconds.
+	 * @param int $max_requests Requests allowed per window.
 	 * @return AIPS_Resilience_Service
 	 */
-	private function make_rate_limited_service( $period = 1 ) {
+	private function make_rate_limited_service( $period = 1, $max_requests = 1 ) {
 		$GLOBALS['aips_test_options'] = array(
 			'aips_enable_circuit_breaker' => false,
 			'aips_enable_retry'           => false,
 			'aips_enable_rate_limiting'   => true,
-			'aips_rate_limit_requests'    => 1,
+			'aips_rate_limit_requests'    => $max_requests,
 			'aips_rate_limit_period'      => $period,
 		);
 		update_option( 'aips_enable_circuit_breaker', false );
 		update_option( 'aips_enable_retry', false );
 		update_option( 'aips_enable_rate_limiting', true );
-		update_option( 'aips_rate_limit_requests', 1 );
+		update_option( 'aips_rate_limit_requests', $max_requests );
 		update_option( 'aips_rate_limit_period', $period );
 
 		delete_transient( 'aips_circuit_breaker_state' );
 		delete_transient( 'aips_rate_limiter_requests' );
 
 		return new AIPS_Resilience_Service();
+	}
+
+	/**
+	 * Invoke the private seconds_until_rate_limit_slot_frees() helper.
+	 *
+	 * @param AIPS_Resilience_Service $service Service under test.
+	 * @return int
+	 */
+	private function seconds_until_slot_frees( $service ) {
+		$method = new ReflectionMethod( AIPS_Resilience_Service::class, 'seconds_until_rate_limit_slot_frees' );
+		$method->setAccessible( true );
+
+		return $method->invoke( $service );
 	}
 
 	/**
@@ -534,6 +547,10 @@ class Test_AIPS_Resilience_Improvements extends WP_UnitTestCase {
 	 * When the local rate-limiter never frees up within the bounded attempts,
 	 * execute_safely() must still fail with rate_limit_exceeded, and that
 	 * failure must not be recorded against the circuit breaker.
+	 *
+	 * It must also fail *fast*: when the next slot frees up further out than
+	 * RATE_LIMIT_RETRY_MAX_WAIT_SECONDS, sleeping cannot possibly help, so the
+	 * caller must not be made to wait out the full retry budget first.
 	 */
 	public function test_execute_safely_returns_rate_limit_exceeded_when_capacity_never_frees() {
 		// A long window guarantees capacity will not free up within the bounded
@@ -543,23 +560,98 @@ class Test_AIPS_Resilience_Improvements extends WP_UnitTestCase {
 		// Exhaust the single-slot window immediately.
 		$service->check_rate_limit();
 
-		$calls = 0;
-		$result = $service->execute_safely(
+		$calls   = 0;
+		$started = microtime( true );
+		$result  = $service->execute_safely(
 			function() use ( &$calls ) {
 				$calls++;
 				return 'OK';
 			},
 			'text', 'prompt', array()
 		);
+		$elapsed = microtime( true ) - $started;
 
 		delete_transient( 'aips_rate_limiter_requests' );
 
 		$this->assertSame( 0, $calls, 'Underlying function must never run while rate-limited' );
 		$this->assertTrue( is_wp_error( $result ) );
 		$this->assertSame( 'rate_limit_exceeded', $result->get_error_code() );
+		$this->assertLessThan(
+			2,
+			$elapsed,
+			'Gate must fail fast when the next slot is further out than the wait budget, not sleep through every attempt'
+		);
 
 		$status = $service->get_circuit_breaker_status();
 		$this->assertSame( 0, $status['failures'], 'rate_limit_exceeded must not count as a CB failure' );
+	}
+
+	/**
+	 * Timestamps that have already aged out of the sliding window must not be
+	 * counted when computing the wait. check_rate_limit() does not persist its
+	 * filtered array when it denies a request, so the transient really can hold
+	 * expired entries; measuring from one of those understates the wait and
+	 * makes the gate retry too early.
+	 */
+	public function test_seconds_until_slot_frees_ignores_expired_requests() {
+		$service = $this->make_rate_limited_service( 60, 2 );
+
+		$now = time();
+		set_transient(
+			'aips_rate_limiter_requests',
+			array( $now - 500, $now - 10, $now - 5 ), // first entry is long expired
+			60
+		);
+
+		$wait = $this->seconds_until_slot_frees( $service );
+
+		delete_transient( 'aips_rate_limiter_requests' );
+
+		// Only the two in-window entries count; the oldest of those frees at
+		// ( $now - 10 ) + 60, i.e. 50s out. Measuring from $now - 500 would
+		// wrongly report 0.
+		$this->assertEqualsWithDelta( 50, $wait, 1, 'Expired timestamps must be filtered before measuring the wait' );
+	}
+
+	/**
+	 * When the configured limit has been lowered while requests were already
+	 * tracked, more than one entry has to expire before a request is admitted.
+	 * The wait must cover the newest of those, not just the oldest entry.
+	 */
+	public function test_seconds_until_slot_frees_accounts_for_multiple_expiries() {
+		$service = $this->make_rate_limited_service( 60, 1 );
+
+		$now = time();
+		set_transient( 'aips_rate_limiter_requests', array( $now - 30, $now - 20, $now - 10 ), 60 );
+
+		$wait = $this->seconds_until_slot_frees( $service );
+
+		delete_transient( 'aips_rate_limiter_requests' );
+
+		// Three tracked requests against a limit of 1: all three must age out, so
+		// the wait is governed by the newest ( $now - 10 ) + 60 = 50s, not by the
+		// oldest ( $now - 30 ) + 60 = 30s.
+		$this->assertEqualsWithDelta( 50, $wait, 1, 'Wait must cover every entry that has to expire' );
+	}
+
+	/**
+	 * A corrupted (non-array) transient must not blow up the rate limiter —
+	 * array_filter() would raise a TypeError on PHP 8.
+	 */
+	public function test_rate_limiter_tolerates_corrupted_transient() {
+		$service = $this->make_rate_limited_service( 60, 2 );
+
+		set_transient( 'aips_rate_limiter_requests', 'not-an-array', 60 );
+		$this->assertSame( 0, $this->seconds_until_slot_frees( $service ) );
+
+		set_transient( 'aips_rate_limiter_requests', 'not-an-array', 60 );
+		$this->assertTrue( $service->check_rate_limit(), 'A corrupted transient should be treated as an empty window' );
+
+		set_transient( 'aips_rate_limiter_requests', 'not-an-array', 60 );
+		$status = $service->get_rate_limiter_status();
+		$this->assertSame( 0, $status['current_requests'] );
+
+		delete_transient( 'aips_rate_limiter_requests' );
 	}
 
 	/**

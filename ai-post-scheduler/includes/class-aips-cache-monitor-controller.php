@@ -75,6 +75,10 @@ class AIPS_Cache_Monitor_Controller {
 			wp_die(esc_html__('You do not have permission to access this page.', 'ai-post-scheduler'));
 		}
 
+		if (!AIPS_Config::get_instance()->get_option('aips_cache_monitor_enabled')) {
+			wp_die(esc_html__('Cache Monitor is currently disabled.', 'ai-post-scheduler'));
+		}
+
 		$service      = $this->service;
 		$summary      = $service->get_summary();
 		$nonce        = wp_create_nonce('aips_cache_monitor');
@@ -409,6 +413,10 @@ class AIPS_Cache_Monitor_Controller {
 
 		if (!current_user_can('manage_options')) {
 			AIPS_Ajax_Response::permission_denied();
+		}
+
+		if (!AIPS_Config::get_instance()->get_option('aips_cache_monitor_enabled')) {
+			AIPS_Ajax_Response::error(__('Cache Monitor is disabled.', 'ai-post-scheduler'));
 		}
 	}
 

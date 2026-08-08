@@ -175,9 +175,13 @@ class AIPS_Scheduler implements AIPS_Cron_Generation_Handler {
 					: '';
 
 				// Parse start_time from datetime-local input (YYYY-MM-DDTHH:MM) or fallback to now.
+				// The input has no timezone of its own; treat it as the WordPress site
+				// timezone (matching how it is displayed elsewhere) rather than PHP's
+				// ambient runtime timezone, which may not match the site's configured one.
 				if (!empty($start_time_raw)) {
-					$start_timestamp = (int) strtotime($start_time_raw);
-					if ($start_timestamp <= 0) {
+					try {
+						$start_timestamp = AIPS_DateTime::fromSiteLocal($start_time_raw)->toUtc()->timestamp();
+					} catch (\InvalidArgumentException $e) {
 						$start_timestamp = AIPS_DateTime::now()->timestamp();
 					}
 				} else {

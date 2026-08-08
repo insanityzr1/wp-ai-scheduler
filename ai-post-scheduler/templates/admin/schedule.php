@@ -69,7 +69,7 @@ if (!defined('ABSPATH')) {
 				<div class="aips-filter-right">
 					<label class="screen-reader-text" for="aips-unified-search"><?php esc_html_e('Search Schedules:', 'ai-post-scheduler'); ?></label>
 					<input type="search" id="aips-unified-search" class="aips-form-input" placeholder="<?php esc_attr_e('Search schedules…', 'ai-post-scheduler'); ?>">
-					<button type="button" id="aips-unified-search-clear" class="aips-btn aips-btn-sm aips-btn-ghost hidden"><?php esc_html_e('Clear', 'ai-post-scheduler'); ?></button>
+					<button type="button" id="aips-unified-search-clear" class="aips-btn aips-btn-sm aips-btn-ghost is-hidden"><?php esc_html_e('Clear', 'ai-post-scheduler'); ?></button>
 				</div>
 			</div>
 
@@ -92,7 +92,7 @@ if (!defined('ABSPATH')) {
 					<button type="button" id="aips-unified-bulk-apply" class="aips-btn aips-btn-primary aips-btn-sm" disabled>
 						<?php esc_html_e('Apply', 'ai-post-scheduler'); ?>
 					</button>
-					<span id="aips-unified-selected-count" class="aips-selected-count hidden"></span>
+					<span id="aips-unified-selected-count" class="aips-selected-count is-hidden"></span>
 				</div>
 			</div>
 
@@ -275,7 +275,7 @@ if (!defined('ABSPATH')) {
 				</table>
 
 				<!-- No Search Results State -->
-				<div id="aips-unified-search-no-results" class="aips-empty-state hidden aips-empty-state-spacious">
+				<div id="aips-unified-search-no-results" class="aips-empty-state is-hidden aips-empty-state-spacious">
 					<div class="dashicons dashicons-search aips-empty-state-icon" aria-hidden="true"></div>
 					<h3 class="aips-empty-state-title"><?php esc_html_e('No Schedules Found', 'ai-post-scheduler'); ?></h3>
 					<p class="aips-empty-state-description"><?php esc_html_e('No schedules match your search criteria. Try a different search term.', 'ai-post-scheduler'); ?></p>
@@ -335,7 +335,7 @@ if (!defined('ABSPATH')) {
 <!-- ============================================================ -->
 <!-- Add / Edit Template Schedule Modal                           -->
 <!-- ============================================================ -->
-<div id="aips-schedule-modal" class="aips-modal"
+<div id="aips-schedule-modal" class="aips-modal is-hidden"
 	data-preselect-template="<?php echo esc_attr($preselect_template_id); ?>"
 	data-preselect-structure="<?php echo esc_attr($preselect_structure_id); ?>">
 	<div class="aips-modal-content">
@@ -481,7 +481,7 @@ if (!defined('ABSPATH')) {
 <!-- ============================================================ -->
 <!-- Schedule History Modal                                       -->
 <!-- ============================================================ -->
-<div id="aips-schedule-history-modal" class="aips-modal"
+<div id="aips-schedule-history-modal" class="aips-modal is-hidden"
 	role="dialog" aria-modal="true">
 	<div class="aips-modal-content aips-modal-large">
 		<div class="aips-modal-header">
@@ -493,12 +493,12 @@ if (!defined('ABSPATH')) {
 				<span class="dashicons dashicons-update aips-spin" aria-hidden="true"></span>
 				<span class="screen-reader-text"><?php esc_html_e('Loading history…', 'ai-post-scheduler'); ?></span>
 			</div>
-			<div id="aips-schedule-history-empty" class="aips-empty-state hidden aips-empty-state-medium">
+			<div id="aips-schedule-history-empty" class="aips-empty-state is-hidden aips-empty-state-medium">
 				<div class="dashicons dashicons-backup aips-empty-state-icon" aria-hidden="true"></div>
 				<h3 class="aips-empty-state-title"><?php esc_html_e('No History Yet', 'ai-post-scheduler'); ?></h3>
 				<p class="aips-empty-state-description"><?php esc_html_e('No history events have been recorded for this schedule yet.', 'ai-post-scheduler'); ?></p>
 			</div>
-			<ul id="aips-schedule-history-list" class="aips-history-timeline hidden aips-list-reset"></ul>
+			<ul id="aips-schedule-history-list" class="aips-history-timeline is-hidden aips-list-reset"></ul>
 		</div>
 	</div>
 </div>

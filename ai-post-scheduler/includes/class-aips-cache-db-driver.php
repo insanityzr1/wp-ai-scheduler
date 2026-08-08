@@ -36,6 +36,10 @@ class AIPS_Cache_Db_Driver implements AIPS_Cache_Driver, AIPS_Cache_Monitorable_
 		$this->prefix = (string) $prefix;
 	}
 
+	public function is_available() {
+		return true;
+	}
+
 	/**
 	 * {@inheritdoc}
 	 */

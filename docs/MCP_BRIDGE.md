@@ -8,9 +8,22 @@ The JSON schema for all tools is at `ai-post-scheduler/mcp-bridge-schema.json`. 
 
 ---
 
+## Enabling the bridge
+
+The bridge is **disabled by default**. It cannot be turned on from the WordPress admin UI — it must be explicitly enabled by a site operator with filesystem access, by adding both of the following to `wp-config.php`:
+
+```php
+define( 'AIPS_MCP_BRIDGE_ENABLED', true );
+define( 'AIPS_MCP_BRIDGE_TOKEN', 'a long random shared secret, e.g. from `wp_generate_password( 64, false )`' );
+```
+
+Without `AIPS_MCP_BRIDGE_ENABLED`, any HTTP POST to `mcp-bridge.php` returns a 404. `AIPS_MCP_BRIDGE_TOKEN` is a shared secret every request must present (see Protocol below) — this is deliberately not a DB option/settings checkbox, so a compromised `manage_options` admin session cannot self-enable the bridge.
+
+---
+
 ## Authentication
 
-All requests require WordPress admin capabilities (`manage_options`). Supported methods:
+All requests require **both** the shared-secret token above (`token` field in the JSON-RPC request body) **and** WordPress admin capabilities (`manage_options`). Supported methods for the latter:
 
 - **Application Passwords** (recommended): generate at WordPress Dashboard → Users → Profile → Application Passwords. Format: `xxxx xxxx xxxx xxxx xxxx xxxx`.
 - **Session cookies**: send WordPress session cookies with the request.
@@ -25,7 +38,7 @@ All requests require WordPress admin capabilities (`manage_options`). Supported 
 curl -X POST https://your-site.com/wp-content/plugins/ai-post-scheduler/mcp-bridge.php \
   -u "admin:xxxx xxxx xxxx xxxx" \
   -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"list_tools","params":{},"id":1}'
+  -d '{"jsonrpc":"2.0","method":"list_tools","params":{},"id":1,"token":"YOUR_AIPS_MCP_BRIDGE_TOKEN"}'
 
 # Or run the local test suite
 cd ai-post-scheduler && php test-mcp-bridge.php
@@ -127,8 +140,10 @@ Test with: `@mcp list_tools from aips` in Copilot chat. Expected: 25 tools.
 All requests follow JSON-RPC 2.0:
 
 ```json
-{ "jsonrpc": "2.0", "method": "tool_name", "params": {}, "id": 1 }
+{ "jsonrpc": "2.0", "method": "tool_name", "params": {}, "id": 1, "token": "YOUR_AIPS_MCP_BRIDGE_TOKEN" }
 ```
+
+The top-level `token` field must match the `AIPS_MCP_BRIDGE_TOKEN` constant defined in `wp-config.php`; requests without it (or with a wrong value) are rejected before any tool runs, regardless of WordPress authentication.
 
 Error responses:
 
@@ -136,7 +151,7 @@ Error responses:
 { "jsonrpc": "2.0", "error": { "code": -32001, "message": "Insufficient permissions." }, "id": 1 }
 ```
 
-Error codes: `-32700` parse error, `-32600` invalid request, `-32001` insufficient permissions, `-32000` tool execution error.
+Error codes: `-32700` parse error, `-32600` invalid request, `-32001` invalid/missing token or insufficient permissions, `-32000` tool execution error. A disabled bridge (`AIPS_MCP_BRIDGE_ENABLED` not set) returns a plain HTTP 404, not a JSON-RPC error.
 
 ---
 
@@ -150,8 +165,10 @@ Error codes: `-32700` parse error, `-32600` invalid request, `-32001` insufficie
 
 ## Troubleshooting
 
+- **404 on every request**: the bridge is disabled by default — define `AIPS_MCP_BRIDGE_ENABLED` and `AIPS_MCP_BRIDGE_TOKEN` in `wp-config.php` (see "Enabling the bridge" above).
+- **-32001 invalid/missing token**: the request body's `token` field doesn't match `AIPS_MCP_BRIDGE_TOKEN`.
 - **401 / auth failure**: use Application Password (not main password); username must be WordPress login name, not email.
 - **403 / permissions**: user must have administrator role (`manage_options`).
-- **Bridge not accessible**: check file permissions on `mcp-bridge.php` and that the plugin is active.
+- **Bridge not accessible**: check file permissions on `mcp-bridge.php`, that the plugin is active, and that the bridge is enabled per above.
 - **Timeout on `generate_post`**: expected for long-running AI calls; increase `timeout` in MCP client config.
 - **Debug logs**: `wp-content/debug.log` (requires `WP_DEBUG_LOG true`) and plugin logs under `wp-content/uploads/aips-logs/`.

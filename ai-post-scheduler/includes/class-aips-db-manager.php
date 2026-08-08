@@ -132,13 +132,13 @@ class AIPS_DB_Manager {
         $sql[] = "CREATE TABLE $table_history_log (
             id bigint(20) NOT NULL AUTO_INCREMENT,
             history_id bigint(20) NOT NULL,
-            log_type varchar(50) NOT NULL,
             history_type_id int DEFAULT 1,
             timestamp bigint(20) unsigned NOT NULL DEFAULT 0,
             details longtext,
             PRIMARY KEY  (id),
             KEY history_id (history_id),
-            KEY history_type_id (history_type_id)
+            KEY history_type_id (history_type_id),
+            KEY history_id_log_type (history_id, log_type)
         ) $charset_collate;";
 
         $sql[] = "CREATE TABLE $table_campaigns (

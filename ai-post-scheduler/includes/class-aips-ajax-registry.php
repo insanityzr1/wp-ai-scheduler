@@ -155,7 +155,6 @@ class AIPS_Ajax_Registry {
 
 		// History
 		'aips_bulk_delete_history'        => 'AIPS_History',
-		'aips_clear_history'              => 'AIPS_History',
 		'aips_export_history'             => 'AIPS_History',
 		'aips_get_history_details'        => 'AIPS_History',
 		'aips_get_history_logs'           => 'AIPS_History',
@@ -256,6 +255,11 @@ class AIPS_Ajax_Registry {
 		'aips_status_clear_partial_generations' => 'AIPS_System_Status_Controller',
 		'aips_status_cleanup_stale_jobs_cache' => 'AIPS_System_Status_Controller',
 		'aips_rebuild_caches'            => 'AIPS_System_Status_Controller',
+		'aips_status_refresh_system'     => 'AIPS_System_Status_Controller',
+		'aips_status_cache_maintenance'  => 'AIPS_System_Status_Controller',
+		'aips_status_cleanup_notifications' => 'AIPS_System_Status_Controller',
+		'aips_status_reset_resilience'   => 'AIPS_System_Status_Controller',
+		'aips_status_repair_datetime'    => 'AIPS_System_Status_Controller',
 
 		// Internal Links Controller
 		'aips_internal_links_get_suggestions'        => 'AIPS_Internal_Links_Controller',

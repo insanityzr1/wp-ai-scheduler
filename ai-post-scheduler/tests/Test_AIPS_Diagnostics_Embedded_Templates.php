@@ -28,8 +28,6 @@ class Test_AIPS_Diagnostics_Embedded_Templates extends WP_UnitTestCase {
 						),
 					),
 				),
-				'export_formats' => array(),
-				'import_formats' => array(),
 			)
 		);
 

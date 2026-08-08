@@ -109,6 +109,7 @@
                 });
 
                 var counts = d.schedule_counts || {};
+                var rateLimiter = d.rate_limiter || { enabled: false, remaining: 0, max_requests: 0 };
                 var cards = [
                     {
                         label: aipsScheduleL10n.activeSchedulesLabel,
@@ -124,6 +125,11 @@
                         label: aipsScheduleL10n.queueDepthLabel,
                         value: queueTotal,
                         tone: 'info'
+                    },
+                    {
+                        label: rateLimiter.enabled ? 'Rate Limit Remaining' : 'Rate Limiting',
+                        value: rateLimiter.enabled ? (rateLimiter.remaining + ' / ' + rateLimiter.max_requests) : 'Disabled',
+                        tone: rateLimiter.enabled && rateLimiter.remaining === 0 ? 'error' : (rateLimiter.enabled ? 'success' : 'neutral')
                     },
                     {
                         label: aipsScheduleL10n.bulkFailedLabel,
@@ -270,6 +276,8 @@
             $(document).on('click', '.aips-run-now-schedule', this.runNowSchedule);
             $(document).on('click', '.aips-save-schedule', this.saveSchedule);
             $(document).on('click', '.aips-save-schedule-wizard', this.saveScheduleWizard);
+            $(document).on('change', '#schedule_frequency', this.onScheduleFrequencyChange);
+            $(document).on('click', '.aips-schedule-day-btn', this.onScheduleDayPick);
             $(document).on('click', '.aips-delete-schedule', this.deleteSchedule);
             $(document).on('change', '.aips-toggle-schedule', this.toggleSchedule);
             $(document).on('click', '.aips-view-schedule-history', this.viewScheduleHistory);
@@ -294,6 +302,9 @@
             $(document).on('keyup search', '#aips-unified-search', this.filterUnifiedSchedules);
             $(document).on('click', '#aips-unified-search-clear', this.clearUnifiedSearch);
             $(document).on('click', '.aips-clear-unified-search-btn', this.clearUnifiedSearch);
+            $(document).on('click', '.aips-tab', this.switchScheduleTab);
+            $(document).on('click', '.aips-reset-circuit', this.resetScheduleCircuit);
+            $(document).on('click', '.aips-resume-batch', this.resumeScheduleBatch);
 
 
 
@@ -696,6 +707,9 @@
                         AIPS.toggleImagePrompt();
                         AIPS.toggleFeaturedImageSourceFields();
 
+                        // Restore affiliate links setting.
+                        $('#affiliate_links_enabled').prop('checked', t.affiliate_links_enabled == 1);
+
                         // Restore source group settings.
                         var includeSources = t.include_sources == 1;
                         $('#include_sources').prop('checked', includeSources);
@@ -894,6 +908,7 @@
                     post_tags: $('#post_tags').val(),
                     post_author: $('#post_author').val(),
                     include_sources: $('#include_sources').is(':checked') ? 1 : 0,
+                    affiliate_links_enabled: $('#affiliate_links_enabled').is(':checked') ? 1 : 0,
                     source_group_ids: (function() {
                         var ids = [];
                         $('.aips-template-source-group-cb:checked').each(function() { ids.push($(this).val()); });
@@ -970,6 +985,7 @@
                     post_tags: $('#post_tags').val(),
                     post_author: $('#post_author').val(),
                     include_sources: $('#include_sources').is(':checked') ? 1 : 0,
+                    affiliate_links_enabled: $('#affiliate_links_enabled').is(':checked') ? 1 : 0,
                     source_group_ids: (function() {
                         var ids = [];
                         $('.aips-template-source-group-cb:checked').each(function() { ids.push($(this).val()); });
@@ -1401,6 +1417,67 @@
         },
 
         /**
+         * Reset the legacy modal's "Repeat on" day picker: hide it, clear the
+         * hidden day value, and un-highlight all day buttons.
+         */
+        resetScheduleDayPicker: function() {
+            $('#schedule_repeat_day').val('');
+            $('.aips-schedule-day-btn').removeClass('aips-btn-primary').addClass('aips-btn-secondary');
+            $('#aips-schedule-repeat-on-row').hide();
+        },
+
+        /**
+         * Apply a `frequency` value (as stored on a schedule row) to the legacy
+         * modal's Frequency select and "Repeat on" day picker.
+         *
+         * The Frequency dropdown no longer lists the 7 day-specific values
+         * (`every_monday` ... `every_sunday`) directly, so a day-specific
+         * frequency is presented as "Weekly" with the matching day pre-selected.
+         *
+         * @param {string} frequency
+         */
+        applyScheduleFrequencyToForm: function(frequency) {
+            var dayMatch = /^every_(monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/.exec(frequency || '');
+            AIPS.resetScheduleDayPicker();
+            if (dayMatch) {
+                var day = dayMatch[1];
+                $('#schedule_frequency').val('weekly');
+                $('#schedule_repeat_day').val(day);
+                $('.aips-schedule-day-btn[data-day="' + day + '"]').removeClass('aips-btn-secondary').addClass('aips-btn-primary');
+                $('#aips-schedule-repeat-on-row').show();
+            } else {
+                $('#schedule_frequency').val(frequency);
+                $('#aips-schedule-repeat-on-row').toggle(frequency === 'weekly');
+            }
+        },
+
+        /**
+         * Show/hide the "Repeat on" day picker when the Frequency select changes.
+         *
+         * @param {Event} e - Change event from `#schedule_frequency`.
+         */
+        onScheduleFrequencyChange: function(e) {
+            if ($(this).val() === 'weekly') {
+                $('#aips-schedule-repeat-on-row').show();
+            } else {
+                AIPS.resetScheduleDayPicker();
+            }
+        },
+
+        /**
+         * Single-select a day-of-week button in the "Repeat on" picker.
+         *
+         * @param {Event} e - Click event from an `.aips-schedule-day-btn` element.
+         */
+        onScheduleDayPick: function(e) {
+            e.preventDefault();
+            var $btn = $(this);
+            $('.aips-schedule-day-btn').removeClass('aips-btn-primary').addClass('aips-btn-secondary');
+            $btn.removeClass('aips-btn-secondary').addClass('aips-btn-primary');
+            $('#schedule_repeat_day').val($btn.data('day'));
+        },
+
+        /**
          * Open the schedule wizard in "Add New" mode.
          *
          * Resets the wizard form, initialises the wizard to step 1, and shows
@@ -1416,6 +1493,7 @@
                 // Fallback to legacy modal if wizard not present
                 $('#aips-schedule-form')[0].reset();
                 $('#schedule_id').val('');
+                AIPS.resetScheduleDayPicker();
                 $('#aips-schedule-modal').find('.aips-modal-title').text('Add New Schedule');
                 $('#aips-schedule-modal').show();
                 return;
@@ -1454,18 +1532,14 @@
                 $('#schedule_id').val(scheduleId);
                 $('#schedule_title').val(scheduleTitle || '');
                 $('#schedule_template').val(templateId);
-                $('#schedule_frequency').val(frequency);
+                AIPS.applyScheduleFrequencyToForm(frequency);
                 $('#schedule_topic').val(topic || '');
                 $('#article_structure_id').val(articleStructureId || '');
                 $('#rotation_pattern').val(rotationPattern || '');
                 $('#schedule_is_active').prop('checked', isActive == 1);
                 if (nextRun) {
-                    var dt0 = AIPS.DateTime.parse(nextRun);
-                    if (dt0) {
-                        var pad0 = function(n) { return n < 10 ? '0' + n : n; };
-                        $('#schedule_start_time').val(dt0.getFullYear() + '-' + pad0(dt0.getMonth() + 1) + '-' + pad0(dt0.getDate()) +
-                            'T' + pad0(dt0.getHours()) + ':' + pad0(dt0.getMinutes()));
-                    }
+                    var offsetSeconds = (typeof aipsScheduleL10n !== 'undefined') ? aipsScheduleL10n.gmtOffsetSeconds : 0;
+                    $('#schedule_start_time').val(AIPS.DateTime.toLocalInputValue(nextRun, offsetSeconds));
                 }
                 $('#aips-schedule-modal').find('.aips-modal-title').text('Edit Schedule');
                 $('#aips-schedule-modal').show();
@@ -1525,7 +1599,7 @@
                 $('#schedule_id').val('');
                 $('#schedule_title').val(scheduleTitle || '');
                 $('#schedule_template').val(templateId);
-                $('#schedule_frequency').val(frequency);
+                AIPS.applyScheduleFrequencyToForm(frequency);
                 $('#schedule_topic').val(topic);
                 $('#article_structure_id').val(articleStructureId);
                 $('#rotation_pattern').val(rotationPattern);
@@ -1575,6 +1649,13 @@
 
             AIPS.Utilities.setButtonLoading($btn, aipsAdminL10n.saving);
 
+            // "Weekly" + a selected day maps to the day-specific backend frequency
+            // (e.g. 'every_monday') so the existing recurrence math is reused unchanged.
+            var repeatDay = $('#schedule_repeat_day').val();
+            var frequency = ($('#schedule_frequency').val() === 'weekly' && repeatDay)
+                ? 'every_' + repeatDay
+                : $('#schedule_frequency').val();
+
             $.ajax({
                 url: aipsAjax.ajaxUrl,
                 type: 'POST',
@@ -1584,7 +1665,7 @@
                     schedule_id: $('#schedule_id').val(),
                     schedule_title: $('#schedule_title').val(),
                     template_id: $('#schedule_template').val(),
-                    frequency: $('#schedule_frequency').val(),
+                    frequency: frequency,
                     start_time: $('#schedule_start_time').val(),
                     topic: $('#schedule_topic').val(),
                     article_structure_id: $('#article_structure_id').val(),
@@ -2296,6 +2377,134 @@
         },
 
         /**
+         * Switch between schedule tabs (All/Content/Author).
+         *
+         * @param {Event} e - Click event on .aips-tab
+         */
+        switchScheduleTab: function(e) {
+            e.preventDefault();
+
+            var $tab = $(this);
+            var tabCategory = $tab.data('tab');
+
+            // Update active tab
+            $('.aips-tab').removeClass('aips-tab-active');
+            $tab.addClass('aips-tab-active');
+
+            // Filter rows by tab category
+            if (tabCategory === 'all') {
+                $('.aips-unified-row').show();
+            } else {
+                $('.aips-unified-row').each(function() {
+                    var rowCategory = $(this).data('tab-category');
+                    if (rowCategory === tabCategory) {
+                        $(this).show();
+                    } else {
+                        $(this).hide();
+                    }
+                });
+            }
+
+            // Update bulk action state
+            AIPS.updateUnifiedBulkActions();
+        },
+
+        /**
+         * Reset circuit breaker for a specific schedule.
+         *
+         * @param {Event} e - Click event on .aips-reset-circuit
+         */
+        resetScheduleCircuit: function(e) {
+            e.preventDefault();
+
+            var $btn = $(this);
+            var id = $btn.data('id');
+            var type = $btn.data('type');
+
+            if (!confirm('Reset the circuit breaker for this schedule? This will allow it to attempt generation on its next run.')) {
+                return;
+            }
+
+            $btn.prop('disabled', true).find('.dashicons').addClass('aips-spin');
+
+            $.post(ajaxurl, {
+                action: 'aips_reset_schedule_circuit',
+                nonce: aipsData.nonce,
+                id: id,
+                type: type
+            })
+            .done(function(response) {
+                if (response.success) {
+                    AIPS.showNotice(response.data.message || 'Circuit breaker reset successfully.', 'success');
+
+                    // Update the row's circuit state
+                    var $row = $btn.closest('.aips-unified-row');
+                    $row.attr('data-circuit-state', 'closed');
+
+                    // Update health indicator badge
+                    $row.find('.column-status .aips-schedule-status-wrapper').first().html(
+                        '<div style="display:flex;align-items:center;gap:8px;">' +
+                        '<span class="aips-badge aips-badge-success" title="Circuit Breaker Status">' +
+                        '<span class="dashicons dashicons-yes"></span> Healthy</span></div>'
+                    );
+
+                    // Remove the reset button
+                    $btn.remove();
+                } else {
+                    AIPS.showNotice(response.data || 'Failed to reset circuit breaker.', 'error');
+                    $btn.prop('disabled', false).find('.dashicons').removeClass('aips-spin');
+                }
+            })
+            .fail(function() {
+                AIPS.showNotice('An error occurred while resetting the circuit breaker.', 'error');
+                $btn.prop('disabled', false).find('.dashicons').removeClass('aips-spin');
+            });
+        },
+
+        /**
+         * Resume an incomplete batch for a specific schedule.
+         *
+         * @param {Event} e - Click event on .aips-resume-batch
+         */
+        resumeScheduleBatch: function(e) {
+            e.preventDefault();
+
+            var $btn = $(this);
+            var id = $btn.data('id');
+            var type = $btn.data('type');
+
+            if (!confirm('Resume the incomplete batch for this schedule? This will continue generation from where it left off.')) {
+                return;
+            }
+
+            $btn.prop('disabled', true).find('.dashicons').addClass('aips-spin');
+
+            $.post(ajaxurl, {
+                action: 'aips_resume_schedule_batch',
+                nonce: aipsData.nonce,
+                id: id,
+                type: type
+            })
+            .done(function(response) {
+                if (response.success) {
+                    AIPS.showNotice(response.data.message || 'Batch resumed successfully.', 'success');
+
+                    // Optionally reload the page or update the UI
+                    setTimeout(function() {
+                        window.location.reload();
+                    }, 1500);
+                } else {
+                    AIPS.showNotice(response.data || 'Failed to resume batch.', 'error');
+                    $btn.prop('disabled', false).find('.dashicons').removeClass('aips-spin');
+                }
+            })
+            .fail(function() {
+                AIPS.showNotice('An error occurred while resuming the batch.', 'error');
+                $btn.prop('disabled', false).find('.dashicons').removeClass('aips-spin');
+            });
+        },
+
+        /**
          * Sync all unified-schedule checkboxes with the "select all" header.
          */
         toggleAllUnified: function() {
@@ -2719,6 +2928,23 @@
 
             if (!id || !type) { return; }
 
+            AIPS.Utilities.confirm(
+                aipsScheduleL10n.runNowChoice || 'How should this manual run affect the schedule?',
+                aipsScheduleL10n.runNow || 'Run Now',
+                [
+                    { label: aipsScheduleL10n.cancel || 'Cancel', className: 'aips-btn aips-btn-secondary' },
+                    { label: aipsScheduleL10n.runNowIndependent || 'Run now, independently from schedule', className: 'aips-btn aips-btn-secondary', action: function() {
+                        AIPS.executeUnifiedRunNow($btn, id, type, false);
+                    }},
+                    { label: aipsScheduleL10n.runNowAndAdvance || 'Run next scheduled run now and advance', className: 'aips-btn aips-btn-primary', action: function() {
+                        AIPS.executeUnifiedRunNow($btn, id, type, true);
+                    }}
+                ]
+            );
+        },
+
+        /** Execute a unified schedule using the selected schedule-advance mode. */
+        executeUnifiedRunNow: function($btn, id, type, advanceSchedule) {
             AIPS.Utilities.setButtonLoading($btn, '<span class="dashicons dashicons-update aips-spin"></span>', { isHtml: true });
 
             $.ajax({
@@ -2728,7 +2954,8 @@
                     action: 'aips_unified_run_now',
                     nonce: aipsAjax.nonce,
                     id: id,
-                    type: type
+                    type: type,
+                    advance_schedule: advanceSchedule ? 1 : 0
                 },
                 success: function(response) {
                     if (response.success) {

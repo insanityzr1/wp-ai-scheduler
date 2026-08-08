@@ -16,10 +16,24 @@ class AIPS_Template_Renderer {
 	 * @return void
 	 */
 	public static function render($template_relative_path, array $view_model = array()) {
-		$template_relative_path = ltrim((string) $template_relative_path, '/\\');
-		$template_path = AIPS_PLUGIN_DIR . $template_relative_path;
+		$template_relative_path = wp_normalize_path(ltrim((string) $template_relative_path, '/\\'));
 
-		if (!file_exists($template_path)) {
+		// Prevent directory traversal (e.g. "../") and keep includes within the plugin directory.
+		if (preg_match('#(^|/)\\.\\.(/|$)#', $template_relative_path)) {
+			return;
+		}
+
+		$plugin_root   = realpath(AIPS_PLUGIN_DIR);
+		$template_path = realpath(AIPS_PLUGIN_DIR . $template_relative_path);
+
+		if (!$plugin_root || !$template_path) {
+			return;
+		}
+
+		$plugin_root   = wp_normalize_path($plugin_root);
+		$template_path = wp_normalize_path($template_path);
+
+		if (0 !== strpos($template_path, rtrim($plugin_root, '/') . '/')) {
 			return;
 		}
 

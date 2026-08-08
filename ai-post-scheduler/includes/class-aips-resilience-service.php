@@ -65,19 +65,32 @@ class AIPS_Resilience_Service {
         'json_query_unavailable',
     );
 
+    // Bounds for retrying the local rate-limiter gate inside execute_safely().
+    //
+    // The local sliding-window limiter (check_rate_limit()) is self-imposed, not a
+    // provider error — a burst of calls for a single post (title/content/excerpt)
+    // can exhaust it even though the provider itself is healthy. These bounds keep
+    // the wait short enough to be safe for synchronous callers (e.g. the "Run Now"
+    // AJAX request, subject to PHP max_execution_time) while still giving the
+    // window a real chance to free up.
+    //
+    // If a slot cannot free up within RATE_LIMIT_RETRY_MAX_WAIT_SECONDS, the gate
+    // fails immediately instead of sleeping — waiting out a window that is longer
+    // than the budget only delays an error that is already unavoidable.
+
     /**
-     * Bounds for retrying the local rate-limiter gate inside execute_safely().
-     *
-     * The local sliding-window limiter (check_rate_limit()) is self-imposed, not a
-     * provider error — a burst of calls for a single post (title/content/excerpt)
-     * can exhaust it even though the provider itself is healthy. These bounds keep
-     * the wait short enough to be safe for synchronous callers (e.g. the "Run Now"
-     * AJAX request, subject to PHP max_execution_time) while still giving the
-     * window a real chance to free up.
+     * Maximum number of times the local rate-limit gate is re-checked.
      *
      * @var int
      */
     const RATE_LIMIT_RETRY_MAX_ATTEMPTS = 3;
+
+    /**
+     * Maximum seconds to sleep on a single rate-limit retry attempt. Doubles as
+     * the "is waiting worth it at all?" budget — see wait_for_rate_limit_capacity().
+     *
+     * @var int
+     */
     const RATE_LIMIT_RETRY_MAX_WAIT_SECONDS = 10;
 
     /**
@@ -599,9 +612,11 @@ class AIPS_Resilience_Service {
         $period = $rl_config['period'];
         $current_time = time();
 
-        // Load rate limiter state from transient
+        // Load rate limiter state from transient. Anything other than an array
+        // (missing, or corrupted by an external writer) is treated as empty —
+        // array_filter() would otherwise raise a TypeError on PHP 8.
         $requests = get_transient('aips_rate_limiter_requests');
-        if ($requests === false) {
+        if (!is_array($requests)) {
             $requests = array();
         }
 
@@ -645,7 +660,7 @@ class AIPS_Resilience_Service {
         $rl_config = $this->config->get_rate_limit_config();
         $requests = get_transient('aips_rate_limiter_requests');
 
-        if ($requests === false) {
+        if (!is_array($requests)) {
             $requests = array();
         }
 
@@ -687,8 +702,9 @@ class AIPS_Resilience_Service {
      *
      * @param string $type Request type for logging.
      * @return bool True once the rate limiter allows the request (a slot has
-     *              already been recorded), false if capacity never freed up
-     *              within RATE_LIMIT_RETRY_MAX_ATTEMPTS.
+     *              already been recorded), false if capacity did not free up
+     *              within RATE_LIMIT_RETRY_MAX_ATTEMPTS or if the next slot is
+     *              further out than RATE_LIMIT_RETRY_MAX_WAIT_SECONDS.
      */
     private function wait_for_rate_limit_capacity($type) {
         for ($attempt = 1; $attempt <= self::RATE_LIMIT_RETRY_MAX_ATTEMPTS; $attempt++) {
@@ -705,10 +721,24 @@ class AIPS_Resilience_Service {
                 break;
             }
 
-            $wait = min(
-                self::RATE_LIMIT_RETRY_MAX_WAIT_SECONDS,
-                max(1, $this->seconds_until_rate_limit_slot_frees())
-            );
+            $wait = $this->seconds_until_rate_limit_slot_frees();
+
+            // Sleeping longer than the budget can never succeed, so don't burn the
+            // caller's request time (or PHP's max_execution_time) on a wait we
+            // already know is too short to matter — fail fast instead.
+            if ($wait > self::RATE_LIMIT_RETRY_MAX_WAIT_SECONDS) {
+                $this->logger->log(
+                    "Rate limit reached, next slot frees in {$wait}s (over the " . self::RATE_LIMIT_RETRY_MAX_WAIT_SECONDS . 's wait budget) — failing fast',
+                    'warning',
+                    array('type' => $type)
+                );
+
+                return false;
+            }
+
+            // A freshly-expired or untracked slot reports 0; still pause briefly so
+            // the retry isn't a busy spin.
+            $wait = max(1, $wait);
 
             $this->logger->log("Rate limit reached, waiting {$wait}s before retry (attempt {$attempt})", 'warning', array(
                 'type' => $type,
@@ -721,23 +751,50 @@ class AIPS_Resilience_Service {
     }
 
     /**
-     * Compute how many seconds remain until the oldest request in the current
-     * rate-limit window ages out, i.e. until a slot actually frees up.
+     * Compute how many seconds remain until enough requests age out of the current
+     * rate-limit window for one more request to be admitted.
      *
-     * @return int Seconds until a slot frees (0 if none are tracked or already expired).
+     * Mirrors the sliding-window filtering in check_rate_limit(): the stored
+     * transient can retain timestamps older than the window (check_rate_limit()
+     * does not persist its filtered array when it denies a request, and each
+     * successful write extends the transient's TTL by a full period), so expired
+     * entries are dropped here before measuring. Counting them would understate
+     * the wait and make wait_for_rate_limit_capacity() retry too early.
+     *
+     * When the configured limit has been lowered while requests were already
+     * tracked, more than one entry may need to expire; this returns the wait for
+     * the newest of those, not merely the oldest tracked request.
+     *
+     * @return int Seconds until a slot frees (0 if none are tracked or all have expired).
      */
     private function seconds_until_rate_limit_slot_frees() {
         $rl_config = $this->config->get_rate_limit_config();
-        $period = $rl_config['period'];
+        $period = (int) $rl_config['period'];
+        $max_requests = (int) $rl_config['requests'];
 
         $requests = get_transient('aips_rate_limiter_requests');
-        if (empty($requests)) {
+        if (!is_array($requests) || empty($requests) || $max_requests < 1) {
+            return 0;
+        }
+
+        $current_time = time();
+
+        // Drop entries that have already aged out of the window.
+        $requests = array_values(array_filter($requests, function($timestamp) use ($current_time, $period) {
+            return ($current_time - $timestamp) < $period;
+        }));
+
+        if (empty($requests) || count($requests) < $max_requests) {
             return 0;
         }
 
         sort($requests);
-        $oldest = $requests[0];
 
-        return max(0, ($oldest + $period) - time());
+        // Admitting one more request means getting below the limit, so
+        // count() - $max_requests + 1 entries must expire; the last of those is at
+        // index count() - $max_requests.
+        $slot_frees_at = $requests[count($requests) - $max_requests] + $period;
+
+        return max(0, $slot_frees_at - $current_time);
     }
 }

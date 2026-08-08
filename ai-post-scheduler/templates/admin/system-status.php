@@ -32,58 +32,40 @@ if (!defined('ABSPATH')) {
                     <p><?php esc_html_e('One-click recovery and cleanup operations. Refresh System runs every safe maintenance operation in a single request.', 'ai-post-scheduler'); ?></p>
                 </div>
 
-                <?php if (!empty($refresh_task_groups)) : ?>
-                <div class="aips-refresh-task-selector">
-                    <div class="aips-refresh-task-selector-header">
-                        <span class="aips-status-op-group-label"><?php esc_html_e('Refresh tasks', 'ai-post-scheduler'); ?></span>
-                        <button type="button" class="aips-btn aips-btn-sm aips-btn-ghost aips-toggle-refresh-tasks"><?php esc_html_e('Toggle All', 'ai-post-scheduler'); ?></button>
+                <div class="aips-refresh-system-layout">
+                    <div class="aips-refresh-system-action">
+                        <button type="button" class="aips-btn aips-btn-primary aips-refresh-system aips-refresh-system-lg">
+                            <span class="dashicons dashicons-update"></span>
+                            <span class="aips-refresh-system-label"><?php esc_html_e('Refresh System', 'ai-post-scheduler'); ?></span>
+                        </button>
+                        <span class="spinner aips-spinner-inline"></span>
                     </div>
-                    <?php foreach ($refresh_task_groups as $task_group) : ?>
-                        <div class="aips-status-op-group">
-                            <span class="aips-status-op-group-label"><?php echo esc_html($task_group['label']); ?></span>
-                            <div class="aips-checkbox-group aips-refresh-task-list">
-                                <?php foreach ($task_group['tasks'] as $task) : ?>
-                                    <?php $task_input_id = 'aips-refresh-task-' . $task['step']; ?>
-                                    <label class="aips-checkbox-label" for="<?php echo esc_attr($task_input_id); ?>">
-                                        <input type="checkbox" id="<?php echo esc_attr($task_input_id); ?>" class="aips-refresh-task" name="aips_refresh_tasks[]" value="<?php echo esc_attr($task['step']); ?>" checked>
-                                        <span><?php echo esc_html($task['label']); ?></span>
-                                    </label>
-                                <?php endforeach; ?>
-                            </div>
+
+                    <?php if (!empty($refresh_task_groups)) : ?>
+                    <div class="aips-refresh-task-selector">
+                        <div class="aips-refresh-task-selector-header">
+                            <span class="aips-status-op-group-label"><?php esc_html_e('Refresh tasks', 'ai-post-scheduler'); ?></span>
+                            <button type="button" class="aips-btn aips-btn-sm aips-btn-ghost aips-toggle-refresh-tasks"><?php esc_html_e('Toggle All', 'ai-post-scheduler'); ?></button>
                         </div>
-                    <?php endforeach; ?>
+                        <?php foreach ($refresh_task_groups as $task_group) : ?>
+                            <div class="aips-status-op-group">
+                                <span class="aips-status-op-group-label"><?php echo esc_html($task_group['label']); ?></span>
+                                <div class="aips-checkbox-group aips-refresh-task-list">
+                                    <?php foreach ($task_group['tasks'] as $task) : ?>
+                                        <?php $task_input_id = 'aips-refresh-task-' . $task['step']; ?>
+                                        <label class="aips-checkbox-label" for="<?php echo esc_attr($task_input_id); ?>">
+                                            <input type="checkbox" id="<?php echo esc_attr($task_input_id); ?>" class="aips-refresh-task" name="aips_refresh_tasks[]" value="<?php echo esc_attr($task['step']); ?>" checked>
+                                            <span><?php echo esc_html($task['label']); ?></span>
+                                        </label>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php endif; ?>
                 </div>
-                <?php endif; ?>
 
-                <div class="aips-refresh-system-row">
-                    <button type="button" class="aips-btn aips-btn-primary aips-refresh-system">
-                        <span class="dashicons dashicons-update"></span>
-                        <?php esc_html_e('Refresh System', 'ai-post-scheduler'); ?>
-                    </button>
-                    <span class="spinner aips-spinner-inline"></span>
-                </div>
                 <div class="aips-refresh-system-results" style="display:none;"></div>
-
-                <div class="aips-status-op-group">
-                    <span class="aips-status-op-group-label"><?php esc_html_e('Recovery', 'ai-post-scheduler'); ?></span>
-                    <div class="aips-btn-group aips-action-group">
-                        <button type="button" class="aips-btn aips-btn-sm aips-btn-secondary aips-status-op" data-op="aips_status_reschedule_missed_cron"><?php esc_html_e('Reschedule Missed Cron Hooks', 'ai-post-scheduler'); ?></button>
-                        <button type="button" class="aips-btn aips-btn-sm aips-btn-secondary aips-status-op" data-op="aips_status_retry_failed_slices"><?php esc_html_e('Retry Failed Slices', 'ai-post-scheduler'); ?></button>
-                        <button type="button" class="aips-btn aips-btn-sm aips-btn-secondary aips-status-op" data-op="aips_status_repair_campaign_data"><?php esc_html_e('Repair Campaign Data', 'ai-post-scheduler'); ?></button>
-                        <button type="button" class="aips-btn aips-btn-sm aips-btn-secondary aips-status-op" data-op="aips_status_clear_partial_generations"><?php esc_html_e('Clear Stuck Partial Generations', 'ai-post-scheduler'); ?></button>
-                        <button type="button" class="aips-btn aips-btn-sm aips-btn-secondary aips-status-op" data-op="aips_status_cleanup_stale_jobs_cache"><?php esc_html_e('Cleanup Stale Batch Jobs/Cache', 'ai-post-scheduler'); ?></button>
-                    </div>
-                </div>
-
-                <div class="aips-status-op-group">
-                    <span class="aips-status-op-group-label"><?php esc_html_e('Cleanup & repair', 'ai-post-scheduler'); ?></span>
-                    <div class="aips-btn-group aips-action-group">
-                        <button type="button" class="aips-btn aips-btn-sm aips-btn-secondary aips-status-op" data-op="aips_status_cache_maintenance"><?php esc_html_e('Prune Cache Data', 'ai-post-scheduler'); ?></button>
-                        <button type="button" class="aips-btn aips-btn-sm aips-btn-secondary aips-status-op" data-op="aips_status_cleanup_notifications"><?php esc_html_e('Clean Old Notifications', 'ai-post-scheduler'); ?></button>
-                        <button type="button" class="aips-btn aips-btn-sm aips-btn-secondary aips-status-op" data-op="aips_status_reset_resilience"><?php esc_html_e('Reset Resilience', 'ai-post-scheduler'); ?></button>
-                        <button type="button" class="aips-btn aips-btn-sm aips-btn-secondary aips-status-op" data-op="aips_status_repair_datetime"><?php esc_html_e('Repair Schedule Timings', 'ai-post-scheduler'); ?></button>
-                    </div>
-                </div>
 
                 <div class="aips-status-op-result"></div>
 
@@ -259,125 +241,45 @@ if (!defined('ABSPATH')) {
                 </div>
             </div>
 
-            <!-- Tools Row: Database + Data Management -->
-            <div class="aips-status-tools-row">
-                <!-- Database Management -->
-                <div class="aips-content-panel">
-                    <div class="aips-panel-header">
-                        <h2>
-                            <span class="dashicons dashicons-database"></span>
-                            <?php esc_html_e('Database Management', 'ai-post-scheduler'); ?>
-                        </h2>
-                    </div>
-                    <div class="aips-panel-body">
-                        <p><?php esc_html_e("Use these tools to repair, reinstall, or wipe the plugin's database tables. Destructive actions require confirmation.", 'ai-post-scheduler'); ?></p>
-
-                        <div class="aips-btn-group aips-db-actions">
-                            <button type="button" class="aips-btn aips-btn-secondary aips-repair-db">
-                                <span class="dashicons dashicons-hammer"></span>
-                                <?php esc_html_e('Repair DB Tables', 'ai-post-scheduler'); ?>
-                            </button>
-
-                            <button type="button" class="aips-btn aips-btn-secondary aips-fix-datetime-db">
-                                <span class="dashicons dashicons-clock"></span>
-                                <?php esc_html_e('Fix Date/Time Values in DB', 'ai-post-scheduler'); ?>
-                            </button>
-
-                            <button type="button" class="aips-btn aips-btn-secondary aips-reinstall-db">
-                                <span class="dashicons dashicons-update"></span>
-                                <?php esc_html_e('Reinstall DB Tables', 'ai-post-scheduler'); ?>
-                            </button>
-
-                            <button type="button" class="aips-btn aips-btn-danger aips-wipe-db">
-                                <span class="dashicons dashicons-trash"></span>
-                                <?php esc_html_e('Wipe Plugin Data', 'ai-post-scheduler'); ?>
-                            </button>
-                        </div>
-
-                        <div>
-                            <label class="aips-backup-label">
-                                <input type="checkbox" id="aips-backup-db" value="1">
-                                <?php esc_html_e('Back up data before reinstalling (data will be restored afterwards)', 'ai-post-scheduler'); ?>
-                            </label>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Data Management -->
-                <div class="aips-content-panel">
-                    <div class="aips-panel-header">
-                        <h2>
-                            <span class="dashicons dashicons-migrate"></span>
-                            <?php esc_html_e('Data Management', 'ai-post-scheduler'); ?>
-                        </h2>
-                    </div>
-                    <div class="aips-panel-body">
-
-                    <!-- Export -->
-                    <h3 class="aips-panel-section-heading"><?php esc_html_e('Export', 'ai-post-scheduler'); ?></h3>
-                    <p><?php esc_html_e('Download a backup of all plugin data in the selected format.', 'ai-post-scheduler'); ?></p>
-                    <div class="aips-btn-group">
-                        <label for="aips-export-format" class="screen-reader-text">
-                            <?php esc_html_e('Export format', 'ai-post-scheduler'); ?>
-                        </label>
-                        <select id="aips-export-format" class="aips-form-select">
-                            <?php foreach ($export_formats as $key => $label) : ?>
-                                <option value="<?php echo esc_attr($key); ?>"><?php echo esc_html($label); ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                        <button type="button" class="aips-btn aips-btn-secondary aips-export-data">
-                            <span class="dashicons dashicons-download"></span>
-                            <?php esc_html_e('Export Data', 'ai-post-scheduler'); ?>
-                        </button>
-                    </div>
-
-                    <hr class="aips-section-divider">
-
-                    <!-- Import -->
-                    <h3 class="aips-panel-section-heading"><?php esc_html_e('Import', 'ai-post-scheduler'); ?></h3>
-                    <p><?php esc_html_e('Restore plugin data from a previously exported file. This will overwrite existing data.', 'ai-post-scheduler'); ?></p>
-                    <div class="aips-btn-group">
-                        <label for="aips-import-format" class="screen-reader-text">
-                            <?php esc_html_e('Import format', 'ai-post-scheduler'); ?>
-                        </label>
-                        <select id="aips-import-format" class="aips-form-select">
-                            <?php foreach ($import_formats as $key => $label) : ?>
-                                <option value="<?php echo esc_attr($key); ?>"><?php echo esc_html($label); ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                        <label for="aips-import-file" class="screen-reader-text">
-                            <?php esc_html_e('Import file', 'ai-post-scheduler'); ?>
-                        </label>
-                        <input type="file" id="aips-import-file" class="aips-file-input">
-                        <button type="button" class="aips-btn aips-btn-secondary aips-import-data">
-                            <span class="dashicons dashicons-upload"></span>
-                            <?php esc_html_e('Import Data', 'ai-post-scheduler'); ?>
-                        </button>
-                    </div>
-
-                    </div>
-                </div>
-            </div>
-
-            <!-- Notifications Maintenance -->
+            <!-- Database Management -->
             <div class="aips-content-panel">
                 <div class="aips-panel-header">
                     <h2>
-                        <span class="dashicons dashicons-bell"></span>
-                        <?php esc_html_e('Notifications Maintenance', 'ai-post-scheduler'); ?>
+                        <span class="dashicons dashicons-database"></span>
+                        <?php esc_html_e('Database Management', 'ai-post-scheduler'); ?>
                     </h2>
                 </div>
                 <div class="aips-panel-body">
-                    <p><?php esc_html_e('Run a one-time hygiene command to clean legacy notification options, unschedule deprecated cron hooks, and normalize notification channel preferences.', 'ai-post-scheduler'); ?></p>
+                    <p><?php esc_html_e("Use these tools to repair, reinstall, or wipe the plugin's database tables. Destructive actions require confirmation.", 'ai-post-scheduler'); ?></p>
 
-                    <div class="aips-btn-group aips-action-group">
-                        <button type="button" class="aips-btn aips-btn-secondary aips-notifications-hygiene">
-                            <span class="dashicons dashicons-admin-tools"></span>
-                            <?php esc_html_e('Run Notifications Hygiene', 'ai-post-scheduler'); ?>
+                    <div class="aips-btn-group aips-db-actions">
+                        <button type="button" class="aips-btn aips-btn-secondary aips-repair-db">
+                            <span class="dashicons dashicons-hammer"></span>
+                            <?php esc_html_e('Repair DB Tables', 'ai-post-scheduler'); ?>
+                        </button>
+
+                        <button type="button" class="aips-btn aips-btn-secondary aips-fix-datetime-db">
+                            <span class="dashicons dashicons-clock"></span>
+                            <?php esc_html_e('Fix Date/Time Values in DB', 'ai-post-scheduler'); ?>
+                        </button>
+
+                        <button type="button" class="aips-btn aips-btn-secondary aips-reinstall-db">
+                            <span class="dashicons dashicons-update"></span>
+                            <?php esc_html_e('Reinstall DB Tables', 'ai-post-scheduler'); ?>
+                        </button>
+
+                        <button type="button" class="aips-btn aips-btn-danger aips-wipe-db">
+                            <span class="dashicons dashicons-trash"></span>
+                            <?php esc_html_e('Wipe Plugin Data', 'ai-post-scheduler'); ?>
                         </button>
                     </div>
 
-                    <div class="aips-notifications-hygiene-result"></div>
+                    <div>
+                        <label class="aips-backup-label">
+                            <input type="checkbox" id="aips-backup-db" value="1">
+                            <?php esc_html_e('Back up data before reinstalling (data will be restored afterwards)', 'ai-post-scheduler'); ?>
+                        </label>
+                    </div>
                 </div>
             </div>
     <?php if (empty($embedded)) : ?>

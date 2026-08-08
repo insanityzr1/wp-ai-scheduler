@@ -112,6 +112,7 @@ class Test_AIPS_System_Diagnostics_Service extends WP_UnitTestCase {
 		$expected_order = array(
 			'cache_maintenance',
 			'cleanup_notifications',
+			'notifications_hygiene',
 			'cleanup_stale_jobs_cache',
 			'clear_partial_generations',
 			'repair_campaign_data',
@@ -123,9 +124,9 @@ class Test_AIPS_System_Diagnostics_Service extends WP_UnitTestCase {
 		);
 
 		$this->assertSame($expected_order, wp_list_pluck($result['steps'], 'step'));
-		$this->assertSame(10, $result['succeeded']);
+		$this->assertSame(11, $result['succeeded']);
 		$this->assertSame(0, $result['failed']);
-		$this->assertStringContainsString('10 of 10', $result['message']);
+		$this->assertStringContainsString('11 of 11', $result['message']);
 
 		foreach ($result['steps'] as $step) {
 			$this->assertTrue($step['success'], $step['step']);
@@ -172,8 +173,8 @@ class Test_AIPS_System_Diagnostics_Service extends WP_UnitTestCase {
 
 		$result = $service->refresh_system();
 
-		$this->assertCount(10, $result['steps']);
-		$this->assertSame(9, $result['succeeded']);
+		$this->assertCount(11, $result['steps']);
+		$this->assertSame(10, $result['succeeded']);
 		$this->assertSame(1, $result['failed']);
 
 		$first_step = $result['steps'][0];

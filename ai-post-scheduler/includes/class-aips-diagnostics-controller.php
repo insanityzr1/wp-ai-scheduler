@@ -71,9 +71,11 @@ class AIPS_Diagnostics_Controller {
 			'label' => __('Insights', 'ai-post-scheduler'),
 		);
 
-		$tabs['seeder'] = array(
-			'label' => __('Seeder', 'ai-post-scheduler'),
-		);
+		if (self::is_tab_available('seeder')) {
+			$tabs['seeder'] = array(
+				'label' => __('Seeder', 'ai-post-scheduler'),
+			);
+		}
 
 		if (self::is_tab_available('dev-tools')) {
 			$tabs['dev-tools'] = array(
@@ -122,7 +124,11 @@ class AIPS_Diagnostics_Controller {
 			return (bool) AIPS_Config::get_instance()->get_option('aips_enable_telemetry');
 		}
 
-		if ('dev-tools' === $tab) {
+		if ('cache-monitor' === $tab) {
+			return (bool) AIPS_Config::get_instance()->get_option('aips_cache_monitor_enabled');
+		}
+
+		if ('seeder' === $tab || 'dev-tools' === $tab) {
 			return (bool) AIPS_Config::get_instance()->get_option('aips_developer_mode');
 		}
 

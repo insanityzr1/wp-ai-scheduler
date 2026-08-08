@@ -175,9 +175,13 @@ class AIPS_Scheduler implements AIPS_Cron_Generation_Handler {
 					: '';
 
 				// Parse start_time from datetime-local input (YYYY-MM-DDTHH:MM) or fallback to now.
+				// The input has no timezone of its own; treat it as the WordPress site
+				// timezone (matching how it is displayed elsewhere) rather than PHP's
+				// ambient runtime timezone, which may not match the site's configured one.
 				if (!empty($start_time_raw)) {
-					$start_timestamp = (int) strtotime($start_time_raw);
-					if ($start_timestamp <= 0) {
+					try {
+						$start_timestamp = AIPS_DateTime::fromSiteLocal($start_time_raw)->toUtc()->timestamp();
+					} catch (\InvalidArgumentException $e) {
 						$start_timestamp = AIPS_DateTime::now()->timestamp();
 					}
 				} else {
@@ -443,10 +447,11 @@ class AIPS_Scheduler implements AIPS_Cron_Generation_Handler {
      *
      * @param int      $schedule_id      The schedule ID.
      * @param int|null $quantity_override Optional number of posts to generate, overriding the template's post_quantity.
+     * @param bool     $advance_schedule Whether this run consumes the next scheduled occurrence.
      * @return int|WP_Error Post ID on success, or WP_Error on failure.
      */
-    public function run_schedule_now($schedule_id, $quantity_override = null) {
-        return $this->processor->process_single_schedule($schedule_id, $quantity_override);
+    public function run_schedule_now($schedule_id, $quantity_override = null, $advance_schedule = true) {
+        return $this->processor->process_single_schedule($schedule_id, $quantity_override, $advance_schedule);
     }
 
     /**

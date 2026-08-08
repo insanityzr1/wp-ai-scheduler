@@ -162,6 +162,7 @@ class AIPS_Config {
 				'post_ready_for_review' => 'db',
 				'post_rejected' => 'db',
 				'partial_generation_completed' => 'db',
+				'post_generated' => 'both',
             ),
             // Notification digest state (runtime markers, not user-configurable)
             'aips_notif_daily_digest_last_sent' => '',

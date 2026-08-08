@@ -50,6 +50,7 @@ class AIPS_Admin_Assets {
 	private const PAGE_STATUS = 'aips-status';
 	private const PAGE_TAXONOMY = 'aips-taxonomy';
 	private const PAGE_SOURCES = 'aips-sources';
+	private const PAGE_SOURCE_DATA = 'aips-source-data';
 	private const PAGE_SETTINGS = 'aips-settings';
 	private const PAGE_TELEMETRY = 'aips-telemetry';
 	private const PAGE_INTERNAL_LINKS = 'aips-internal-links';
@@ -157,7 +158,7 @@ class AIPS_Admin_Assets {
 			$this->enqueue_taxonomy_assets();
 		}
 
-        if (self::PAGE_SOURCES === $page || $this->hook_contains($hook, self::PAGE_SOURCES) || $this->is_automations_tab($page, 'sources')) {
+        if (self::PAGE_SOURCES === $page || self::PAGE_SOURCE_DATA === $page || $this->hook_contains($hook, self::PAGE_SOURCES) || $this->hook_contains($hook, self::PAGE_SOURCE_DATA) || $this->is_automations_tab($page, 'sources')) {
 			$this->enqueue_sources_assets();
 		}
 
@@ -1530,6 +1531,16 @@ class AIPS_Admin_Assets {
                 'urlRequired'       => __('A URL is required.', 'ai-post-scheduler'),
                 'groupNameRequired' => __('Please enter a group name.', 'ai-post-scheduler'),
                 'deleteGroupConfirm' => __('Delete this Source Group? Sources in this group will not be deleted.', 'ai-post-scheduler'),
+                'deleteDataConfirm'  => __('Are you sure you want to delete this source data record?', 'ai-post-scheduler'),
+                'viewDataFailed'     => __('Failed to load source data.', 'ai-post-scheduler'),
+                'saveDataFailed'     => __('Failed to save source data.', 'ai-post-scheduler'),
+                'deleteDataFailed'   => __('Failed to delete source data.', 'ai-post-scheduler'),
+                'saveData'           => __('Save Source Data', 'ai-post-scheduler'),
+                'sourceDataNonces'   => array(
+                    'get'    => wp_create_nonce('aips_source_data_get'),
+                    'save'   => wp_create_nonce('aips_source_data_save'),
+                    'delete' => wp_create_nonce('aips_source_data_delete'),
+                ),
             ));
     }
 
@@ -1572,6 +1583,15 @@ class AIPS_Admin_Assets {
                 'nonceClearPartialGenerations'          => wp_create_nonce('aips_status_clear_partial_generations'),
                 'nonceCleanupStaleJobsCache'            => wp_create_nonce('aips_status_cleanup_stale_jobs_cache'),
                 'nonceRebuildCaches'                  => wp_create_nonce('aips_rebuild_caches'),
+                'nonceRefreshSystem'                    => wp_create_nonce('aips_status_refresh_system'),
+                'nonceCacheMaintenance'                 => wp_create_nonce('aips_status_cache_maintenance'),
+                'nonceCleanupNotifications'             => wp_create_nonce('aips_status_cleanup_notifications'),
+                'nonceResetResilience'                  => wp_create_nonce('aips_status_reset_resilience'),
+                'nonceRepairDatetime'                   => wp_create_nonce('aips_status_repair_datetime'),
+                'refreshRunning'                        => __('Refreshing system…', 'ai-post-scheduler'),
+                'refreshDone'                           => __('System refresh complete.', 'ai-post-scheduler'),
+                'refreshPartial'                        => __('System refresh finished with some failures.', 'ai-post-scheduler'),
+                'selectTasksRequired'                   => __('Select at least one maintenance task to run.', 'ai-post-scheduler'),
                 'hideDetails'                           => __('Hide Details', 'ai-post-scheduler'),
                 'showDetails'                           => __('Show Details', 'ai-post-scheduler'),
                 'resetSuccess'                          => __('Circuit reset. Reload the page to confirm.', 'ai-post-scheduler'),

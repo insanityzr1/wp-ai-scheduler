@@ -11,11 +11,14 @@ case "$MODE" in
   test)
     COMPOSER_COMMAND="composer test"
     ;;
+  ai-api|ai_api)
+    COMPOSER_COMMAND="composer test:setup && php vendor/bin/phpunit --configuration phpunit.xml tests/Test_AIPS_AI_Service.php tests/Test_AIPS_AI_Service_With_Provider.php tests/Test_AIPS_AI_Provider_Factory.php tests/Test_AIPS_WP_AI_Client_Provider.php tests/Test_AIPS_Provider_Availability.php tests/Test_AIPS_Resilience_Service.php tests/Test_AIPS_Resilience_Improvements.php"
+    ;;
   coverage|--coverage)
     COMPOSER_COMMAND="XDEBUG_MODE=coverage composer test:coverage"
     ;;
   *)
-    echo "Usage: bash scripts/run-wp-tests-docker.sh [test|coverage]" >&2
+    echo "Usage: bash scripts/run-wp-tests-docker.sh [test|ai-api|coverage]" >&2
     exit 1
     ;;
 esac
@@ -26,13 +29,20 @@ DB_USER="${AIPS_WP_TEST_DB_USER:-root}"
 DB_PASS="${AIPS_WP_TEST_DB_PASS:-root}"
 DB_HOST="${AIPS_WP_TEST_DB_HOST:-127.0.0.1:3307}"
 WP_VERSION="${AIPS_WP_TEST_WP_VERSION:-latest}"
-WP_TESTS_DIR_WIN="${WP_TESTS_DIR:-C:/tmp/wordpress-tests-lib-docker}"
-WP_CORE_DIR_WIN="${WP_CORE_DIR:-C:/tmp/wordpress-docker}"
 
+# Default paths are only Windows-style (C:/tmp/...) on Git-Bash/Cygwin, where
+# cygpath is available to translate them back to a Unix path below. On native
+# Linux/macOS (no cygpath), a C:/tmp/... default would be treated as a
+# relative path (no leading /) and silently resolve under the plugin
+# directory -- so default to a real absolute /tmp path there instead.
 if command -v cygpath >/dev/null 2>&1; then
+  WP_TESTS_DIR_WIN="${WP_TESTS_DIR:-C:/tmp/wordpress-tests-lib-docker}"
+  WP_CORE_DIR_WIN="${WP_CORE_DIR:-C:/tmp/wordpress-docker}"
   WP_TESTS_DIR_UNIX="$(cygpath -u "$WP_TESTS_DIR_WIN")"
   WP_CORE_DIR_UNIX="$(cygpath -u "$WP_CORE_DIR_WIN")"
 else
+  WP_TESTS_DIR_WIN="${WP_TESTS_DIR:-/tmp/wordpress-tests-lib-docker}"
+  WP_CORE_DIR_WIN="${WP_CORE_DIR:-/tmp/wordpress-docker}"
   WP_TESTS_DIR_UNIX="$WP_TESTS_DIR_WIN"
   WP_CORE_DIR_UNIX="$WP_CORE_DIR_WIN"
 fi

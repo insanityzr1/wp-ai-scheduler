@@ -63,13 +63,19 @@ class AIPS_Diagnostics_Controller {
 			);
 		}
 
+		$tabs['stress-test'] = array(
+			'label' => __('Stress Test', 'ai-post-scheduler'),
+		);
+
 		$tabs['insights'] = array(
 			'label' => __('Insights', 'ai-post-scheduler'),
 		);
 
-		$tabs['seeder'] = array(
-			'label' => __('Seeder', 'ai-post-scheduler'),
-		);
+		if (self::is_tab_available('seeder')) {
+			$tabs['seeder'] = array(
+				'label' => __('Seeder', 'ai-post-scheduler'),
+			);
+		}
 
 		if (self::is_tab_available('dev-tools')) {
 			$tabs['dev-tools'] = array(
@@ -108,7 +114,9 @@ class AIPS_Diagnostics_Controller {
 	 * @return bool
 	 */
 	public static function is_tab_available($tab) {
-		if (in_array($tab, array('status', 'seeder', 'insights', 'cache-monitor'), true)) {
+		// Keep in step with get_tabs(): a tab listed there but missing here is
+		// rejected by get_active_tab_key() and silently falls back to the default.
+		if (in_array($tab, array('status', 'seeder', 'insights', 'cache-monitor', 'stress-test'), true)) {
 			return true;
 		}
 
@@ -116,7 +124,11 @@ class AIPS_Diagnostics_Controller {
 			return (bool) AIPS_Config::get_instance()->get_option('aips_enable_telemetry');
 		}
 
-		if ('dev-tools' === $tab) {
+		if ('cache-monitor' === $tab) {
+			return (bool) AIPS_Config::get_instance()->get_option('aips_cache_monitor_enabled');
+		}
+
+		if ('seeder' === $tab || 'dev-tools' === $tab) {
 			return (bool) AIPS_Config::get_instance()->get_option('aips_developer_mode');
 		}
 
@@ -156,6 +168,9 @@ class AIPS_Diagnostics_Controller {
 				break;
 			case 'cache-monitor':
 				$this->render_cache_monitor_tab();
+				break;
+			case 'stress-test':
+				$this->render_stress_test_tab();
 				break;
 			case 'telemetry':
 				$this->render_telemetry_tab();
@@ -217,6 +232,16 @@ class AIPS_Diagnostics_Controller {
 	 */
 	private function render_cache_monitor_tab() {
 		$controller = new AIPS_Cache_Monitor_Controller();
+		$controller->render_page(true);
+	}
+
+	/**
+	 * Render the Stress Test tab.
+	 *
+	 * @return void
+	 */
+	private function render_stress_test_tab() {
+		$controller = new AIPS_Stress_Test_Controller();
 		$controller->render_page(true);
 	}
 

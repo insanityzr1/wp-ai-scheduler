@@ -211,14 +211,17 @@ class AIPS_History_Container {
 			),
 			$this->metadata
 		);
-		
+
+		$data = apply_filters('aips_history_record_data', $data, null);
+
 		$this->history_id = $this->repository->create($data);
-		
+
 		if ($this->history_id) {
 			$this->is_persisted = true;
+			do_action('aips_history_created', $this->history_id, $this->type, $this->metadata);
 			return true;
 		}
-		
+
 		return false;
 	}
 	
@@ -272,10 +275,12 @@ class AIPS_History_Container {
 		// Determine history type ID based on log_type
 		$history_type_id = $this->map_log_type_to_history_type($log_type);
 		
-		// Build details array
+		// Build details array — log_subtype carries the semantic string label
+		// so callers can search/display it even though there is no log_type column.
 		$details = array(
-			'message' => $message,
-			'timestamp' => AIPS_DateTime::now()->timestamp(),
+			'log_subtype' => $log_type,
+			'message'     => $message,
+			'timestamp'   => AIPS_DateTime::now()->timestamp(),
 		);
 		
 		// Add input if provided
@@ -309,12 +314,17 @@ class AIPS_History_Container {
 			$this->session->add_error();
 		}
 		
-		return $this->repository->add_log_entry(
+		$log_id = $this->repository->add_log_entry(
 			$this->history_id,
-			$log_type,
 			$details,
 			$history_type_id
 		);
+
+		if ($log_id) {
+			do_action('aips_history_log_added', $this->history_id, $log_type, $details);
+		}
+
+		return $log_id;
 	}
 	
 	/**
@@ -421,8 +431,16 @@ class AIPS_History_Container {
 			),
 			$result_data
 		);
-		
-		return $this->repository->update($this->history_id, $update_data) !== false;
+
+		$update_data = apply_filters('aips_history_record_data', $update_data, $this->history_id);
+
+		$success = $this->repository->update($this->history_id, $update_data) !== false;
+
+		if ($success) {
+			do_action('aips_history_updated', $this->history_id, $update_data, 'processing');
+		}
+
+		return $success;
 	}
 	
 	/**
@@ -447,13 +465,21 @@ class AIPS_History_Container {
 		
 		// Log the error
 		$this->record('error', $error_message, null, null, $error_data);
-		
+
 		// Update history status
-		return $this->repository->update($this->history_id, array(
+		$update_data = apply_filters('aips_history_record_data', array(
 			'status' => 'failed',
 			'error_message' => $error_message,
 			'completed_at' => AIPS_DateTime::now()->timestamp(),
-		)) !== false;
+		), $this->history_id);
+
+		$success = $this->repository->update($this->history_id, $update_data) !== false;
+
+		if ($success) {
+			do_action('aips_history_updated', $this->history_id, $update_data, 'processing');
+		}
+
+		return $success;
 	}
 	
 	/**

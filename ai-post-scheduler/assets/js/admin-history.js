@@ -509,9 +509,6 @@
 		/** @type {string} Actor filter value (cron, manual, etc.) */
 		actorFilter: '',
 
-		/** @type {string} Correlation ID filter for request tracing */
-		correlationId: '',
-
 		/** @type {string} Date range filter start (YYYY-MM-DD format) */
 		dateFrom: '',
 
@@ -549,13 +546,12 @@
 			this.statusFilter = $('#aips-filter-status').val() || '';
 			this.domainFilter = $('#aips-filter-domain').val() || '';
 			this.actorFilter = $('#aips-filter-actor').val() || '';
-			this.correlationId = $('#aips-filter-correlation').val() || '';
 			this.dateFrom = $('#aips-filter-date-from').val() || '';
 			this.dateTo = $('#aips-filter-date-to').val() || '';
 			this.searchQuery  = $('#aips-history-search-input').val() || '';
 			this.syncSearchClearButton();
 			this.bindEvents();
-			this.initHeartbeatAutoRefresh();
+			this.renderFilterChips();
 			this.maybeOpenFromQuery();
 		},
 
@@ -569,6 +565,7 @@
 			/* --- Modal Events --- */
 			// Open logs modal
 			$(document).on('click', '.aips-view-history-logs', this.openLogsModal.bind(this));
+			$(document).on('keydown', '.aips-history-row', this.onHistoryRowKeydown.bind(this));
 
 			// Collapsible log-detail sections inside the modal
 			$(document).on('click', '.aips-log-toggle', this.toggleLogDetail.bind(this));
@@ -579,9 +576,12 @@
 			// Log type filter tabs inside the modal
 			$(document).on('click', '.aips-log-type-filter-btn', this.filterLogsByType.bind(this));
 			$(document).on('change', '.aips-json-viewer-toggle', this.toggleJsonViewerMode.bind(this));
+			$(document).on('click', '.aips-history-detail-tab', this.switchDetailTab.bind(this));
+			$(document).on('keydown', '.aips-history-detail-tab', this.onDetailTabKeydown.bind(this));
+			$(document).on('click', '.aips-copy-diagnostic', this.copyDiagnostic.bind(this));
 
 			// Close modal via close button or backdrop click.
-			// $(document).on('click', '#aips-history-logs-modal .aips-modal-close', this.closeLogsModal.bind(this)); // Handled globally by admin.js
+			$(document).on('click', '#aips-history-logs-modal .aips-modal-close', this.closeLogsModal.bind(this));
 			$(document).on('click', '#aips-history-logs-modal', this.closeLogsModalOnOverlay.bind(this));
 
 			/* --- Bulk Selection Events --- */
@@ -593,14 +593,17 @@
 			$(document).on('click', '#aips-delete-selected-btn', this.deleteSelected.bind(this));
 
 			/* --- Row Action Events --- */
+			// Overflow toggle for the action group
+			$(document).on('click', '.aips-row-action-overflow-toggle', this.onRowActionOverflowToggle.bind(this));
+			$(document).on('click', '.aips-row-action-menu .aips-row-action-item', this.onRowActionItemClick.bind(this));
+			$(document).on('click', this.onDocumentClick.bind(this));
+			$(document).on('keydown', this.onDocumentKeyDown.bind(this));
+
 			// Individual row delete
 			$(document).on('click', '.aips-delete-history', this.deleteSingleItem.bind(this));
 
 			// Retry failed generation
 			$(document).on('click', '.aips-retry-generation', this.retryGeneration.bind(this));
-
-			// Clear history (failed / all)
-			$(document).on('click', '.aips-clear-history', this.clearHistory.bind(this));
 
 			/* --- Reload & Pagination Events --- */
 			// Reload button
@@ -623,6 +626,11 @@
 			$(document).on('keydown', '#aips-history-search-input', this.onSearchKeydown.bind(this));
 			$(document).on('click', '#aips-history-search-clear', this.clearSearch.bind(this));
 			$(document).on('click', '.aips-clear-history-search-btn', this.clearSearch.bind(this));
+			$(document).on('click', '#aips-history-more-filters', this.toggleMoreFilters.bind(this));
+			$(document).on('click', '.aips-history-quick-date', this.applyQuickDate.bind(this));
+			$(document).on('click', '.aips-history-metric-filter', this.applyMetricFilter.bind(this));
+			$(document).on('click', '.aips-history-filter-chip', this.removeFilterChip.bind(this));
+			$(document).on('click', '.aips-history-clear-filters', this.clearAllFilters.bind(this));
 
 			/* --- Export Event --- */
 			// Export CSV
@@ -641,6 +649,56 @@
 		},
 
 
+
+		/* ========================================================================
+		 * Row Action Overflow Menu
+		 * ======================================================================== */
+
+		onRowActionOverflowToggle: function (e) {
+			e.preventDefault();
+			e.stopPropagation();
+
+			var $toggle = $(e.currentTarget);
+			var menuId  = $toggle.attr('aria-controls');
+			var $menu   = menuId ? $('#' + menuId) : $();
+
+			if (!$menu.length) {
+				return;
+			}
+
+			var isExpanded = $toggle.attr('aria-expanded') === 'true';
+			this.closeAllRowActionMenus();
+
+			if (!isExpanded) {
+				$toggle.attr('aria-expanded', 'true');
+				$menu.prop('hidden', false);
+			}
+		},
+
+		onRowActionItemClick: function () {
+			this.closeAllRowActionMenus();
+		},
+
+		onDocumentClick: function (e) {
+			if ($(e.target).closest('.aips-row-action-group, .aips-row-action-menu').length) {
+				return;
+			}
+			this.closeAllRowActionMenus();
+		},
+
+		onDocumentKeyDown: function (e) {
+			if (e.key === 'Escape') {
+				this.closeAllRowActionMenus();
+				if ($('#aips-history-logs-modal').is(':visible')) {
+					this.restoreHistoryFocus();
+				}
+			}
+		},
+
+		closeAllRowActionMenus: function () {
+			$('.aips-row-action-overflow-toggle[aria-expanded="true"]').attr('aria-expanded', 'false');
+			$('.aips-row-action-menu').prop('hidden', true);
+		},
 
 		/**
 		 * Auto-open a specific history container from query args when available.
@@ -694,6 +752,9 @@
 		 * @param {Event} e - Click event from an `.aips-view-history-logs` element.
 		 */
 		openLogsModal: function (e) {
+			if ($(e.target).closest('a, button, input, select, .aips-row-action-menu').length && !$(e.target).closest('.aips-history-row').is(e.target)) {
+				return;
+			}
 			e.preventDefault();
 			e.stopPropagation();
 
@@ -705,6 +766,7 @@
 			var $modal   = $('#aips-history-logs-modal');
 			var $content = $('#aips-history-logs-modal').find('.aips-modal-content-body');
 			var T        = AIPS.Templates;
+			this.lastFocusedHistoryElement = e.currentTarget;
 
 			AIPS.HistoryModalShared.resetModalHeader($modal, {
 				titleSelector: '#aips-history-logs-modal-title',
@@ -745,6 +807,7 @@
 						defaultTitle: aipsHistoryL10n.historyDetailsTitle || 'History Details'
 					});
 					$content.html(modalHtml);
+					$content.find('.aips-history-detail-tab').first().focus();
 				},
 				error: function () {
 					$content.html(T.render('aips-tmpl-history-error-msg', {
@@ -752,6 +815,41 @@
 					}));
 				}
 			});
+		},
+
+		onHistoryRowKeydown: function (e) {
+			if (e.key === 'Enter' || e.key === ' ') {
+				this.openLogsModal(e);
+			}
+		},
+
+		switchDetailTab: function (e) {
+			var $tab = $(e.currentTarget);
+			var name = $tab.data('tab');
+			var $drawer = $tab.closest('.aips-history-log-renderer');
+			$drawer.find('.aips-history-detail-tab').removeClass('is-active').attr('aria-selected', 'false');
+			$tab.addClass('is-active').attr('aria-selected', 'true');
+			$drawer.find('.aips-history-detail-panel').removeClass('is-active').prop('hidden', true);
+			$drawer.find('[data-panel="' + name + '"]').addClass('is-active').prop('hidden', false);
+		},
+
+		onDetailTabKeydown: function (e) {
+			if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') { return; }
+			e.preventDefault();
+			var $tabs = $(e.currentTarget).closest('[role="tablist"]').find('[role="tab"]');
+			var index = $tabs.index(e.currentTarget);
+			var next = e.key === 'ArrowRight' ? (index + 1) % $tabs.length : (index - 1 + $tabs.length) % $tabs.length;
+			$tabs.eq(next).focus().trigger('click');
+		},
+
+		copyDiagnostic: function (e) {
+			e.preventDefault();
+			var text = $(e.currentTarget).data('diagnostic') || '';
+			if (navigator.clipboard && navigator.clipboard.writeText) {
+				navigator.clipboard.writeText(text).then(function () {
+					AIPS.Utilities.showToast(aipsHistoryL10n.copiedDetails || 'Copied!', 'success');
+				});
+			}
 		},
 
 		/**
@@ -1024,6 +1122,13 @@
 		closeLogsModal: function (e) {
 			e.preventDefault();
 			$('#aips-history-logs-modal').fadeOut(200);
+			this.restoreHistoryFocus();
+		},
+
+		restoreHistoryFocus: function () {
+			if (this.lastFocusedHistoryElement && document.contains(this.lastFocusedHistoryElement)) {
+				this.lastFocusedHistoryElement.focus();
+			}
 		},
 
 		/**
@@ -1034,6 +1139,7 @@
 		closeLogsModalOnOverlay: function (e) {
 			if ($(e.target).is('#aips-history-logs-modal')) {
 				$('#aips-history-logs-modal').fadeOut(200);
+				this.restoreHistoryFocus();
 			}
 		},
 
@@ -1228,62 +1334,6 @@
 		},
 
 		/* ========================================================================
-		 * Clear History
-		 * ======================================================================== */
-
-		/**
-		 * Clear history by status (or all) after an accessible confirmation dialog.
-		 *
-		 * @param {Event} e - Click event from an `.aips-clear-history` element.
-		 */
-		clearHistory: function (e) {
-			e.preventDefault();
-
-			var status = $(e.currentTarget).data('status');
-			var msg    = status
-				? (aipsHistoryL10n.confirmClearStatus || 'Clear all history entries with this status? This cannot be undone.')
-				: (aipsHistoryL10n.confirmClearAll   || 'Clear all history? This cannot be undone.');
-
-			var self = this;
-
-			AIPS.Utilities.confirm(msg, 'Notice', [
-				{ label: aipsHistoryL10n.cancelLabel    || 'No, cancel', className: 'aips-btn aips-btn-primary' },
-				{ label: aipsHistoryL10n.confirmClearLabel || 'Yes, clear', className: 'aips-btn aips-btn-danger-solid', action: function () {
-					$.ajax({
-						url: aipsAjax.ajaxUrl,
-						type: 'POST',
-						data: {
-							action: 'aips_clear_history',
-							nonce: aipsAjax.nonce,
-							status: status
-						},
-						success: function (response) {
-							if (response.success) {
-								AIPS.Utilities.showToast(
-									response.data && response.data.message
-										? response.data.message
-										: (aipsHistoryL10n.clearedSuccess || 'History cleared.'),
-									'success'
-								);
-								self.reload();
-							} else {
-								AIPS.Utilities.showToast(
-									response.data && response.data.message
-										? response.data.message
-										: (aipsHistoryL10n.errorClearing || 'Error clearing history.'),
-									'error'
-								);
-							}
-						},
-						error: function () {
-							AIPS.Utilities.showToast(aipsHistoryL10n.errorClearing || 'Error clearing history.', 'error');
-						}
-					});
-				}}
-			]);
-		},
-
-		/* ========================================================================
 		 * Reload, Pagination, Filters & Search
 		 * ======================================================================== */
 
@@ -1314,7 +1364,6 @@
 			var self       = this;
 			var $tbody     = $('#aips-history-tbody');
 			var $pagWrap   = $('#aips-history-pagination-wrap');
-			var $timeline  = $('#aips-history-timeline-content');
 			var $reloadBtn = $('#aips-reload-history-btn');
 			var origHtml   = $reloadBtn.html();
 
@@ -1342,7 +1391,6 @@
 					search: self.searchQuery,
 					domain: self.domainFilter,
 					actor: self.actorFilter,
-					correlation_id: self.correlationId,
 					date_from: self.dateFrom,
 					date_to: self.dateTo,
 					paged: paged
@@ -1378,17 +1426,15 @@
 						$pagWrap.html(response.data.pagination_html);
 					}
 
-					if ($timeline.length && response.data.timeline_html !== undefined) {
-						$timeline.html(response.data.timeline_html);
-					}
-
 					// Refresh stat cards.
 					var stats = response.data.stats;
 					if (stats) {
 						$('#aips-stat-total').text(stats.total);
 						$('#aips-stat-completed').text(stats.completed);
 						$('#aips-stat-failed').text(stats.failed);
+						$('#aips-stat-processing').text(stats.processing);
 						$('#aips-stat-success-rate').text(stats.success_rate + '%');
+						$('#aips-stat-median-duration').text(self.formatDuration(stats.median_duration));
 					}
 
 					// Keep the URL in sync.
@@ -1403,6 +1449,7 @@
 					// Reset checkboxes and delete button.
 					$('#aips-cb-select-all').prop('checked', false);
 					self.updateDeleteButton();
+					self.renderFilterChips();
 				},
 				error: function () {
 					if (!options.fromHeartbeat) {
@@ -1416,6 +1463,12 @@
 					self.isAutoRefreshing = false;
 				}
 			});
+		},
+
+		formatDuration: function (seconds) {
+			if (seconds === null || seconds === undefined || seconds === '') { return '—'; }
+			seconds = parseInt(seconds, 10);
+			return seconds < 60 ? seconds + 's' : Math.floor(seconds / 60) + 'm ' + (seconds % 60) + 's';
 		},
 
 		/**
@@ -1448,13 +1501,13 @@
 			this.statusFilter = $('#aips-filter-status').val() || '';
 			this.domainFilter = $('#aips-filter-domain').val() || '';
 			this.actorFilter = $('#aips-filter-actor').val() || '';
-			this.correlationId = $('#aips-filter-correlation').val() || '';
 			this.dateFrom = $('#aips-filter-date-from').val() || '';
 			this.dateTo = $('#aips-filter-date-to').val() || '';
+			this.searchQuery = $('#aips-history-search-input').val() || '';
 
 			// Reflect change in the URL without reloading.
 			var url = new URL(window.location.href);
-			[['status', this.statusFilter], ['domain', this.domainFilter], ['actor', this.actorFilter], ['correlation_id', this.correlationId], ['date_from', this.dateFrom], ['date_to', this.dateTo]].forEach(function (entry) {
+			[['status', this.statusFilter], ['domain', this.domainFilter], ['actor', this.actorFilter], ['date_from', this.dateFrom], ['date_to', this.dateTo]].forEach(function (entry) {
 				if (entry[1]) {
 					url.searchParams.set(entry[0], entry[1]);
 				} else {
@@ -1465,6 +1518,66 @@
 			window.history.pushState({}, '', url.toString());
 
 			this.reload(1);
+		},
+
+		toggleMoreFilters: function (e) {
+			e.preventDefault();
+			var $button = $(e.currentTarget);
+			var expanded = $button.attr('aria-expanded') === 'true';
+			$button.attr('aria-expanded', String(!expanded));
+			$('#aips-history-advanced-filters').prop('hidden', expanded);
+		},
+
+		applyQuickDate: function (e) {
+			e.preventDefault();
+			var days = parseInt($(e.currentTarget).data('days'), 10);
+			var end = new Date();
+			var start = new Date();
+			if (days > 0) { start.setDate(end.getDate() - (days - 1)); }
+			var iso = function (date) { return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0'); };
+			$('#aips-filter-date-from').val(iso(start));
+			$('#aips-filter-date-to').val(iso(end));
+			this.applyFilter();
+		},
+
+		applyMetricFilter: function (e) {
+			e.preventDefault();
+			$('#aips-filter-status').val($(e.currentTarget).data('status') || '');
+			this.applyFilter();
+		},
+
+		renderFilterChips: function () {
+			var filters = [
+				['status', this.statusFilter, $('#aips-filter-status option:selected').text()],
+				['domain', this.domainFilter, $('#aips-filter-domain option:selected').text()],
+				['actor', this.actorFilter, $('#aips-filter-actor option:selected').text()],
+				['date_from', this.dateFrom, this.dateFrom ? 'From ' + this.dateFrom : ''],
+				['date_to', this.dateTo, this.dateTo ? 'To ' + this.dateTo : ''],
+				['search', this.searchQuery, this.searchQuery ? 'Search: ' + this.searchQuery : '']
+			];
+			var html = filters.filter(function (filter) { return !!filter[1]; }).map(function (filter) {
+				return '<button type="button" class="aips-history-filter-chip" data-filter="' + filter[0] + '">' + $('<div>').text(filter[2]).html() + ' <span aria-hidden="true">×</span></button>';
+			}).join('');
+			if (html) { html += '<button type="button" class="aips-history-clear-filters">Clear all</button>'; }
+			$('#aips-history-filter-chips').html(html);
+			if (this.domainFilter || this.actorFilter || this.dateFrom || this.dateTo) {
+				$('#aips-history-advanced-filters').prop('hidden', false);
+				$('#aips-history-more-filters').attr('aria-expanded', 'true');
+			}
+		},
+
+		removeFilterChip: function (e) {
+			e.preventDefault();
+			var filter = $(e.currentTarget).data('filter');
+			var selectors = { status: '#aips-filter-status', domain: '#aips-filter-domain', actor: '#aips-filter-actor', date_from: '#aips-filter-date-from', date_to: '#aips-filter-date-to', search: '#aips-history-search-input' };
+			$(selectors[filter]).val('');
+			this.applyFilter();
+		},
+
+		clearAllFilters: function (e) {
+			if (e) { e.preventDefault(); }
+			$('#aips-filter-status, #aips-filter-domain, #aips-filter-actor, #aips-filter-date-from, #aips-filter-date-to, #aips-history-search-input').val('');
+			this.applyFilter();
 		},
 
 		/**
@@ -1538,7 +1651,7 @@
 		 * Show or hide the inline search clear button.
 		 */
 		syncSearchClearButton: function () {
-			var hasValue = $('#aips-history-search-input').val().trim().length > 0;
+			var hasValue = ($('#aips-history-search-input').val() || '').trim().length > 0;
 			$('#aips-history-search-clear').toggle(hasValue);
 		},
 
@@ -1561,7 +1674,6 @@
 			form.append($('<input type="hidden" name="search">').val(this.searchQuery));
 			form.append($('<input type="hidden" name="domain">').val(this.domainFilter));
 			form.append($('<input type="hidden" name="actor">').val(this.actorFilter));
-			form.append($('<input type="hidden" name="correlation_id">').val(this.correlationId));
 			form.append($('<input type="hidden" name="date_from">').val(this.dateFrom));
 			form.append($('<input type="hidden" name="date_to">').val(this.dateTo));
 			$('body').append(form);

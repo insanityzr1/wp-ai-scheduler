@@ -181,8 +181,8 @@ if (!function_exists('aips_datetime_from_db_value')) {
 					<?php endif; ?>
 				</div>
 			</div>
-<?php endif; ?>
 		</div>
+<?php endif; ?>
 		<div id="aips-schedule-status-strip" class="aips-content-panel aips-schedule-status-strip">
 			<div class="aips-panel-body">
 				<div id="aips-schedule-status-summary" class="aips-schedule-status-summary-cards"><?php esc_html_e('Loading schedule status…', 'ai-post-scheduler'); ?></div>
@@ -617,11 +617,73 @@ if (!function_exists('aips_datetime_from_db_value')) {
 						uasort($cron_schedules_list, function ($a, $b) {
 							return $a['interval'] - $b['interval'];
 						});
+
+						// The 7 single-day frequencies (every_monday ... every_sunday) are chosen
+						// via the "Repeat On" day picker below instead of being listed here
+						// individually — that used to mean scanning past 7 near-duplicate entries
+						// to find e.g. "Every Monday".
+						$day_specific_keys = array_map(function ($day) {
+							return 'every_' . strtolower($day);
+						}, array('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'));
+
+						$frequency_groups = array(
+							'hourly'  => array('label' => __('Hourly', 'ai-post-scheduler'), 'options' => array()),
+							'daily'   => array('label' => __('Daily', 'ai-post-scheduler'), 'options' => array()),
+							'weekly'  => array('label' => __('Weekly', 'ai-post-scheduler'), 'options' => array()),
+							'monthly' => array('label' => __('Monthly', 'ai-post-scheduler'), 'options' => array()),
+							'once'    => array('label' => __('One-Time', 'ai-post-scheduler'), 'options' => array()),
+						);
+
 						foreach ($cron_schedules_list as $key => $schedule) {
-							echo '<option value="' . esc_attr($key) . '" ' . selected('daily', $key, false) . '>' . esc_html($schedule['display']) . '</option>';
+							if (in_array($key, $day_specific_keys, true)) {
+								continue;
+							}
+							if ('once' === $key) {
+								$group_key = 'once';
+							} elseif ($schedule['interval'] < DAY_IN_SECONDS) {
+								$group_key = 'hourly';
+							} elseif ($schedule['interval'] === DAY_IN_SECONDS) {
+								$group_key = 'daily';
+							} elseif ($schedule['interval'] <= 2 * WEEK_IN_SECONDS) {
+								$group_key = 'weekly';
+							} else {
+								$group_key = 'monthly';
+							}
+							$frequency_groups[$group_key]['options'][$key] = $schedule['display'];
+						}
+
+						foreach ($frequency_groups as $group) {
+							if (empty($group['options'])) {
+								continue;
+							}
+							echo '<optgroup label="' . esc_attr($group['label']) . '">';
+							foreach ($group['options'] as $key => $display) {
+								echo '<option value="' . esc_attr($key) . '" ' . selected('daily', $key, false) . '>' . esc_html($display) . '</option>';
+							}
+							echo '</optgroup>';
 						}
 						?>
 					</select>
+				</div>
+				<div class="aips-form-row" id="aips-schedule-repeat-on-row" style="display:none;">
+					<label><?php esc_html_e('Repeat On', 'ai-post-scheduler'); ?></label>
+					<input type="hidden" id="schedule_repeat_day" name="repeat_day" value="">
+					<div class="aips-btn-group" role="group" aria-label="<?php esc_attr_e('Day of week', 'ai-post-scheduler'); ?>">
+						<?php
+						$day_picker_labels = array(
+							'monday'    => __('Mon', 'ai-post-scheduler'),
+							'tuesday'   => __('Tue', 'ai-post-scheduler'),
+							'wednesday' => __('Wed', 'ai-post-scheduler'),
+							'thursday'  => __('Thu', 'ai-post-scheduler'),
+							'friday'    => __('Fri', 'ai-post-scheduler'),
+							'saturday'  => __('Sat', 'ai-post-scheduler'),
+							'sunday'    => __('Sun', 'ai-post-scheduler'),
+						);
+						foreach ($day_picker_labels as $day_key => $day_label): ?>
+						<button type="button" class="aips-btn aips-btn-sm aips-btn-secondary aips-schedule-day-btn" data-day="<?php echo esc_attr($day_key); ?>"><?php echo esc_html($day_label); ?></button>
+						<?php endforeach; ?>
+					</div>
+					<p class="description"><?php esc_html_e('Choose which day of the week this schedule should run on.', 'ai-post-scheduler'); ?></p>
 				</div>
 				<div class="aips-form-row">
 					<label for="schedule_start_time"><?php esc_html_e('Start Time', 'ai-post-scheduler'); ?></label>

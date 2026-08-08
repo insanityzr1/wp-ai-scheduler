@@ -66,6 +66,14 @@ if (!defined('AIPS_AI_DEBUG_LOG_PROMPTS')) {
     define('AIPS_AI_DEBUG_LOG_PROMPTS', defined('WP_DEBUG') && WP_DEBUG);
 }
 
+if (!defined('AIPS_DEBUG')) {
+    define('AIPS_DEBUG', defined('WP_DEBUG') && WP_DEBUG);
+}
+
+if (!defined('AIPS_DEBUG_LEVEL')) {
+    define('AIPS_DEBUG_LEVEL', defined('WP_DEBUG') && WP_DEBUG ? 1 : 0);
+}
+
 final class AI_Post_Scheduler {
     
     /**
@@ -414,6 +422,16 @@ final class AI_Post_Scheduler {
         $container->singleton(AIPS_Template_Repository::class, function( $container ) {
             return AIPS_Template_Repository::instance();
         });
+
+        // Register AIPS_System_Diagnostics_Service
+        $container->singleton(AIPS_System_Diagnostics_Service::class, function( $container ) {
+            return new AIPS_System_Diagnostics_Service();
+        });
+
+        // Register AIPS_System_Status_Diagnostics_Service
+        $container->singleton(AIPS_System_Status_Diagnostics_Service::class, function( $container ) {
+            return new AIPS_System_Status_Diagnostics_Service();
+        });
     }
 
     /**
@@ -716,8 +734,8 @@ final class AI_Post_Scheduler {
                     return $post_id;
                 }
 
-                update_post_meta( $post_id, '_aips_trending_topic_id',  absint( $item['id'] ) );
-                update_post_meta( $post_id, '_aips_trending_topic_text', sanitize_text_field( (string) $item['topic'] ) );
+                update_post_meta( $post_id, AIPS_Post_Manager::META_TRENDING_TOPIC_ID,  absint( $item['id'] ) );
+                update_post_meta( $post_id, AIPS_Post_Manager::META_TRENDING_TOPIC_TEXT, sanitize_text_field( (string) $item['topic'] ) );
 
                 return $post_id;
             }

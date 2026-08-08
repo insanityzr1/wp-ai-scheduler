@@ -428,10 +428,11 @@ class AIPS_MCP_Bridge {
 	 * @return void
 	 */
 	public function handle_request() {
-		// Verify user has admin capabilities
-		if (!current_user_can('manage_options')) {
-			$this->send_error(-32001, 'Insufficient permissions. Admin access required.');
-			return;
+		// Defense in depth: re-check the bridge is enabled even though the
+		// top-level dispatcher already gates on this before instantiating us.
+		if (!defined('AIPS_MCP_BRIDGE_ENABLED') || !AIPS_MCP_BRIDGE_ENABLED) {
+			http_response_code(404);
+			exit;
 		}
 
 		// Get request body
@@ -440,6 +441,22 @@ class AIPS_MCP_Bridge {
 
 		if (json_last_error() !== JSON_ERROR_NONE) {
 			$this->send_error(-32700, 'Parse error: Invalid JSON');
+			return;
+		}
+
+		// Require a shared-secret token before any other processing. This is
+		// the bridge's CSRF protection (the endpoint is otherwise cookie/session
+		// authenticated only) and lets non-browser MCP clients authenticate
+		// without a WordPress nonce tied to a logged-in session.
+		$provided_token = isset($request['token']) ? (string) $request['token'] : '';
+		if (!defined('AIPS_MCP_BRIDGE_TOKEN') || '' === AIPS_MCP_BRIDGE_TOKEN || !hash_equals((string) AIPS_MCP_BRIDGE_TOKEN, $provided_token)) {
+			$this->send_error(-32001, 'Unauthorized: invalid or missing token.');
+			return;
+		}
+
+		// Verify user has admin capabilities
+		if (!current_user_can('manage_options')) {
+			$this->send_error(-32001, 'Insufficient permissions. Admin access required.');
 			return;
 		}
 
@@ -1576,10 +1593,10 @@ class AIPS_MCP_Bridge {
 		}
 		
 		// Get AI-specific metadata from post meta
-		$ai_model = get_post_meta($post_id, '_aips_ai_model', true);
-		$ai_prompt = get_post_meta($post_id, '_aips_prompt', true);
-		$generation_time = get_post_meta($post_id, '_aips_generation_time', true);
-		$tokens_used = get_post_meta($post_id, '_aips_tokens_used', true);
+		$ai_model = get_post_meta($post_id, AIPS_Post_Manager::META_AI_MODEL, true);
+		$ai_prompt = get_post_meta($post_id, AIPS_Post_Manager::META_PROMPT, true);
+		$generation_time = get_post_meta($post_id, AIPS_Post_Manager::META_GENERATION_TIME, true);
+		$tokens_used = get_post_meta($post_id, AIPS_Post_Manager::META_TOKENS_USED, true);
 		
 		// Build response
 		$metadata = array(
@@ -1788,6 +1805,14 @@ $is_cli = php_sapi_name() === 'cli' || php_sapi_name() === 'cli-server';
 $is_http_post = isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'POST';
 
 if ($is_http_post) {
+	// The bridge is disabled by default. It must be explicitly enabled by
+	// defining AIPS_MCP_BRIDGE_ENABLED (and AIPS_MCP_BRIDGE_TOKEN) in wp-config.php
+	// so it cannot be turned on from within the WP admin UI.
+	if (!defined('AIPS_MCP_BRIDGE_ENABLED') || !AIPS_MCP_BRIDGE_ENABLED) {
+		http_response_code(404);
+		exit;
+	}
+
 	// HTTP POST: standard JSON-RPC request/response
 	$bridge = new AIPS_MCP_Bridge();
 	$bridge->handle_request();

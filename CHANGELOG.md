@@ -1,3 +1,17 @@
+## [Unreleased]
+
+### Security
+- **Dev Tools Gating**: Cache Monitor and the Seeder are now disabled by default and properly enforce their feature flags (`aips_cache_monitor_enabled`, `aips_developer_mode`) at every layer — menu, Diagnostics tab, page render, and AJAX handlers — closing gaps where the flag was only checked for UI visibility. The AI scaffold generator ("Dev Tools") AJAX handler now also re-checks `aips_developer_mode`.
+- **MCP Bridge**: `mcp-bridge.php` is now disabled by default and can only be enabled by defining `AIPS_MCP_BRIDGE_ENABLED` and a shared-secret `AIPS_MCP_BRIDGE_TOKEN` in `wp-config.php` — it can no longer be turned on from the WordPress admin UI. All HTTP requests must now present a matching `token` field, closing a CSRF gap on this previously cookie-auth-only endpoint. See `docs/MCP_BRIDGE.md`.
+
+## [3.0.1] - 2026-07-07
+
+### Added
+- **Generated Post Marker**: All plugin-created posts now receive `_aips_generated_post = '1'`, making them easy to identify and filter.
+
+### Changed
+- **Private Post Meta Normalization**: Standardized plugin-owned post meta on the private `_aips_*` convention and added a migration to rename legacy partial-generation keys.
+
 ## [3.0.0] - 2026-06-21
 
 ### Added
@@ -10,6 +24,7 @@
 - **DST Production Seed Script**: Added DevStackTips production seeder script. ([#1756](../../pull/1756))
 
 ### Changed
+- **Planner Queue Management**: Staggered bulk-scheduled 'once' topics to improve background queue efficiency.
 - **Admin History**: Replaced full page reload with AJAX table reload when retrying failed generations to improve user flow.
 - Refactored multiple admin UI actions to update DOM tables dynamically without a full page reload for a smoother user experience.
 - **Cache Drivers**: Reduced available cache drivers to Array, WP Object Cache, and Database for simplicity and reliability. ([#1708](../../pull/1708))
@@ -116,6 +131,7 @@ All notable changes to this project will be documented in this file.
   - Eliminates 1970 UI date bugs from mixed timestamp formats
 
 ### Changed
+- **Planner Queue Management**: Staggered bulk-scheduled 'once' topics to improve background queue efficiency.
 - **Template Post Duplication Fix**: Resolved issue causing duplicate posts from single template runs
 - **System Status Operations**: Separated nonces per operation, direct logic execution, configurable batch sizes
 - **Performance Tab**: Renamed "Cache" to "Performance" with "Enable Cache System" toggle
@@ -134,6 +150,7 @@ All notable changes to this project will be documented in this file.
 - **Query diagnostics**: telemetry payloads now summarize slow queries and duplicate queries when `SAVEQUERIES` is available, using `AIPS_TELEMETRY_SLOW_QUERY_MS` and bounded query samples.
 
 ### Changed
+- **Planner Queue Management**: Staggered bulk-scheduled 'once' topics to improve background queue efficiency.
 - **Telemetry schema**: `aips_telemetry` now stores top-level request type, event categories, cache counters, total event count, and query anomaly counters for server-side filtering and faster list rendering.
 
 ## [2.3.1] - 2026-04-09
@@ -164,6 +181,7 @@ All notable changes to this project will be documented in this file.
 
 ## [refactor-post-generation-flow] - 2026-02-07
 ### Changed
+- **Planner Queue Management**: Staggered bulk-scheduled 'once' topics to improve background queue efficiency.
 - **MAJOR**: Refactored post generation to use AI Engine's Chatbot feature for conversational context
   - Content, title, and excerpt now generated in a single conversation with shared context
   - AI "remembers" previously generated components, resulting in better coherence

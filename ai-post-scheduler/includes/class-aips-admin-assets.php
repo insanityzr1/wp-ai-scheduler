@@ -862,6 +862,10 @@ class AIPS_Admin_Assets {
      */
     private function enqueue_schedule_assets($hook) {
             wp_localize_script('aips-admin-script', 'aipsScheduleL10n', array(
+                // Current WordPress site UTC offset in seconds, used to render/parse the
+                // "Start Time" datetime-local field in site-local time regardless of the
+                // admin's own browser timezone.
+                'gmtOffsetSeconds'                => (int) wp_timezone()->getOffset(new DateTime('now', wp_timezone())),
                 // Run schedule
                 'runScheduleConfirm'             => __('Are you sure you want to run this schedule now? This will immediately generate posts.', 'ai-post-scheduler'),
                 'scheduleRunning'                => __('Running...', 'ai-post-scheduler'),

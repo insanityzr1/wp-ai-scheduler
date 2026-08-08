@@ -539,9 +539,10 @@ class AIPS_Schedule_Processor {
      *
      * @param int      $schedule_id      The schedule ID.
      * @param int|null $quantity_override Optional number of posts to generate, overriding the template's post_quantity.
+     * @param bool     $advance_schedule Whether this run consumes the next scheduled occurrence.
      * @return int|WP_Error Post ID on success, or WP_Error on failure.
      */
-    public function process_single_schedule($schedule_id, $quantity_override = null) {
+    public function process_single_schedule($schedule_id, $quantity_override = null, $advance_schedule = true) {
         $schedule = $this->repository->get_by_id($schedule_id);
 
         if (!$schedule) {
@@ -562,11 +563,19 @@ class AIPS_Schedule_Processor {
         $schedule_with_template->schedule_id = $schedule->id;
         $schedule_with_template->name = $template_data->name; // ensure template name is preserved
 
+        if ($advance_schedule && $schedule->frequency !== 'once') {
+            $next_run = $this->interval_calculator->calculate_next_run(
+                $schedule->frequency,
+                AIPS_DateTime::now()->timestamp()
+            );
+            $this->repository->update($schedule->id, array('next_run' => $next_run));
+        }
+
         // Generate a correlation ID for this manual run and reset it when done.
         AIPS_Correlation_ID::generate();
 
         try {
-            $result = $this->execute_schedule_logic($schedule_with_template, true, $quantity_override);
+            $result = $this->execute_schedule_logic($schedule_with_template, true, $quantity_override, $advance_schedule);
         } finally {
             AIPS_Correlation_ID::reset();
         }
@@ -669,9 +678,10 @@ class AIPS_Schedule_Processor {
      * @param object   $schedule         Schedule object (merged with template).
      * @param bool     $is_manual        Whether this is a manual execution.
      * @param int|null $quantity_override Optional number of posts to generate, overriding the template's post_quantity.
+     * @param bool     $advance_schedule Whether a manual run updates schedule state.
      * @return int|WP_Error Post ID or WP_Error.
      */
-    private function execute_schedule_logic($schedule, $is_manual = false, $quantity_override = null) {
+    private function execute_schedule_logic($schedule, $is_manual = false, $quantity_override = null, $advance_schedule = true) {
         if (!$is_manual) {
             // Dispatch schedule execution started event
             do_action('aips_schedule_execution_started', $schedule->schedule_id);
@@ -1055,7 +1065,7 @@ class AIPS_Schedule_Processor {
             // reflects the execution instead of staying frozen on "Past due".
             // For once-schedules, also deactivate: next_run is still in the past
             // so the cron would otherwise fire it again on the next trigger.
-            if (!is_wp_error($overall_result)) {
+            if ($advance_schedule && !is_wp_error($overall_result)) {
                 $this->repository->update_last_run($schedule->schedule_id, AIPS_DateTime::now()->timestamp());
                 if ($schedule->frequency === 'once') {
                     $this->repository->update($schedule->schedule_id, array(

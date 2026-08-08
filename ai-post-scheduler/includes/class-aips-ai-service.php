@@ -23,6 +23,16 @@ if (!defined('ABSPATH')) {
  */
 class AIPS_AI_Service implements AIPS_AI_Service_Interface {
 
+	/**
+	 * Minimum provider output allowance for short-form requests.
+	 *
+	 * Reasoning-capable models may count hidden reasoning tokens against
+	 * max_tokens before emitting the title or excerpt. The administrator's
+	 * per-type setting remains the desired visible-output budget; this floor
+	 * supplies transport headroom and is still bounded by the global hard cap.
+	 */
+	private const SHORT_FORM_MIN_TOKENS = 1200;
+
     /**
      * @var AIPS_AI_Provider_Interface Active AI transport provider
      */
@@ -637,7 +647,9 @@ class AIPS_AI_Service implements AIPS_AI_Service_Interface {
      * forwards it verbatim; the WordPress AI Client maps it to the model config's
      * maxTokens). The budget is therefore derived purely from the expected output
      * size for the request type, plus a 25% safety buffer, capped at the
-     * configured aips_max_tokens_limit setting.
+     * configured aips_max_tokens_limit setting. Title and excerpt calls also
+     * receive a short-form minimum so reasoning-capable models cannot consume
+     * the complete allowance before returning the visible response.
      *
      * The prompt length is deliberately NOT part of this figure. Adding it made a
      * long prompt silently raise the response allowance well above the configured
@@ -652,6 +664,8 @@ class AIPS_AI_Service implements AIPS_AI_Service_Interface {
      * @return int The calculated maxTokens value (always >= 1).
      */
     private function calculate_max_tokens($prompt, $type = 'content') {
+		$minimum_tokens = 1;
+
         // Determine the expected output token requirement for this request type.
         if (is_int($type) && $type > 0) {
             // Caller supplied a custom output token count as the base.
@@ -662,10 +676,12 @@ class AIPS_AI_Service implements AIPS_AI_Service_Interface {
                 case 'title':
                     // Short titles: ~10-20 words.
                     $output_tokens = (int) $config->get_option('aips_max_tokens_title');
+					$minimum_tokens = self::SHORT_FORM_MIN_TOKENS;
                     break;
                 case 'excerpt':
                     // 2-3 sentence summary: ~50-75 words.
                     $output_tokens = (int) $config->get_option('aips_max_tokens_excerpt');
+					$minimum_tokens = self::SHORT_FORM_MIN_TOKENS;
                     break;
                 case 'content':
                 default:
@@ -684,7 +700,7 @@ class AIPS_AI_Service implements AIPS_AI_Service_Interface {
             $output_tokens,
             array(
                 'buffer_ratio' => 0.25,
-                'minimum_tokens' => 1,
+				'minimum_tokens' => $minimum_tokens,
                 'respect_config_limit' => true,
                 'include_prompt_tokens' => false,
             )

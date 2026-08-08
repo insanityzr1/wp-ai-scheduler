@@ -228,12 +228,12 @@ if (!defined('ABSPATH')) {
                             <p class="aips-status-message aips-status-success">
                                 <span class="aips-badge aips-badge-success">
                                     <span class="dashicons dashicons-yes-alt"></span>
-                                    <?php esc_html_e('Connected', 'ai-post-scheduler'); ?>
+                                    <?php esc_html_e('Configured', 'ai-post-scheduler'); ?>
                                 </span>
                                 <?php
                                 printf(
                                     /* translators: %s: active AI provider label. */
-                                    esc_html__('%s is active and ready.', 'ai-post-scheduler'),
+                                    esc_html__('%s is selected and locally configured. Use Test Connection to verify live access.', 'ai-post-scheduler'),
                                     esc_html($ai_provider_label)
                                 );
                                 ?>

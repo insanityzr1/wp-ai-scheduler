@@ -25,6 +25,51 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+/**
+ * Resilience configuration for interactive stress-test requests.
+ *
+ * The page is intended to validate the complete pipeline, so one transient
+ * timeout or provider 503 should be retried quickly. Circuit-breaker and local
+ * rate-limit settings continue to mirror the site's real configuration.
+ */
+class AIPS_Stress_Test_Resilience_Config {
+
+    /** @var AIPS_Config */
+    private $config;
+
+    /**
+     * @param AIPS_Config $config Site configuration.
+     */
+    public function __construct($config) {
+        $this->config = $config;
+    }
+
+    /**
+     * Use one short retry after the initial provider attempt.
+     *
+     * @return array<string,mixed>
+     */
+    public function get_retry_config() {
+        return array(
+            'enabled'       => true,
+            'max_attempts'  => 2,
+            'initial_delay' => 1,
+            'exponential'   => true,
+            'jitter'        => true,
+        );
+    }
+
+    /** @return array<string,mixed> */
+    public function get_circuit_breaker_config() {
+        return $this->config->get_circuit_breaker_config();
+    }
+
+    /** @return array<string,mixed> */
+    public function get_rate_limit_config() {
+        return $this->config->get_rate_limit_config();
+    }
+}
+
 class AIPS_Stress_Test_Service {
 
     /**
@@ -66,8 +111,16 @@ class AIPS_Stress_Test_Service {
     public function __construct($ai_service = null, $logger = null) {
         $container = AIPS_Container::get_instance();
 
-        $this->logger     = $logger ?: ($container->has(AIPS_Logger_Interface::class) ? $container->make(AIPS_Logger_Interface::class) : new AIPS_Logger());
-        $this->ai_service = $ai_service ?: new AIPS_AI_Service();
+        $this->logger = $logger ?: ($container->has(AIPS_Logger_Interface::class) ? $container->make(AIPS_Logger_Interface::class) : new AIPS_Logger());
+
+        if ($ai_service) {
+            $this->ai_service = $ai_service;
+        } else {
+            $config             = AIPS_Config::get_instance();
+            $resilience_config  = new AIPS_Stress_Test_Resilience_Config($config);
+            $resilience_service = new AIPS_Resilience_Service($this->logger, $resilience_config);
+            $this->ai_service   = new AIPS_AI_Service($this->logger, $config, $resilience_service);
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -506,7 +559,10 @@ class AIPS_Stress_Test_Service {
 
         $result = $this->ai_service->generate_json($prompt, array(
             'json_schema' => $schema,
-            'max_tokens'  => 300,
+            // Reasoning-capable models count hidden thought tokens against the
+            // output budget. Leave enough headroom for the requested JSON value.
+            'max_tokens'  => 1200,
+            'temperature' => 0.1,
         ));
 
         $raw = $this->last_ai_response_text();

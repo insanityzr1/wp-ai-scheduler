@@ -437,10 +437,14 @@ class Test_AIPS_AI_Service extends WP_UnitTestCase {
             $service->generate_text($prompt, array('request_type' => 'title'));
 
             $output_tokens = (int) get_option('aips_max_tokens_title', 150);
-            $buffer        = (int) ceil($output_tokens * 0.25);
-            $expected      = $output_tokens + $buffer;
+            $expected      = max(1200, $output_tokens + (int) ceil($output_tokens * 0.25));
+            $limit         = (int) get_option('aips_max_tokens_limit', 16000);
 
-            $this->assertSame($expected, $capture->params['maxTokens'], 'Title request_type should produce title-sized max_tokens.');
+            if ($limit > 0) {
+                $expected = min($expected, $limit);
+            }
+
+            $this->assertSame($expected, $capture->params['maxTokens'], 'Title requests should reserve enough output headroom for reasoning-capable models.');
         } finally {
             $mwai = $original_mwai;
         }
@@ -464,10 +468,14 @@ class Test_AIPS_AI_Service extends WP_UnitTestCase {
             $service->generate_text($prompt, array('request_type' => 'excerpt'));
 
             $output_tokens = (int) get_option('aips_max_tokens_excerpt', 300);
-            $buffer        = (int) ceil($output_tokens * 0.25);
-            $expected      = $output_tokens + $buffer;
+            $expected      = max(1200, $output_tokens + (int) ceil($output_tokens * 0.25));
+            $limit         = (int) get_option('aips_max_tokens_limit', 16000);
 
-            $this->assertSame($expected, $capture->params['maxTokens'], 'Excerpt request_type should produce excerpt-sized max_tokens.');
+            if ($limit > 0) {
+                $expected = min($expected, $limit);
+            }
+
+            $this->assertSame($expected, $capture->params['maxTokens'], 'Excerpt requests should reserve enough output headroom for reasoning-capable models.');
         } finally {
             $mwai = $original_mwai;
         }
@@ -493,11 +501,7 @@ class Test_AIPS_AI_Service extends WP_UnitTestCase {
             $service = new AIPS_AI_Service();
             $service->generate_text($prompt, array('request_type' => 'title'));
 
-            $output_tokens = 500;
-            $buffer        = (int) ceil($output_tokens * 0.25);
-            $expected      = $output_tokens + $buffer;
-
-            $this->assertSame($expected, $capture->params['maxTokens'], 'Custom aips_max_tokens_title should override the default title budget.');
+            $this->assertSame(1200, $capture->params['maxTokens'], 'A small custom title budget should retain the short-form reasoning reserve.');
         } finally {
             $mwai = $original_mwai;
             if ($original === false) {
@@ -528,11 +532,7 @@ class Test_AIPS_AI_Service extends WP_UnitTestCase {
             $service = new AIPS_AI_Service();
             $service->generate_text($prompt, array('request_type' => 'excerpt'));
 
-            $output_tokens = 800;
-            $buffer        = (int) ceil($output_tokens * 0.25);
-            $expected      = $output_tokens + $buffer;
-
-            $this->assertSame($expected, $capture->params['maxTokens'], 'Custom aips_max_tokens_excerpt should override the default excerpt budget.');
+            $this->assertSame(1200, $capture->params['maxTokens'], 'A small custom excerpt budget should retain the short-form reasoning reserve.');
         } finally {
             $mwai = $original_mwai;
             if ($original === false) {
@@ -633,9 +633,9 @@ class Test_AIPS_AI_Service extends WP_UnitTestCase {
 
         try {
             $service = new AIPS_AI_Service();
-            $service->generate_text('Some prompt', array('request_type' => 'content'));
+            $service->generate_text('Some prompt', array('request_type' => 'title'));
 
-            $this->assertSame(100, $capture->params['maxTokens'], 'max_tokens should be capped at aips_max_tokens_limit.');
+            $this->assertSame(100, $capture->params['maxTokens'], 'The global max_tokens limit should cap the short-form reasoning reserve.');
         } finally {
             $mwai = $original_mwai;
             if ($original_limit === false) {

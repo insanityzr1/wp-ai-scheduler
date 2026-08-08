@@ -22,6 +22,51 @@ if (!function_exists('wp_ai_client_prompt')) {
     }
 }
 
+/**
+ * Override local connector readiness in provider unit tests.
+ *
+ * @param bool $configured Detected connector readiness.
+ * @return bool
+ */
+if (!function_exists('aips_test_wp_ai_client_connector_configured')) {
+    function aips_test_wp_ai_client_connector_configured($configured) {
+        global $aips_wp_ai_client_test_configured;
+
+        return isset($aips_wp_ai_client_test_configured)
+            ? (bool) $aips_wp_ai_client_test_configured
+            : $configured;
+    }
+}
+
+/**
+ * Supply connector definitions for routing tests.
+ *
+ * @param array $connectors Registered connector definitions.
+ * @return array
+ */
+if (!function_exists('aips_test_wp_ai_client_connectors')) {
+	function aips_test_wp_ai_client_connectors($connectors) {
+		global $aips_wp_ai_client_test_connectors;
+
+		return isset($aips_wp_ai_client_test_connectors) ? $aips_wp_ai_client_test_connectors : $connectors;
+	}
+}
+
+/**
+ * Inject the test prompt builder on every supported WordPress version.
+ *
+ * @param mixed  $builder Existing override.
+ * @param string $prompt  Prompt text.
+ * @return mixed
+ */
+if (!function_exists('aips_test_wp_ai_client_prompt_builder')) {
+	function aips_test_wp_ai_client_prompt_builder($builder, $prompt) {
+		global $aips_wp_ai_client_test_builder;
+
+		return isset($aips_wp_ai_client_test_builder) ? $aips_wp_ai_client_test_builder : $builder;
+	}
+}
+
 class AIPS_Test_WP_AI_Client_Builder {
     public $text_supported = true;
     public $image_supported = true;
@@ -37,6 +82,9 @@ class AIPS_Test_WP_AI_Client_Builder {
     public $captured_system_instruction = null;
     public $captured_history = null;
     public $with_history_call_count = 0;
+	public $captured_provider = null;
+	public $attempted_providers = array();
+	public $provider_text_responses = array();
 
     public function set_prompt($prompt) {
         $this->prompt = $prompt;
@@ -55,6 +103,11 @@ class AIPS_Test_WP_AI_Client_Builder {
         $this->captured_model_preferences = $models;
         return $this;
     }
+
+	public function using_provider($provider_id) {
+		$this->captured_provider = $provider_id;
+		return $this;
+	}
 
     public function using_temperature($temperature) {
         $this->captured_temperature = $temperature;
@@ -83,6 +136,13 @@ class AIPS_Test_WP_AI_Client_Builder {
     }
 
     public function generate_text() {
+		if ($this->captured_provider !== null) {
+			$this->attempted_providers[] = $this->captured_provider;
+			if (array_key_exists($this->captured_provider, $this->provider_text_responses)) {
+				return $this->provider_text_responses[$this->captured_provider];
+			}
+		}
+
         return $this->text_response;
     }
 
@@ -153,21 +213,40 @@ class AIPS_Test_WP_AI_Client_Builder_Without_JSON {
 class Test_AIPS_WP_AI_Client_Provider extends WP_UnitTestCase {
 
     public function setUp(): void {
+		global $aips_wp_ai_client_test_configured, $aips_wp_ai_client_test_connectors;
+
         parent::setUp();
+        $aips_wp_ai_client_test_configured = true;
+		$aips_wp_ai_client_test_connectors = null;
+        add_filter('aips_wp_ai_client_has_configured_connector', 'aips_test_wp_ai_client_connector_configured');
+		add_filter('aips_wp_ai_client_connectors', 'aips_test_wp_ai_client_connectors');
+		add_filter('aips_wp_ai_client_prompt_builder', 'aips_test_wp_ai_client_prompt_builder', 10, 2);
         AIPS_AI_Provider_Factory::reset_cache();
     }
 
     public function tearDown(): void {
-        global $aips_wp_ai_client_test_builder, $mwai;
+		global $aips_wp_ai_client_test_builder, $aips_wp_ai_client_test_configured, $aips_wp_ai_client_test_connectors, $mwai;
 
         $aips_wp_ai_client_test_builder = null;
+        $aips_wp_ai_client_test_configured = null;
+		$aips_wp_ai_client_test_connectors = null;
         $mwai = null;
+        remove_filter('aips_wp_ai_client_has_configured_connector', 'aips_test_wp_ai_client_connector_configured');
+		remove_filter('aips_wp_ai_client_connectors', 'aips_test_wp_ai_client_connectors');
+		remove_filter('aips_wp_ai_client_prompt_builder', 'aips_test_wp_ai_client_prompt_builder', 10);
         delete_option('aips_ai_provider');
+		$config = AIPS_Config::get_instance();
+		$config->set_option('aips_wp_ai_connector_mode', 'all');
+		$config->set_option('aips_wp_ai_connector_ids', array());
+		$config->set_option('aips_wp_ai_connector_failover', true);
+		foreach (array('google', 'openai', 'anthropic') as $connector_id) {
+			delete_transient('aips_wp_ai_health_' . md5($connector_id));
+		}
         AIPS_AI_Provider_Factory::reset_cache();
         parent::tearDown();
     }
 
-    public function test_is_available_requires_text_generation_support() {
+    public function test_is_available_does_not_require_live_text_generation_probe() {
         global $aips_wp_ai_client_test_builder;
 
         $builder = new AIPS_Test_WP_AI_Client_Builder();
@@ -176,21 +255,22 @@ class Test_AIPS_WP_AI_Client_Provider extends WP_UnitTestCase {
 
         $provider = new AIPS_WP_AI_Client_Provider();
 
-        $this->assertFalse($provider->is_available());
-        $this->assertStringContainsString('text generation', $provider->get_unavailable_reason());
+        $this->assertTrue($provider->is_available());
+        $this->assertSame('', $provider->get_unavailable_reason());
     }
 
-    public function test_is_available_returns_false_when_builder_creation_fails() {
-        global $aips_wp_ai_client_test_builder;
+    public function test_is_available_returns_false_when_no_connector_is_configured() {
+        global $aips_wp_ai_client_test_builder, $aips_wp_ai_client_test_configured;
 
         $aips_wp_ai_client_test_builder = new WP_Error('no_connector', 'No connector configured.');
+        $aips_wp_ai_client_test_configured = false;
 
         $provider = new AIPS_WP_AI_Client_Provider();
 
         $this->assertFalse($provider->is_available());
     }
 
-    public function test_factory_autodetect_does_not_select_wp_ai_client_without_text_support() {
+    public function test_factory_autodetect_selects_configured_wp_ai_client_when_live_probe_is_offline() {
         global $aips_wp_ai_client_test_builder, $mwai;
 
         $mwai = null;
@@ -200,8 +280,8 @@ class Test_AIPS_WP_AI_Client_Provider extends WP_UnitTestCase {
 
         $provider = AIPS_AI_Provider_Factory::create();
 
-        $this->assertInstanceOf('AIPS_Null_AI_Provider', $provider);
-        $this->assertArrayNotHasKey('wp_ai_client', AIPS_AI_Provider_Factory::available_providers());
+        $this->assertInstanceOf('AIPS_WP_AI_Client_Provider', $provider);
+        $this->assertArrayHasKey('wp_ai_client', AIPS_AI_Provider_Factory::available_providers());
     }
 
     public function test_factory_available_providers_includes_wp_ai_client_when_text_ready() {
@@ -215,7 +295,7 @@ class Test_AIPS_WP_AI_Client_Provider extends WP_UnitTestCase {
         $this->assertArrayHasKey('wp_ai_client', $available);
     }
 
-    public function test_supports_native_json_requires_json_api_and_text_support() {
+    public function test_supports_native_json_requires_json_api_without_live_probe() {
         global $aips_wp_ai_client_test_builder;
 
         $aips_wp_ai_client_test_builder = new AIPS_Test_WP_AI_Client_Builder();
@@ -230,20 +310,35 @@ class Test_AIPS_WP_AI_Client_Provider extends WP_UnitTestCase {
         $builder->text_supported = false;
         $aips_wp_ai_client_test_builder = $builder;
         $provider = new AIPS_WP_AI_Client_Provider();
-        $this->assertFalse($provider->supports_native_json());
+        $this->assertTrue($provider->supports_native_json());
     }
 
-    public function test_generate_image_throws_when_image_generation_unsupported() {
+    public function test_generate_image_surfaces_client_capability_error() {
         global $aips_wp_ai_client_test_builder;
 
         $builder = new AIPS_Test_WP_AI_Client_Builder();
         $builder->image_supported = false;
+        $builder->image_response = new WP_Error('prompt_builder_error', 'No image-capable model was found.');
         $aips_wp_ai_client_test_builder = $builder;
 
         $this->expectException(Exception::class);
-        $this->expectExceptionMessage('image_generation_not_supported');
+        $this->expectExceptionMessage('prompt_builder_error');
 
         (new AIPS_WP_AI_Client_Provider())->generate_image('Image prompt', array());
+    }
+
+    public function test_generate_text_surfaces_network_error_instead_of_unsupported_error() {
+        global $aips_wp_ai_client_test_builder;
+
+        $builder = new AIPS_Test_WP_AI_Client_Builder();
+        $builder->text_supported = false;
+        $builder->text_response = new WP_Error('prompt_network_error', 'Could not reach the connector.');
+        $aips_wp_ai_client_test_builder = $builder;
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('prompt_network_error');
+
+        (new AIPS_WP_AI_Client_Provider())->generate_text('Prompt', array());
     }
 
     public function test_service_falls_back_directly_when_wp_provider_native_json_unsupported() {
@@ -278,6 +373,125 @@ class Test_AIPS_WP_AI_Client_Provider extends WP_UnitTestCase {
         $this->assertSame(0.4, $builder->captured_temperature);
         $this->assertSame(512, $builder->captured_max_tokens);
     }
+
+	public function test_selected_connectors_are_attempted_in_saved_order_with_failover() {
+		global $aips_wp_ai_client_test_builder, $aips_wp_ai_client_test_connectors;
+
+		$aips_wp_ai_client_test_connectors = $this->get_routing_test_connectors();
+		$config = AIPS_Config::get_instance();
+		$config->set_option('aips_wp_ai_connector_mode', 'selected');
+		$config->set_option('aips_wp_ai_connector_ids', array('google', 'openai'));
+		$config->set_option('aips_wp_ai_connector_failover', true);
+
+		$builder = new AIPS_Test_WP_AI_Client_Builder();
+		$builder->provider_text_responses = array(
+			'google' => new WP_Error('prompt_network_error', 'Google is temporarily unavailable.'),
+			'openai' => 'Generated by OpenAI',
+		);
+		$aips_wp_ai_client_test_builder = $builder;
+
+		$result = (new AIPS_WP_AI_Client_Provider())->generate_text('Prompt', array());
+
+		$this->assertSame('Generated by OpenAI', $result);
+		$this->assertSame(array('google', 'openai'), $builder->attempted_providers);
+		$this->assertNotContains('anthropic', $builder->attempted_providers);
+	}
+
+	public function test_content_policy_failure_does_not_try_another_connector() {
+		global $aips_wp_ai_client_test_builder, $aips_wp_ai_client_test_connectors;
+
+		$aips_wp_ai_client_test_connectors = $this->get_routing_test_connectors();
+		$config = AIPS_Config::get_instance();
+		$config->set_option('aips_wp_ai_connector_mode', 'selected');
+		$config->set_option('aips_wp_ai_connector_ids', array('google', 'openai'));
+		$config->set_option('aips_wp_ai_connector_failover', true);
+
+		$builder = new AIPS_Test_WP_AI_Client_Builder();
+		$builder->provider_text_responses = array(
+			'google' => new WP_Error('content_policy_violation', 'Prompt rejected.'),
+			'openai' => 'Should not be used',
+		);
+		$aips_wp_ai_client_test_builder = $builder;
+
+		try {
+			(new AIPS_WP_AI_Client_Provider())->generate_text('Prompt', array());
+			$this->fail('Expected the policy error to be surfaced.');
+		} catch (Exception $e) {
+			$this->assertStringStartsWith('content_policy_violation:', $e->getMessage());
+		}
+
+		$this->assertSame(array('google'), $builder->attempted_providers);
+	}
+
+	public function test_disabled_failover_does_not_try_the_next_connector() {
+		global $aips_wp_ai_client_test_builder, $aips_wp_ai_client_test_connectors;
+
+		$aips_wp_ai_client_test_connectors = $this->get_routing_test_connectors();
+		$config = AIPS_Config::get_instance();
+		$config->set_option('aips_wp_ai_connector_mode', 'selected');
+		$config->set_option('aips_wp_ai_connector_ids', array('google', 'openai'));
+		$config->set_option('aips_wp_ai_connector_failover', false);
+
+		$builder = new AIPS_Test_WP_AI_Client_Builder();
+		$builder->provider_text_responses = array(
+			'google' => new WP_Error('prompt_network_error', 'Unavailable.'),
+			'openai' => 'Should not be used',
+		);
+		$aips_wp_ai_client_test_builder = $builder;
+
+		try {
+			(new AIPS_WP_AI_Client_Provider())->generate_text('Prompt', array());
+			$this->fail('Expected the first connector error to be surfaced.');
+		} catch (Exception $e) {
+			$this->assertStringStartsWith('prompt_network_error:', $e->getMessage());
+		}
+
+		$this->assertSame(array('google'), $builder->attempted_providers);
+	}
+
+	public function test_all_mode_uses_every_configured_connector_without_saved_selection() {
+		global $aips_wp_ai_client_test_builder, $aips_wp_ai_client_test_connectors;
+
+		$aips_wp_ai_client_test_connectors = $this->get_routing_test_connectors();
+		$config = AIPS_Config::get_instance();
+		$config->set_option('aips_wp_ai_connector_mode', 'all');
+		$config->set_option('aips_wp_ai_connector_ids', array('anthropic'));
+		$config->set_option('aips_wp_ai_connector_failover', true);
+
+		$builder = new AIPS_Test_WP_AI_Client_Builder();
+		$builder->provider_text_responses = array(
+			'google'    => new WP_Error('prompt_network_error', 'Unavailable.'),
+			'openai'    => 'Generated by OpenAI',
+			'anthropic' => 'Generated by Anthropic',
+		);
+		$aips_wp_ai_client_test_builder = $builder;
+
+		$result = (new AIPS_WP_AI_Client_Provider())->generate_text('Prompt', array());
+
+		$this->assertSame('Generated by OpenAI', $result);
+		$this->assertSame(array('google', 'openai'), $builder->attempted_providers);
+	}
+
+	/**
+	 * Connector registry entries used by routing tests.
+	 *
+	 * @return array
+	 */
+	private function get_routing_test_connectors(): array {
+		$connector = static function($name) {
+			return array(
+				'name'           => $name,
+				'type'           => 'ai_provider',
+				'authentication' => array('method' => 'none'),
+			);
+		};
+
+		return array(
+			'google'    => $connector('Google'),
+			'openai'    => $connector('OpenAI'),
+			'anthropic' => $connector('Anthropic'),
+		);
+	}
 
     public function test_generate_text_forwards_context_and_instructions_as_system_instruction() {
         global $aips_wp_ai_client_test_builder;
@@ -429,7 +643,7 @@ class Test_AIPS_WP_AI_Client_Provider extends WP_UnitTestCase {
         $aips_wp_ai_client_test_builder = $builder;
 
         $provider = new AIPS_WP_AI_Client_Provider();
-        $provider->is_available(); // triggers create_prompt_builder()
+        $provider->supports_text_generation(); // Triggers create_prompt_builder().
 
         // The test stub captures the argument via set_prompt(). A null would cause
         // a PHP 8 TypeError on any non-nullable string parameter in the real function.
@@ -442,12 +656,12 @@ class Test_AIPS_WP_AI_Client_Provider extends WP_UnitTestCase {
         // First probe: builder creation fails → null stored in WeakMap.
         $aips_wp_ai_client_test_builder = new WP_Error('no_connector', 'No connector.');
         $provider = new AIPS_WP_AI_Client_Provider();
-        $this->assertFalse($provider->is_available());
+        $this->assertFalse($provider->supports_text_generation());
 
         // Swap to a working builder. Without the offsetExists fix (i.e. using isset),
         // the null would not be seen as a cache hit and the provider would re-probe,
         // find the new builder, and incorrectly return true.
         $aips_wp_ai_client_test_builder = new AIPS_Test_WP_AI_Client_Builder();
-        $this->assertFalse($provider->is_available(), 'Cached null must be honoured; provider must not re-probe.');
+        $this->assertFalse($provider->supports_text_generation(), 'Cached null must be honoured; provider must not re-probe.');
     }
 }

@@ -135,6 +135,9 @@ class AIPS_Config {
             'aips_ai_provider' => '', // '' = auto-detect (Meow preferred)
             'aips_ai_model' => '',
             'aips_ai_env_id' => '',
+			'aips_wp_ai_connector_mode' => 'all',
+			'aips_wp_ai_connector_ids' => array(),
+			'aips_wp_ai_connector_failover' => true,
             'aips_max_tokens_limit' => 16000,
             'aips_max_tokens_title' => 150,
             'aips_max_tokens_excerpt' => 300,

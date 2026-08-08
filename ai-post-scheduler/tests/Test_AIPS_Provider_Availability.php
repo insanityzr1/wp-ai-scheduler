@@ -9,18 +9,34 @@
  * @subpackage Tests
  */
 
+if (!function_exists('aips_test_wp_ai_client_connector_configured')) {
+    function aips_test_wp_ai_client_connector_configured($configured) {
+        global $aips_wp_ai_client_test_configured;
+
+        return isset($aips_wp_ai_client_test_configured)
+            ? (bool) $aips_wp_ai_client_test_configured
+            : $configured;
+    }
+}
+
 class Test_AIPS_Provider_Availability extends WP_UnitTestCase {
 
     public function setUp(): void {
+        global $aips_wp_ai_client_test_configured;
+
         parent::setUp();
+        $aips_wp_ai_client_test_configured = true;
+        add_filter('aips_wp_ai_client_has_configured_connector', 'aips_test_wp_ai_client_connector_configured');
         AIPS_AI_Provider_Factory::reset_cache();
     }
 
     public function tearDown(): void {
-        global $aips_wp_ai_client_test_builder, $mwai;
+        global $aips_wp_ai_client_test_builder, $aips_wp_ai_client_test_configured, $mwai;
 
         $aips_wp_ai_client_test_builder = null;
+        $aips_wp_ai_client_test_configured = null;
         $mwai = null;
+        remove_filter('aips_wp_ai_client_has_configured_connector', 'aips_test_wp_ai_client_connector_configured');
         delete_option('aips_ai_provider');
         AIPS_AI_Provider_Factory::reset_cache();
         parent::tearDown();
@@ -46,10 +62,11 @@ class Test_AIPS_Provider_Availability extends WP_UnitTestCase {
     }
 
     public function test_has_available_provider_false_when_nothing_ready() {
-        global $mwai, $aips_wp_ai_client_test_builder;
+        global $mwai, $aips_wp_ai_client_test_builder, $aips_wp_ai_client_test_configured;
 
         $mwai = null;
         $aips_wp_ai_client_test_builder = new WP_Error('no_connector', 'Nothing configured.');
+        $aips_wp_ai_client_test_configured = false;
 
         $this->assertFalse(AIPS_AI_Provider_Factory::has_available_provider());
     }
@@ -81,10 +98,11 @@ class Test_AIPS_Provider_Availability extends WP_UnitTestCase {
     }
 
     public function test_campaign_warnings_report_missing_provider_when_nothing_ready() {
-        global $mwai, $aips_wp_ai_client_test_builder;
+        global $mwai, $aips_wp_ai_client_test_builder, $aips_wp_ai_client_test_configured;
 
         $mwai = null;
         $aips_wp_ai_client_test_builder = new WP_Error('no_connector', 'Nothing configured.');
+        $aips_wp_ai_client_test_configured = false;
 
         $warnings = $this->build_campaign_warnings();
         $types = wp_list_pluck($warnings, 'type');

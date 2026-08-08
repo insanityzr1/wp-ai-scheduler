@@ -131,6 +131,18 @@ class AIPS_Settings {
 				'sanitize_callback' => array($ui, 'sanitize_ai_provider'),
 				'default'           => $defaults['aips_ai_provider'],
 			),
+			'aips_wp_ai_connector_mode' => array(
+				'sanitize_callback' => array($ui, 'sanitize_wp_ai_connector_mode'),
+				'default'           => $defaults['aips_wp_ai_connector_mode'],
+			),
+			'aips_wp_ai_connector_ids' => array(
+				'sanitize_callback' => array($ui, 'sanitize_wp_ai_connector_ids'),
+				'default'           => $defaults['aips_wp_ai_connector_ids'],
+			),
+			'aips_wp_ai_connector_failover' => array(
+				'sanitize_callback' => 'absint',
+				'default'           => $defaults['aips_wp_ai_connector_failover'],
+			),
 			'aips_ai_model' => array(
 				'sanitize_callback' => 'sanitize_text_field',
 				'default'           => $defaults['aips_ai_model'],
@@ -275,6 +287,14 @@ class AIPS_Settings {
             'aips-settings',
             'aips_ai_section'
         );
+
+		add_settings_field(
+			'aips_wp_ai_connectors',
+			__('WordPress AI Connectors', 'ai-post-scheduler'),
+			array($this->ui, 'wp_ai_connectors_field_callback'),
+			'aips-settings',
+			'aips_ai_section'
+		);
 
         add_settings_field(
             'aips_ai_model',

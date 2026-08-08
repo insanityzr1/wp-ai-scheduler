@@ -66,7 +66,12 @@ class AIPS_Settings_AJAX {
 				continue;
 			}
 
-			if (is_array($raw_value) && 'aips_notification_preferences' !== $option_name) {
+			$array_settings = array(
+				'aips_notification_preferences',
+				'aips_wp_ai_connector_ids',
+			);
+
+			if (is_array($raw_value) && !in_array($option_name, $array_settings, true)) {
 				continue;
 			}
 
@@ -81,7 +86,7 @@ class AIPS_Settings_AJAX {
 
 		AIPS_Ajax_Response::success(array(
 			'message' => __('Settings saved successfully.', 'ai-post-scheduler'),
-			'updated' => array_keys($updated),
+			'updated' => array_values($updated),
 		));
 	}
 

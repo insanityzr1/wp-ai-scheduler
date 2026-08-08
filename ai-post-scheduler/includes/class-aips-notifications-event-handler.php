@@ -357,6 +357,16 @@ class AIPS_Notifications_Event_Handler {
 		$post = get_post($post_id);
 		$post_status = ($post && !empty($post->post_status)) ? $post->post_status : '';
 
+		$this->notifications->post_generated(array(
+			'post_id'           => $post_id,
+			'history_id'        => absint($history_id),
+			'source_label'      => $this->get_source_label($context),
+			'post_status'       => $post_status,
+			'post_status_label' => $this->format_post_status_label($post_status),
+			'dedupe_key'        => 'post_generated_' . $post_id,
+			'dedupe_window'     => 60,
+		));
+
 		if ('manual' === $creation_method) {
 			$this->notifications->manual_generation_completed(array(
 				'post_id'       => $post_id,
@@ -666,6 +676,17 @@ class AIPS_Notifications_Event_Handler {
 		}
 
 		return __('Unknown', 'ai-post-scheduler');
+	}
+
+	/**
+	 * Return a human-readable label for a WordPress post status slug.
+	 *
+	 * @param string $post_status Post status slug.
+	 * @return string
+	 */
+	private function format_post_status_label($post_status) {
+		$status_object = get_post_status_object($post_status);
+		return ($status_object && !empty($status_object->label)) ? $status_object->label : ucfirst(str_replace('_', ' ', (string) $post_status));
 	}
 
 	/**

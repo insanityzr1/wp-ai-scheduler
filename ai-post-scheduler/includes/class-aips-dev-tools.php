@@ -25,6 +25,10 @@ class AIPS_Dev_Tools {
      * @return void
      */
     public function render_page($embedded = false) {
+        if (!AIPS_Config::get_instance()->get_option('aips_developer_mode')) {
+            wp_die(esc_html__('Developer Mode is currently disabled.', 'ai-post-scheduler'));
+        }
+
         $embedded = (bool) $embedded;
 
         include AIPS_PLUGIN_DIR . 'templates/admin/dev-tools.php';
@@ -45,6 +49,10 @@ class AIPS_Dev_Tools {
 
         if (!current_user_can('manage_options')) {
             AIPS_Ajax_Response::error(__('Unauthorized access.', 'ai-post-scheduler'));
+        }
+
+        if (!AIPS_Config::get_instance()->get_option('aips_developer_mode')) {
+            AIPS_Ajax_Response::error(__('Developer Mode is disabled.', 'ai-post-scheduler'));
         }
 
         $topic = isset($_POST['topic']) ? sanitize_text_field(wp_unslash($_POST['topic'])) : '';

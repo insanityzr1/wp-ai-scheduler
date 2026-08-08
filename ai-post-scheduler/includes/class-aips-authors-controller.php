@@ -377,6 +377,17 @@ class AIPS_Authors_Controller {
 		}
 
 		// Enrich with WordPress post data
+		$post_ids = array();
+		foreach ($posts as $post) {
+			if ($post->post_id) {
+				$post_ids[] = (int) $post->post_id;
+			}
+		}
+
+		if (!empty($post_ids) && function_exists('_prime_post_caches')) {
+			_prime_post_caches(array_unique($post_ids), false, true);
+		}
+
 		foreach ($posts as &$post) {
 			if ($post->post_id) {
 				$wp_post = get_post($post->post_id);
@@ -496,6 +507,7 @@ class AIPS_Authors_Controller {
 				$post_ids[] = (int) $log->post_id;
 			}
 		}
+    
 		if (!empty($post_ids) && function_exists('_prime_post_caches')) {
 			_prime_post_caches(array_unique($post_ids), false, true);
 		}

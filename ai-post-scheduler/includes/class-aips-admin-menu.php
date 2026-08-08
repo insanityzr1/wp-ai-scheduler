@@ -244,14 +244,16 @@ class AIPS_Admin_Menu {
             array($this, 'render_status_page')
         );
 
-        add_submenu_page(
-            null,
-            __('Seeder', 'ai-post-scheduler'),
-            __('Seeder', 'ai-post-scheduler'),
-            'manage_options',
-            'aips-seeder',
-            array($this, 'render_seeder_page')
-        );
+        if (AIPS_Config::get_instance()->get_option('aips_developer_mode')) {
+            add_submenu_page(
+                null,
+                __('Seeder', 'ai-post-scheduler'),
+                __('Seeder', 'ai-post-scheduler'),
+                'manage_options',
+                'aips-seeder',
+                array($this, 'render_seeder_page')
+            );
+        }
 
         add_submenu_page(
             null,
@@ -273,14 +275,16 @@ class AIPS_Admin_Menu {
             );
         }
 
-        add_submenu_page(
-            null,
-            __('Cache Monitor', 'ai-post-scheduler'),
-            __('Cache Monitor', 'ai-post-scheduler'),
-            'manage_options',
-            'aips-cache-monitor',
-            array($this, 'render_cache_monitor_page')
-        );
+        if (AIPS_Config::get_instance()->get_option('aips_cache_monitor_enabled')) {
+            add_submenu_page(
+                null,
+                __('Cache Monitor', 'ai-post-scheduler'),
+                __('Cache Monitor', 'ai-post-scheduler'),
+                'manage_options',
+                'aips-cache-monitor',
+                array($this, 'render_cache_monitor_page')
+            );
+        }
         if (AIPS_Config::get_instance()->get_option('aips_developer_mode')) {
             add_submenu_page(
                 null,

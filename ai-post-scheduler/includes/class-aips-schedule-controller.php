@@ -732,7 +732,7 @@ class AIPS_Schedule_Controller {
             $entries[] = array(
                 'id' => absint($log->id),
                 'timestamp' => esc_html($log->timestamp),
-                'log_type' => esc_html($log->log_type),
+                'log_type' => isset($details['log_subtype']) ? esc_html($details['log_subtype']) : '',
                 'history_type_id' => absint($log->history_type_id),
                 'message' => isset($details['message']) ? esc_html($details['message']) : '',
                 'event_type' => isset($input['event_type']) ? esc_html($input['event_type']) : '',
@@ -761,13 +761,14 @@ class AIPS_Schedule_Controller {
         $id       = isset($_POST['id']) ? absint($_POST['id']) : 0;
         $type     = isset($_POST['type']) ? sanitize_key(wp_unslash($_POST['type'])) : '';
         $quantity = isset($_POST['quantity']) ? min(AIPS_Author_Post_Generator::MAX_POSTS_PER_RUN, max(1, absint($_POST['quantity']))) : null;
+        $advance_schedule = !isset($_POST['advance_schedule']) || rest_sanitize_boolean(wp_unslash($_POST['advance_schedule']));
 
         if (!$id || empty($type)) {
             AIPS_Ajax_Response::error(__('Invalid parameters.', 'ai-post-scheduler'));
         }
 
         $service = new AIPS_Unified_Schedule_Service();
-        $result  = $service->run_now($id, $type, $quantity);
+        $result  = $service->run_now($id, $type, $quantity, $advance_schedule);
 
         if (is_wp_error($result)) {
             AIPS_Ajax_Response::error(array('message' => $result->get_error_message()));

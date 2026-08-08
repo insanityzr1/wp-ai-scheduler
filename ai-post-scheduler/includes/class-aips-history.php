@@ -30,13 +30,64 @@ class AIPS_History {
         $this->repository = new AIPS_History_Repository();
         
         add_action('wp_ajax_aips_bulk_delete_history', array($this, 'ajax_bulk_delete_history'));
-        add_action('wp_ajax_aips_clear_history', array($this, 'ajax_clear_history'));
         add_action('wp_ajax_aips_export_history', array($this, 'ajax_export_history'));
         add_action('wp_ajax_aips_get_history_details', array($this, 'ajax_get_history_details'));
         add_action('wp_ajax_aips_get_history_logs', array($this, 'ajax_get_history_logs'));
         add_action('wp_ajax_aips_get_history_modal_html', array($this, 'ajax_get_history_modal_html'));
         add_action('wp_ajax_aips_reload_history', array($this, 'ajax_reload_history'));
         add_action('wp_ajax_aips_retry_generation', array($this, 'ajax_retry_generation'));
+    }
+
+    /**
+     * Human-readable labels for known creation_method values.
+     *
+     * @return array<string,string>
+     */
+    private static function creation_method_labels(): array {
+        return array(
+            'manual'                  => __( 'Manual', 'ai-post-scheduler' ),
+            'scheduled'               => __( 'Scheduled', 'ai-post-scheduler' ),
+            'template_schedule'       => __( 'Template Schedule', 'ai-post-scheduler' ),
+            'author_topic_gen'        => __( 'Author Topics', 'ai-post-scheduler' ),
+            'author_post_gen'         => __( 'Author Posts', 'ai-post-scheduler' ),
+            'author_topic_generation' => __( 'Author Topics', 'ai-post-scheduler' ),
+            'author_post_generation'  => __( 'Author Posts', 'ai-post-scheduler' ),
+            'author_embeddings'       => __( 'Author Embeddings', 'ai-post-scheduler' ),
+            'post_generation'         => __( 'Post Generation', 'ai-post-scheduler' ),
+            'bulk_generate'           => __( 'Bulk Generation', 'ai-post-scheduler' ),
+            'bulk_generate_now'       => __( 'Bulk Generation', 'ai-post-scheduler' ),
+            'bulk_generation'         => __( 'Bulk Generation', 'ai-post-scheduler' ),
+            'bulk_regenerate'         => __( 'Bulk Regeneration', 'ai-post-scheduler' ),
+        );
+    }
+
+    /**
+     * Return a display title for a history row, falling back to the creation
+     * method label or a generic placeholder when no generated title exists.
+     *
+     * @param object $item History row object from wp_aips_history.
+     * @return string
+     */
+    public static function get_display_title( object $item ): string {
+        if ( ! empty( $item->generated_title ) ) {
+            return $item->generated_title;
+        }
+        $labels = self::creation_method_labels();
+        if ( ! empty( $item->creation_method ) && isset( $labels[ $item->creation_method ] ) ) {
+            return $labels[ $item->creation_method ];
+        }
+        return __( 'Generation Event', 'ai-post-scheduler' );
+    }
+
+    /**
+     * Return a human-readable label for a creation_method value.
+     *
+     * @param string $method Raw creation_method value from the DB.
+     * @return string
+     */
+    public static function get_creation_method_label( string $method ): string {
+        $labels = self::creation_method_labels();
+        return $labels[ $method ] ?? ucwords( str_replace( '_', ' ', $method ) );
     }
 
     /**
@@ -59,34 +110,17 @@ class AIPS_History {
             AIPS_Ajax_Response::error(__('No items selected.', 'ai-post-scheduler'));
         }
 
+        do_action('aips_history_before_delete', $ids);
+
         $result = $this->repository->delete_bulk($ids);
 
         if ($result === false) {
             AIPS_Ajax_Response::error(__('Failed to delete items.', 'ai-post-scheduler'));
         }
 
+        do_action('aips_history_deleted', $ids);
+
         AIPS_Ajax_Response::success(array(), __('Selected items deleted successfully.', 'ai-post-scheduler'));
-    }
-
-    /**
-     * AJAX handler to clear history, optionally filtered by status.
-     *
-     * @return void
-     */
-    public function ajax_clear_history() {
-        if ( ! check_ajax_referer('aips_ajax_nonce', 'nonce', false) ) {
-            AIPS_Ajax_Response::error(__('Invalid nonce.', 'ai-post-scheduler'));
-        }
-
-        if (!current_user_can('manage_options')) {
-            AIPS_Ajax_Response::permission_denied();
-        }
-
-        $status = isset($_POST['status']) ? sanitize_text_field(wp_unslash($_POST['status'])) : '';
-
-        $this->clear_history($status);
-
-        AIPS_Ajax_Response::success(array(), __('History cleared successfully.', 'ai-post-scheduler'));
     }
 
     /**
@@ -107,7 +141,6 @@ class AIPS_History {
         $search_query = isset($_POST['search']) ? sanitize_text_field(wp_unslash($_POST['search'])) : '';
         $domain_filter = isset($_POST['domain']) ? sanitize_key(wp_unslash($_POST['domain'])) : '';
         $actor_filter = isset($_POST['actor']) ? sanitize_key(wp_unslash($_POST['actor'])) : '';
-        $correlation_id = isset($_POST['correlation_id']) ? sanitize_text_field(wp_unslash($_POST['correlation_id'])) : '';
         $date_from = isset($_POST['date_from']) ? sanitize_text_field(wp_unslash($_POST['date_from'])) : '';
         $date_to = isset($_POST['date_to']) ? sanitize_text_field(wp_unslash($_POST['date_to'])) : '';
 
@@ -123,7 +156,6 @@ class AIPS_History {
             'search' => $search_query,
             'domain' => $domain_filter,
             'actor' => $actor_filter,
-            'correlation_id' => $correlation_id,
             'date_from' => $date_from,
             'date_to' => $date_to,
         ));
@@ -150,7 +182,7 @@ class AIPS_History {
             'Date',
             'Title',
             'Status',
-            'Template',
+            'History Type',
             'Post ID',
             'Error Message'
         ));
@@ -162,7 +194,7 @@ class AIPS_History {
                     $item->created_at,
                     $this->sanitize_csv_cell($item->generated_title),
                     $item->status,
-                    $this->sanitize_csv_cell($item->template_name),
+                    $this->sanitize_csv_cell(self::get_creation_method_label((string) $item->creation_method)),
                     $item->post_id,
                     $this->sanitize_csv_cell($item->error_message)
                 ));
@@ -265,6 +297,9 @@ class AIPS_History {
             'summary_lines' => $this->build_history_summary_lines($analysis),
             'summary_meta' => $this->build_history_summary_meta($container),
             'detail_cards' => $this->build_history_detail_cards($container),
+            'root_issue' => !empty($container['error_message']) ? (string) $container['error_message'] : '',
+            'suggested_action' => $this->build_history_suggested_action($container),
+            'diagnostic_text' => $this->build_history_diagnostic_text($container, $analysis),
         );
     }
 
@@ -463,6 +498,22 @@ class AIPS_History {
             );
         }
 
+        foreach (array(
+            'actor_type' => __('Actor', 'ai-post-scheduler'),
+            'topic_id' => __('Topic ID', 'ai-post-scheduler'),
+            'completed_at' => __('Completed', 'ai-post-scheduler'),
+            'correlation_id' => __('Correlation ID', 'ai-post-scheduler'),
+            'id' => __('Container ID', 'ai-post-scheduler'),
+        ) as $key => $label) {
+            if (!empty($container[$key])) {
+                $cards[] = array(
+                    'label' => $label,
+                    'value' => (string) $container[$key],
+                    'class' => '',
+                );
+            }
+        }
+
         if (!empty($container['post_id']) && empty($container['post_url']) && empty($container['post_edit_url'])) {
             $cards[] = array(
                 'label' => __('Post ID', 'ai-post-scheduler'),
@@ -480,6 +531,34 @@ class AIPS_History {
         }
 
         return $cards;
+    }
+
+    private function build_history_suggested_action($container) {
+        if ($container['status'] === 'failed') {
+            return !empty($container['template_name'])
+                ? __('Review the error and retry this run after correcting its template or AI configuration.', 'ai-post-scheduler')
+                : __('Review the error and technical log before retrying the originating workflow.', 'ai-post-scheduler');
+        }
+        if ($container['status'] === 'processing') {
+            return __('Allow the run to finish; reload History if it remains in progress unexpectedly.', 'ai-post-scheduler');
+        }
+        return '';
+    }
+
+    private function build_history_diagnostic_text($container, $analysis) {
+        $lines = array(
+            sprintf(__('History #%d', 'ai-post-scheduler'), (int) $container['id']),
+            sprintf(__('Status: %s', 'ai-post-scheduler'), (string) $container['status']),
+            sprintf(__('What happened: %s', 'ai-post-scheduler'), (string) $analysis['what_happened']),
+            sprintf(__('What changed: %s', 'ai-post-scheduler'), (string) $analysis['what_changed']),
+        );
+        if (!empty($container['error_message'])) {
+            $lines[] = sprintf(__('Error: %s', 'ai-post-scheduler'), (string) $container['error_message']);
+        }
+        if (!empty($container['correlation_id'])) {
+            $lines[] = sprintf(__('Correlation ID: %s', 'ai-post-scheduler'), (string) $container['correlation_id']);
+        }
+        return implode("\n", $lines);
     }
 
     /**
@@ -557,9 +636,11 @@ class AIPS_History {
                 }
             }
 
+            $log_type_label = isset($details['log_subtype']) ? (string) $details['log_subtype'] : '';
+
             $logs[] = array(
                 'id' => (int) $log->id,
-                'log_type' => (string) $log->log_type,
+                'log_type' => $log_type_label,
                 'history_type_id' => (int) $log->history_type_id,
                 'type_label' => AIPS_History_Type::get_label((int) $log->history_type_id),
                 'type_class' => $this->get_history_type_class((int) $log->history_type_id),
@@ -586,6 +667,15 @@ class AIPS_History {
         if ($format_dates) {
             $created_at = !empty($created_at) ? AIPS_DateTime::formatRelativeOrAbsolute($created_at) : '';
         }
+        $completed_at = isset($history_item->completed_at) ? $history_item->completed_at : '';
+        if ($format_dates) {
+            $completed_at = !empty($completed_at) ? AIPS_DateTime::formatRelativeOrAbsolute($completed_at) : '';
+        }
+        $creation_method = isset($history_item->creation_method) ? (string) $history_item->creation_method : '';
+        $actor_type = isset($history_item->actor_type) ? (string) $history_item->actor_type : '';
+        if ($actor_type === '') {
+            $actor_type = strpos($creation_method, 'manual') !== false || strpos($creation_method, 'admin') !== false ? 'admin' : 'system';
+        }
 
         return array(
             'id' => (int) $history_item->id,
@@ -598,7 +688,11 @@ class AIPS_History {
             'post_id' => $post_id,
             'post_url' => $post_urls['post_url'],
             'post_edit_url' => $post_urls['post_edit_url'],
-            'creation_method' => isset($history_item->creation_method) ? $history_item->creation_method : null,
+            'creation_method' => $creation_method,
+            'actor_type' => $actor_type,
+            'topic_id' => !empty($history_item->topic_id) ? (int) $history_item->topic_id : null,
+            'correlation_id' => isset($history_item->correlation_id) ? (string) $history_item->correlation_id : '',
+            'completed_at' => $completed_at,
             'duration_seconds' => $duration_seconds,
             'duration_label' => $this->format_history_duration_label($duration_seconds),
         );
@@ -875,6 +969,10 @@ class AIPS_History {
         );
     }
 
+    public function format_duration_for_display($duration_seconds) {
+        return $this->format_history_duration_label($duration_seconds);
+    }
+
     /**
      * Determine whether a normalized log entry is an AI request.
      *
@@ -882,7 +980,7 @@ class AIPS_History {
      * @return bool
      */
     private function is_ai_request_history_log($log) {
-        return (string) $log['history_type_id'] === '5' || (isset($log['log_type']) && $log['log_type'] === 'ai_request');
+        return (int) $log['history_type_id'] === AIPS_History_Type::AI_REQUEST;
     }
 
     /**
@@ -892,7 +990,7 @@ class AIPS_History {
      * @return bool
      */
     private function is_ai_response_history_log($log) {
-        return (string) $log['history_type_id'] === '6' || (isset($log['log_type']) && $log['log_type'] === 'ai_response');
+        return (int) $log['history_type_id'] === AIPS_History_Type::AI_RESPONSE;
     }
 
     /**
@@ -1183,7 +1281,6 @@ class AIPS_History {
         $search_query = isset($_POST['search']) ? sanitize_text_field(wp_unslash($_POST['search'])) : '';
         $domain_filter = isset($_POST['domain']) ? sanitize_key(wp_unslash($_POST['domain'])) : '';
         $actor_filter = isset($_POST['actor']) ? sanitize_key(wp_unslash($_POST['actor'])) : '';
-        $correlation_id = isset($_POST['correlation_id']) ? sanitize_text_field(wp_unslash($_POST['correlation_id'])) : '';
         $date_from = isset($_POST['date_from']) ? sanitize_text_field(wp_unslash($_POST['date_from'])) : '';
         $date_to = isset($_POST['date_to']) ? sanitize_text_field(wp_unslash($_POST['date_to'])) : '';
         $paged = isset($_POST['paged']) ? max(1, absint($_POST['paged'])) : 1;
@@ -1194,7 +1291,6 @@ class AIPS_History {
             'search' => $search_query,
             'domain' => $domain_filter,
             'actor' => $actor_filter,
-            'correlation_id' => $correlation_id,
             'date_from' => $date_from,
             'date_to' => $date_to,
             'fields' => 'list',
@@ -1214,14 +1310,9 @@ class AIPS_History {
         $this->render_pagination_html($history, $status_filter, $search_query);
         $pagination_html = ob_get_clean();
 
-        ob_start();
-        $this->render_timeline_html($history['items']);
-        $timeline_html = ob_get_clean();
-
         AIPS_Ajax_Response::success(array(
             'items_html'      => $items_html,
             'pagination_html' => $pagination_html,
-            'timeline_html'   => $timeline_html,
             'paged'           => $paged,
             'stats'           => $this->get_stats(),
         ));
@@ -1312,16 +1403,6 @@ class AIPS_History {
     }
 
     /**
-     * Clear history records, optionally filtered by status.
-     *
-     * @param string $status Status filter.
-     * @return mixed
-     */
-    public function clear_history($status = '') {
-        return $this->repository->delete_by_status($status);
-    }
-
-    /**
      * Render pagination HTML for history table (used by template and AJAX).
      *
      * @param array  $history       History result with total, pages, current_page.
@@ -1370,7 +1451,6 @@ class AIPS_History {
         $search_query = isset($_GET['s']) ? sanitize_text_field(wp_unslash($_GET['s'])) : '';
         $domain_filter = isset($_GET['domain']) ? sanitize_key(wp_unslash($_GET['domain'])) : '';
         $actor_filter = isset($_GET['actor']) ? sanitize_key(wp_unslash($_GET['actor'])) : '';
-        $correlation_id = isset($_GET['correlation_id']) ? sanitize_text_field(wp_unslash($_GET['correlation_id'])) : '';
         $date_from = isset($_GET['date_from']) ? sanitize_text_field(wp_unslash($_GET['date_from'])) : '';
         $date_to = isset($_GET['date_to']) ? sanitize_text_field(wp_unslash($_GET['date_to'])) : '';
 
@@ -1380,13 +1460,13 @@ class AIPS_History {
             'search' => $search_query,
             'domain' => $domain_filter,
             'actor' => $actor_filter,
-            'correlation_id' => $correlation_id,
             'date_from' => $date_from,
             'date_to' => $date_to,
             'fields' => 'list',
         ));
 
         $this->prepare_items_for_display($history['items']);
+        $stats = $this->get_stats();
 
         // Pass handler to template for helper methods
         $history_handler = $this;
@@ -1475,6 +1555,21 @@ class AIPS_History {
             }
 
             $item->formatted_date = $date_time->toDisplay( $format );
+            $item->relative_date = AIPS_DateTime::formatRelativeOrAbsolute($created_at);
+            $item->duration_label = isset($item->duration_seconds) && $item->duration_seconds !== null
+                ? $this->format_history_duration_label((int) $item->duration_seconds)
+                : '';
+            $item->warning_count = isset($item->warning_count) ? (int) $item->warning_count : 0;
+            $item->error_count = isset($item->error_count) ? (int) $item->error_count : 0;
+            $item->ai_call_count = isset($item->ai_call_count) ? (int) $item->ai_call_count : 0;
+            if (!empty($item->latest_message)) {
+                $latest_details = json_decode((string) $item->latest_message, true);
+                if (is_array($latest_details) && !empty($latest_details['message'])) {
+                    $item->latest_message = sanitize_text_field((string) $latest_details['message']);
+                } elseif (strpos(ltrim((string) $item->latest_message), '{') === 0) {
+                    $item->latest_message = '';
+                }
+            }
         }
     }
 }

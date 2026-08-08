@@ -284,6 +284,15 @@ class AIPS_Admin_Menu {
             );
         }
 
+        add_submenu_page(
+            null,
+            __('Stress Test', 'ai-post-scheduler'),
+            __('Stress Test', 'ai-post-scheduler'),
+            'manage_options',
+            AIPS_Stress_Test_Controller::PAGE_SLUG,
+            array($this, 'render_stress_test_page')
+        );
+
         if (AIPS_Config::get_instance()->get_option('aips_cache_monitor_enabled')) {
             add_submenu_page(
                 null,
@@ -294,6 +303,7 @@ class AIPS_Admin_Menu {
                 array($this, 'render_cache_monitor_page')
             );
         }
+      
         if (AIPS_Config::get_instance()->get_option('aips_developer_mode')) {
             add_submenu_page(
                 null,
@@ -360,6 +370,7 @@ class AIPS_Admin_Menu {
                 'aips-seeder',
                 'aips-dev-tools',
                 'aips-cache-monitor',
+                AIPS_Stress_Test_Controller::PAGE_SLUG,
             ),
             true
         );
@@ -740,6 +751,18 @@ class AIPS_Admin_Menu {
     public function render_status_page() {
         $status_handler = new AIPS_System_Status();
         $status_handler->render_page();
+    }
+
+    /**
+     * Render the Stress Test page.
+     *
+     * Delegates rendering to AIPS_Stress_Test_Controller.
+     *
+     * @return void
+     */
+    public function render_stress_test_page() {
+        $controller = new AIPS_Stress_Test_Controller();
+        $controller->render_page();
     }
 
     /**

@@ -2,6 +2,22 @@
 
 This document lists all the actions and filters available in the AI Post Scheduler plugin. Developers can use these hooks to extend the plugin's functionality.
 
+## AI Provider Filters
+
+### `aips_wp_ai_client_prompt_builder`
+Filters an optional prebuilt WordPress AI Client prompt builder before AIPS calls `wp_ai_client_prompt()`.
+
+* **Arguments:**
+  * `object|WP_Error|null $builder`: Replacement builder, or `null` to use WordPress core.
+  * `string $prompt`: Prompt text for the request.
+  * `AIPS_WP_AI_Client_Provider $provider`: Current provider adapter.
+
+### `aips_wp_ai_client_connectors`
+Filters active WordPress AI connectors before AIPS applies its connector allowlist and failover policy.
+
+* **Arguments:**
+  * `array $connectors`: Active AI connector definitions keyed by connector ID.
+
 ## Action Hooks
 
 ### Post Generation
@@ -39,12 +55,12 @@ Fires after a post has been created but one or more requested components failed 
     *   `int $history_id`: The ID of the history record associated with this generation.
 
 #### `aips_post_components_updated`
-Fires after AI Edit saves updated post components.
+Fires after AI Assistance saves updated post components.
 
 *   **Arguments:**
     *   `int $post_id`: The updated post ID.
     *   `array $updated_components`: Updated component keys (`title`, `excerpt`, `content`, `featured_image`).
-    *   `array $components`: Raw component payload submitted by AI Edit.
+    *   `array $components`: Raw component payload submitted by AI Assistance.
 
 #### `aips_generation_failed`
 Fires when a non-scheduled/manual generation flow fails and should create a high-priority notification.
@@ -306,4 +322,3 @@ Filters the maximum number of similar approved topics used as expanded context w
 *   **Default:** `5`
 *   **Arguments:**
     *   `int $limit` Maximum context topics.
-

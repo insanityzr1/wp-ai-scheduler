@@ -32,6 +32,10 @@ class AIPS_Cache_Array_Driver implements AIPS_Cache_Driver, AIPS_Cache_Monitorab
 	 */
 	private $expiries = array();
 
+	public function is_available() {
+		return true;
+	}
+
 	/**
 	 * {@inheritdoc}
 	 */

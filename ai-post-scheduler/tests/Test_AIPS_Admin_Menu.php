@@ -135,7 +135,7 @@ class Test_AIPS_Admin_Menu extends WP_UnitTestCase {
 			'Diagnostics should be visible in the primary submenu.'
 		);
 
-		foreach (array('aips-operations-insights', 'aips-status', 'aips-seeder') as $hidden_page) {
+		foreach (array('aips-operations-insights', 'aips-status') as $hidden_page) {
 			$this->assertNotContains(
 				$hidden_page,
 				$submenu_pages,
@@ -155,6 +155,96 @@ class Test_AIPS_Admin_Menu extends WP_UnitTestCase {
 	public function test_diagnostics_controller_and_template_exist() {
 		$this->assertTrue(class_exists('AIPS_Diagnostics_Controller'));
 		$this->assertFileExists(AIPS_PLUGIN_DIR . 'templates/admin/diagnostics.php');
+	}
+
+	/**
+	 * Seeder is a dev/test-data tool and must be disabled (unregistered) by default.
+	 */
+	public function test_seeder_page_is_not_registered_by_default() {
+		global $submenu, $_registered_pages;
+
+		$submenu           = array();
+		$_registered_pages = array();
+
+		update_option('aips_developer_mode', false);
+		AIPS_Config::get_instance()->flush_option_cache();
+
+		$this->admin_menu->add_menu_pages();
+
+		$this->assertArrayNotHasKey(
+			'admin_page_aips-seeder',
+			$_registered_pages,
+			'Seeder should not be registered when Developer Mode is disabled.'
+		);
+	}
+
+	/**
+	 * Seeder becomes reachable once Developer Mode is enabled.
+	 */
+	public function test_seeder_page_is_registered_when_developer_mode_enabled() {
+		global $submenu, $_registered_pages;
+
+		$submenu           = array();
+		$_registered_pages = array();
+
+		update_option('aips_developer_mode', true);
+		AIPS_Config::get_instance()->flush_option_cache();
+
+		$this->admin_menu->add_menu_pages();
+
+		$this->assertArrayHasKey(
+			'admin_page_aips-seeder',
+			$_registered_pages,
+			'Seeder should be registered for direct admin.php?page= access when Developer Mode is enabled.'
+		);
+
+		update_option('aips_developer_mode', false);
+		AIPS_Config::get_instance()->flush_option_cache();
+	}
+
+	/**
+	 * Cache Monitor is an internal introspection tool and must be disabled by default.
+	 */
+	public function test_cache_monitor_page_is_not_registered_by_default() {
+		global $submenu, $_registered_pages;
+
+		$submenu           = array();
+		$_registered_pages = array();
+
+		update_option('aips_cache_monitor_enabled', false);
+		AIPS_Config::get_instance()->flush_option_cache();
+
+		$this->admin_menu->add_menu_pages();
+
+		$this->assertArrayNotHasKey(
+			'admin_page_aips-cache-monitor',
+			$_registered_pages,
+			'Cache Monitor should not be registered when aips_cache_monitor_enabled is disabled.'
+		);
+	}
+
+	/**
+	 * Cache Monitor becomes reachable once explicitly enabled.
+	 */
+	public function test_cache_monitor_page_is_registered_when_enabled() {
+		global $submenu, $_registered_pages;
+
+		$submenu           = array();
+		$_registered_pages = array();
+
+		update_option('aips_cache_monitor_enabled', true);
+		AIPS_Config::get_instance()->flush_option_cache();
+
+		$this->admin_menu->add_menu_pages();
+
+		$this->assertArrayHasKey(
+			'admin_page_aips-cache-monitor',
+			$_registered_pages,
+			'Cache Monitor should be registered for direct admin.php?page= access when enabled.'
+		);
+
+		update_option('aips_cache_monitor_enabled', false);
+		AIPS_Config::get_instance()->flush_option_cache();
 	}
 
 	/**

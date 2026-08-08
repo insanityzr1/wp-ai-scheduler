@@ -126,6 +126,13 @@ class AIPS_System_Diagnostics_Service {
 				'aips_status_cleanup_notifications',
 				array($this, 'cleanup_notifications')
 			),
+			'notifications_hygiene' => $this->build_refresh_task_definition(
+				__('Notifications hygiene', 'ai-post-scheduler'),
+				__('Run Notifications Hygiene', 'ai-post-scheduler'),
+				'cleanup_repair',
+				'aips_status_notifications_hygiene',
+				array($this, 'notifications_hygiene')
+			),
 			'cleanup_stale_jobs_cache' => $this->build_refresh_task_definition(
 				__('Stale batch jobs/cache cleanup', 'ai-post-scheduler'),
 				__('Cleanup Stale Batch Jobs/Cache', 'ai-post-scheduler'),
@@ -208,6 +215,7 @@ class AIPS_System_Diagnostics_Service {
 				'steps' => array(
 					'cache_maintenance',
 					'cleanup_notifications',
+					'notifications_hygiene',
 					'reset_resilience',
 					'repair_datetime',
 					'rebuild_caches',
@@ -454,6 +462,75 @@ class AIPS_System_Diagnostics_Service {
 			'success' => true,
 			'message' => sprintf(__('Deleted %1$d read notifications older than %2$d days.', 'ai-post-scheduler'), (int) $deleted, (int) $days),
 			'deleted' => (int) $deleted,
+		);
+	}
+
+	/**
+	 * Run one-time notifications hygiene: prune legacy options, unschedule
+	 * deprecated hooks, ensure the rollup event is scheduled, and normalize
+	 * notification channel preferences.
+	 *
+	 * @return array
+	 */
+	public function notifications_hygiene() {
+		$config = AIPS_Config::get_instance();
+
+		$removed_options = 0;
+		if ($config->has_option('aips_review_notifications_enabled')) {
+			delete_option('aips_review_notifications_enabled');
+			$removed_options++;
+		}
+
+		$unscheduled_events = 0;
+		$legacy_hook        = 'aips_send_review_notifications';
+		$next_run           = wp_next_scheduled($legacy_hook);
+		while ($next_run) {
+			wp_unschedule_event($next_run, $legacy_hook);
+			$unscheduled_events++;
+			$next_run = wp_next_scheduled($legacy_hook);
+		}
+
+		$rollup_scheduled = (bool) wp_next_scheduled('aips_notification_rollups');
+		if (!$rollup_scheduled) {
+			wp_schedule_event(AIPS_DateTime::now()->timestamp(), 'daily', 'aips_notification_rollups');
+			$rollup_scheduled = (bool) wp_next_scheduled('aips_notification_rollups');
+		}
+
+		$registry            = AIPS_Notifications::get_notification_type_registry();
+		$allowed_modes       = array_keys(AIPS_Notifications::get_channel_mode_options());
+		$current_preferences = $config->get_option('aips_notification_preferences');
+		$current_preferences = is_array($current_preferences) ? $current_preferences : array();
+
+		$cleaned_preferences = array();
+		foreach ($registry as $type => $meta) {
+			$fallback = isset($meta['default_mode']) ? $meta['default_mode'] : AIPS_Notifications::MODE_BOTH;
+			$mode     = isset($current_preferences[$type]) ? sanitize_key($current_preferences[$type]) : $fallback;
+			if (!in_array($mode, $allowed_modes, true)) {
+				$mode = $fallback;
+			}
+			$cleaned_preferences[$type] = $mode;
+		}
+
+		$preferences_changed = ($cleaned_preferences !== $current_preferences);
+		if ($preferences_changed) {
+			update_option('aips_notification_preferences', $cleaned_preferences, false);
+		}
+
+		return array(
+			'success' => true,
+			'message' => sprintf(
+				__('Notifications hygiene complete: %1$d legacy option(s) removed, %2$d deprecated hook(s) unscheduled, rollup %3$s, preferences %4$s.', 'ai-post-scheduler'),
+				(int) $removed_options,
+				(int) $unscheduled_events,
+				$rollup_scheduled ? __('scheduled', 'ai-post-scheduler') : __('not scheduled', 'ai-post-scheduler'),
+				$preferences_changed ? __('normalized', 'ai-post-scheduler') : __('unchanged', 'ai-post-scheduler')
+			),
+			'details' => array(
+				'removed_options'     => (int) $removed_options,
+				'unscheduled_events'  => (int) $unscheduled_events,
+				'rollup_scheduled'    => $rollup_scheduled ? 1 : 0,
+				'preferences_changed' => $preferences_changed ? 1 : 0,
+			),
 		);
 	}
 

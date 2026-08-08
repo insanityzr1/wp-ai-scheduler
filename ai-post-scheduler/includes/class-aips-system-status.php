@@ -12,44 +12,11 @@ class AIPS_System_Status {
         if ( isset( $system_info['database'] ) ) {
             $system_info['database'] = $this->condense_database_checks( $system_info['database'] );
         }
-        $data_management = $this->get_data_management();
         $embedded = (bool) $embedded;
-
-        if ( $data_management ) {
-            $export_formats = $data_management->get_export_formats();
-            $import_formats = $data_management->get_import_formats();
-        } else {
-            $export_formats = array();
-            $import_formats = array();
-        }
 
         include AIPS_PLUGIN_DIR . 'templates/admin/system-status.php';
     }
 
-    /**
-     * Get the AIPS_Data_Management instance without causing duplicate hook registrations.
-     *
-     * @return AIPS_Data_Management|null
-     */
-    private function get_data_management() {
-        if ( ! class_exists( 'AIPS_Data_Management' ) ) {
-            return null;
-        }
-
-        // Prefer a shared/global instance if the plugin exposes one.
-        global $aips_data_management;
-        if ( isset( $aips_data_management ) && $aips_data_management instanceof AIPS_Data_Management ) {
-            return $aips_data_management;
-        }
-
-        // Fallback to a singleton accessor if available.
-        if ( method_exists( 'AIPS_Data_Management', 'get_instance' ) ) {
-            return AIPS_Data_Management::get_instance();
-        }
-
-        // As a last resort, create a new instance.
-        return new AIPS_Data_Management();
-    }
     /**
      * Resolve a service from the container when available.
      *

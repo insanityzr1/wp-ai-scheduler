@@ -540,6 +540,15 @@ class AIPS_Cache {
 	// -----------------------------------------------------------------------
 
 	/**
+	 * Check whether the cache system and underlying driver are available.
+	 *
+	 * @return bool True when caching is enabled and the driver is available.
+	 */
+	public function is_available() {
+		return self::is_system_enabled() && $this->driver->is_available();
+	}
+
+	/**
 	 * Return the underlying driver instance.
 	 *
 	 * @return AIPS_Cache_Driver

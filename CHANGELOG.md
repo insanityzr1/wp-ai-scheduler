@@ -1,3 +1,9 @@
+## [Unreleased]
+
+### Security
+- **Dev Tools Gating**: Cache Monitor and the Seeder are now disabled by default and properly enforce their feature flags (`aips_cache_monitor_enabled`, `aips_developer_mode`) at every layer — menu, Diagnostics tab, page render, and AJAX handlers — closing gaps where the flag was only checked for UI visibility. The AI scaffold generator ("Dev Tools") AJAX handler now also re-checks `aips_developer_mode`.
+- **MCP Bridge**: `mcp-bridge.php` is now disabled by default and can only be enabled by defining `AIPS_MCP_BRIDGE_ENABLED` and a shared-secret `AIPS_MCP_BRIDGE_TOKEN` in `wp-config.php` — it can no longer be turned on from the WordPress admin UI. All HTTP requests must now present a matching `token` field, closing a CSRF gap on this previously cookie-auth-only endpoint. See `docs/MCP_BRIDGE.md`.
+
 ## [3.0.1] - 2026-07-07
 
 ### Added

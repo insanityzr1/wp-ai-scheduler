@@ -107,12 +107,14 @@ class AIPS_System_Diagnostics_Environment_Provider implements AIPS_System_Diagno
 	private function check_database() {
 		global $wpdb;
 
-		$tables  = AIPS_DB_Manager::get_expected_columns();
-		$results = array();
+		$tables          = AIPS_DB_Manager::get_expected_columns();
+		$database_tables = $wpdb->get_col( 'SHOW TABLES' );
+		$table_lookup    = array_fill_keys( array_map( 'strtolower', $database_tables ), true );
+		$results         = array();
 
 		foreach ( $tables as $table_name => $columns ) {
 			$full_table_name = $wpdb->prefix . $table_name;
-			$table_exists    = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $full_table_name ) ) === $full_table_name;
+			$table_exists    = isset( $table_lookup[ strtolower( $full_table_name ) ] );
 
 			if ( ! $table_exists ) {
 				$results[ $table_name ] = array(
@@ -124,7 +126,8 @@ class AIPS_System_Diagnostics_Environment_Provider implements AIPS_System_Diagno
 			}
 
 			$missing_columns = array();
-			$db_columns      = $wpdb->get_results( "SHOW COLUMNS FROM $full_table_name", ARRAY_A );
+			$escaped_table   = str_replace( '`', '``', $full_table_name );
+			$db_columns      = $wpdb->get_results( "SHOW COLUMNS FROM `{$escaped_table}`", ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			$db_column_names = array_column( $db_columns, 'Field' );
 
 			foreach ( $columns as $col ) {

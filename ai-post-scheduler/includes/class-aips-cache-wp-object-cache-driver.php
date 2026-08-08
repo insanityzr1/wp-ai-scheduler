@@ -70,6 +70,10 @@ class AIPS_Cache_Wp_Object_Cache_Driver implements AIPS_Cache_Driver, AIPS_Cache
 		$this->generation = ( false !== $stored && is_int( $stored ) ) ? $stored : 0;
 	}
 
+	public function is_available() {
+		return true;
+	}
+
 	// -----------------------------------------------------------------------
 	// AIPS_Cache_Driver implementation
 	// -----------------------------------------------------------------------

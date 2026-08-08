@@ -177,8 +177,13 @@ class AIPS_History_Repository implements AIPS_History_Repository_Interface {
     public function get_average_duration_by_flow($days = 14) {
         $days = max(1, absint($days));
 
+        // completed_at / created_at are UNSIGNED BIGINT timestamps defaulting to 0.
+        // Incomplete rows keep completed_at = 0, and `completed_at IS NOT NULL` never
+        // filters them because the column is NOT NULL. A bare `completed_at - created_at`
+        // then underflows the unsigned type (MySQL error 1690). Guard on
+        // completed_at >= created_at so only genuinely finished rows are averaged.
         return $this->wpdb->get_results($this->wpdb->prepare(
-            "SELECT COALESCE(NULLIF(creation_method, ''), 'unknown') AS flow_type, AVG(completed_at - created_at) AS avg_duration_seconds, COUNT(*) AS sample_count FROM {$this->table_name} WHERE completed_at IS NOT NULL AND created_at >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL %d DAY)) GROUP BY flow_type ORDER BY avg_duration_seconds DESC",
+            "SELECT COALESCE(NULLIF(creation_method, ''), 'unknown') AS flow_type, AVG(completed_at - created_at) AS avg_duration_seconds, COUNT(*) AS sample_count FROM {$this->table_name} WHERE completed_at >= created_at AND created_at >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL %d DAY)) GROUP BY flow_type ORDER BY avg_duration_seconds DESC",
             $days
         ), ARRAY_A);
     }
@@ -235,7 +240,6 @@ class AIPS_History_Repository implements AIPS_History_Repository_Interface {
             'template_id' => 0,
             'campaign_id' => 0,
             'author_id' => 0,
-            'correlation_id' => '',
             'domain' => '',
             'actor' => '',
             'date_from' => '',
@@ -285,7 +289,9 @@ class AIPS_History_Repository implements AIPS_History_Repository_Interface {
                 {$event_domain_case_sql} AS event_domain,
                 {$event_label_case_sql} AS event_label,
                 {$actor_type_case_sql} AS actor_type,
-                t.name as template_name";
+                t.name as template_name,
+                CASE WHEN h.completed_at > 0 AND h.completed_at >= h.created_at THEN h.completed_at - h.created_at ELSE NULL END AS duration_seconds,
+                ls.warning_count, ls.error_count, ls.ai_call_count, ls.latest_message";
         } elseif ($args['fields'] === 'all') {
             // Include longtext fields only when 'all' is explicitly requested or defaulted to, to prevent breaking changes
             $fields_sql = "h.id, h.uuid, h.correlation_id, h.post_id, h.template_id, h.campaign_id, h.status, h.generated_title, h.error_message, h.created_at, h.completed_at, h.author_id, h.topic_id, h.creation_method, h.prompt, h.generated_content, h.generation_log,
@@ -327,11 +333,6 @@ class AIPS_History_Repository implements AIPS_History_Repository_Interface {
         if (!empty($args['author_id'])) {
             $where_clauses[] = "h.author_id = %d";
             $where_args[] = $args['author_id'];
-        }
-
-        if (!empty($args['correlation_id'])) {
-            $where_clauses[] = "h.correlation_id = %s";
-            $where_args[] = sanitize_text_field($args['correlation_id']);
         }
 
         if (!empty($args['domain'])) {
@@ -405,7 +406,16 @@ class AIPS_History_Repository implements AIPS_History_Repository_Interface {
         $results = $this->wpdb->get_results($this->wpdb->prepare("
             SELECT $fields_sql
             FROM {$this->table_name} h 
-            LEFT JOIN {$templates_table} t ON h.template_id = t.id 
+            LEFT JOIN {$templates_table} t ON h.template_id = t.id
+            LEFT JOIN (
+                SELECT history_id,
+                    SUM(CASE WHEN history_type_id = 3 THEN 1 ELSE 0 END) AS warning_count,
+                    SUM(CASE WHEN history_type_id = 2 THEN 1 ELSE 0 END) AS error_count,
+                    SUM(CASE WHEN history_type_id = 5 THEN 1 ELSE 0 END) AS ai_call_count,
+                    LEFT(SUBSTRING_INDEX(GROUP_CONCAT(details ORDER BY timestamp DESC SEPARATOR '||'), '||', 1), 180) AS latest_message
+                FROM {$this->table_name_log}
+                GROUP BY history_id
+            ) ls ON h.id = ls.history_id
             WHERE $where_sql
             ORDER BY h.$orderby $order 
             LIMIT %d OFFSET %d
@@ -531,9 +541,9 @@ class AIPS_History_Repository implements AIPS_History_Repository_Interface {
                 GROUP BY post_id
             ) latest ON latest.latest_history_id = h.id
             INNER JOIN {$posts_table} p ON h.post_id = p.ID
-            LEFT JOIN {$postmeta_table} pm_incomplete ON pm_incomplete.post_id = p.ID AND pm_incomplete.meta_key = 'aips_post_generation_incomplete'
-            LEFT JOIN {$postmeta_table} pm_had_partial ON pm_had_partial.post_id = p.ID AND pm_had_partial.meta_key = 'aips_post_generation_had_partial'
-            LEFT JOIN {$postmeta_table} pm_status ON pm_status.post_id = p.ID AND pm_status.meta_key = 'aips_post_generation_component_statuses'
+            LEFT JOIN {$postmeta_table} pm_incomplete ON pm_incomplete.post_id = p.ID AND pm_incomplete.meta_key = '" . AIPS_Post_Manager::META_GENERATION_INCOMPLETE . "'
+            LEFT JOIN {$postmeta_table} pm_had_partial ON pm_had_partial.post_id = p.ID AND pm_had_partial.meta_key = '" . AIPS_Post_Manager::META_GENERATION_HAD_PARTIAL . "'
+            LEFT JOIN {$postmeta_table} pm_status ON pm_status.post_id = p.ID AND pm_status.meta_key = '" . AIPS_Post_Manager::META_GENERATION_COMPONENT_STATUSES . "'
             LEFT JOIN {$templates_table} t ON h.template_id = t.id
             WHERE $where_sql
                 ORDER BY $orderby_sql";
@@ -563,8 +573,8 @@ class AIPS_History_Repository implements AIPS_History_Repository_Interface {
                     GROUP BY post_id
                 ) latest ON latest.latest_history_id = h.id
                 INNER JOIN {$posts_table} p ON h.post_id = p.ID
-                LEFT JOIN {$postmeta_table} pm_incomplete ON pm_incomplete.post_id = p.ID AND pm_incomplete.meta_key = 'aips_post_generation_incomplete'
-                LEFT JOIN {$postmeta_table} pm_had_partial ON pm_had_partial.post_id = p.ID AND pm_had_partial.meta_key = 'aips_post_generation_had_partial'
+                LEFT JOIN {$postmeta_table} pm_incomplete ON pm_incomplete.post_id = p.ID AND pm_incomplete.meta_key = '" . AIPS_Post_Manager::META_GENERATION_INCOMPLETE . "'
+                LEFT JOIN {$postmeta_table} pm_had_partial ON pm_had_partial.post_id = p.ID AND pm_had_partial.meta_key = '" . AIPS_Post_Manager::META_GENERATION_HAD_PARTIAL . "'
                 WHERE $where_sql",
                 $where_args
             ));
@@ -579,8 +589,8 @@ class AIPS_History_Repository implements AIPS_History_Repository_Interface {
                     GROUP BY post_id
                 ) latest ON latest.latest_history_id = h.id
                 INNER JOIN {$posts_table} p ON h.post_id = p.ID
-                LEFT JOIN {$postmeta_table} pm_incomplete ON pm_incomplete.post_id = p.ID AND pm_incomplete.meta_key = 'aips_post_generation_incomplete'
-                LEFT JOIN {$postmeta_table} pm_had_partial ON pm_had_partial.post_id = p.ID AND pm_had_partial.meta_key = 'aips_post_generation_had_partial'
+                LEFT JOIN {$postmeta_table} pm_incomplete ON pm_incomplete.post_id = p.ID AND pm_incomplete.meta_key = '" . AIPS_Post_Manager::META_GENERATION_INCOMPLETE . "'
+                LEFT JOIN {$postmeta_table} pm_had_partial ON pm_had_partial.post_id = p.ID AND pm_had_partial.meta_key = '" . AIPS_Post_Manager::META_GENERATION_HAD_PARTIAL . "'
                 WHERE $where_sql"
             );
         }
@@ -712,7 +722,7 @@ class AIPS_History_Repository implements AIPS_History_Repository_Interface {
                  WHERE meta_key = %s
                  ORDER BY meta_id DESC
                  LIMIT %d",
-                '_aips_post_generation_total_time',
+                AIPS_Post_Manager::META_POST_GENERATION_TOTAL_TIME,
                 $limit
             )
         );
@@ -774,6 +784,27 @@ class AIPS_History_Repository implements AIPS_History_Repository_Interface {
                 $stats['success_rate'] = $stats['total'] > 0
                     ? round(($stats['completed'] / $stats['total']) * 100, 1)
                     : 0;
+
+                $durations = $this->wpdb->get_col(
+                    $this->wpdb->prepare(
+                        "SELECT completed_at - created_at
+                         FROM {$this->table_name}
+                         WHERE completed_at > 0
+                           AND completed_at >= created_at
+                           AND COALESCE(creation_method, '') NOT IN ({$auxiliary_placeholders})
+                           AND NOT (creation_method IS NULL AND template_id IS NULL AND topic_id IS NULL AND post_id IS NULL AND author_id IS NULL)
+                         ORDER BY completed_at - created_at ASC",
+                        ...$auxiliary_methods
+                    )
+                );
+                $duration_count = count($durations);
+                $stats['median_duration'] = null;
+                if ($duration_count > 0) {
+                    $middle = intdiv($duration_count, 2);
+                    $stats['median_duration'] = $duration_count % 2
+                        ? (int) $durations[$middle]
+                        : (int) round(((int) $durations[$middle - 1] + (int) $durations[$middle]) / 2);
+                }
 
                 return $stats;
             }
@@ -853,6 +884,7 @@ class AIPS_History_Repository implements AIPS_History_Repository_Interface {
             'schedule_lifecycle',
             'template_lifecycle',
             'campaign_lifecycle',
+            'notification_sent',
         );
     }
 

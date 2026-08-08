@@ -34,6 +34,10 @@ class AIPS_Seeder_Admin {
     }
 
     public function render_page($embedded = false) {
+        if (!AIPS_Config::get_instance()->get_option('aips_developer_mode')) {
+            wp_die(esc_html__('Developer Mode is currently disabled.', 'ai-post-scheduler'));
+        }
+
         $embedded = (bool) $embedded;
 
         include AIPS_PLUGIN_DIR . 'templates/admin/seeder.php';
@@ -46,6 +50,10 @@ class AIPS_Seeder_Admin {
 
         if (!current_user_can('manage_options')) {
             AIPS_Ajax_Response::permission_denied();
+        }
+
+        if (!AIPS_Config::get_instance()->get_option('aips_developer_mode')) {
+            AIPS_Ajax_Response::error(__('Developer Mode is disabled.', 'ai-post-scheduler'));
         }
 
         $type = isset($_POST['type']) ? sanitize_text_field(wp_unslash($_POST['type'])) : '';

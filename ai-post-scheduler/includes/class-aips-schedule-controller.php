@@ -1023,13 +1023,14 @@ class AIPS_Schedule_Controller implements AIPS_Admin_Controller_Interface {
         $id       = isset($_POST['id']) ? absint($_POST['id']) : 0;
         $type     = isset($_POST['type']) ? sanitize_key(wp_unslash($_POST['type'])) : '';
         $quantity = isset($_POST['quantity']) ? min(AIPS_Author_Post_Generator::MAX_POSTS_PER_RUN, max(1, absint($_POST['quantity']))) : null;
+        $advance_schedule = !isset($_POST['advance_schedule']) || rest_sanitize_boolean(wp_unslash($_POST['advance_schedule']));
 
         if (!$id || empty($type)) {
             AIPS_Ajax_Response::error(__('Invalid parameters.', 'ai-post-scheduler'));
         }
 
         $service = new AIPS_Unified_Schedule_Service();
-        $result  = $service->run_now($id, $type, $quantity);
+        $result  = $service->run_now($id, $type, $quantity, $advance_schedule);
 
         if (is_wp_error($result)) {
             AIPS_Ajax_Response::error(array('message' => $result->get_error_message()));

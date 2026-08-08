@@ -862,6 +862,10 @@ class AIPS_Admin_Assets {
      */
     private function enqueue_schedule_assets($hook) {
             wp_localize_script('aips-admin-script', 'aipsScheduleL10n', array(
+                // Current WordPress site UTC offset in seconds, used to render/parse the
+                // "Start Time" datetime-local field in site-local time regardless of the
+                // admin's own browser timezone.
+                'gmtOffsetSeconds'                => (int) wp_timezone()->getOffset(new DateTime('now', wp_timezone())),
                 // Run schedule
                 'runScheduleConfirm'             => __('Are you sure you want to run this schedule now? This will immediately generate posts.', 'ai-post-scheduler'),
                 'scheduleRunning'                => __('Running...', 'ai-post-scheduler'),
@@ -1240,15 +1244,10 @@ class AIPS_Admin_Assets {
                 'copiedDetails'        => __('Copied!', 'ai-post-scheduler'),
                 'confirmDelete'        => __('Delete this history container? This cannot be undone.', 'ai-post-scheduler'),
                 'confirmBulkDelete'    => __('Delete the selected history containers? This cannot be undone.', 'ai-post-scheduler'),
-                'confirmClearAll'      => __('Clear all history? This cannot be undone.', 'ai-post-scheduler'),
-                'confirmClearStatus'   => __('Clear all history entries with this status? This cannot be undone.', 'ai-post-scheduler'),
                 'confirmDeleteLabel'   => __('Yes, delete', 'ai-post-scheduler'),
-                'confirmClearLabel'    => __('Yes, clear', 'ai-post-scheduler'),
                 'cancelLabel'          => __('No, cancel', 'ai-post-scheduler'),
                 'deletedSuccess'       => __('Items deleted successfully.', 'ai-post-scheduler'),
-                'clearedSuccess'       => __('History cleared successfully.', 'ai-post-scheduler'),
                 'errorDeleting'        => __('Error deleting items.', 'ai-post-scheduler'),
-                'errorClearing'        => __('Error clearing history.', 'ai-post-scheduler'),
                 'deleting'             => __('Deleting…', 'ai-post-scheduler'),
                 'retrying'             => __('Retrying…', 'ai-post-scheduler'),
                 'errorRetrying'        => __('An error occurred. Please try again.', 'ai-post-scheduler'),

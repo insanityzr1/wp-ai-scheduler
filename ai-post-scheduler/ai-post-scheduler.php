@@ -3,7 +3,7 @@
  * Plugin Name: AI Post Scheduler
  * Plugin URI: https://nunezserver.com/nunezscheduler
  * Description: Schedule AI-generated posts using advanced features & scheduling options.
- * Version: 3.0.0
+ * Version: 3.1.0
  * Author: Raymond Nunez
  * Author URI: https://nunezserver.com
  * License: GPL v2 or later
@@ -44,7 +44,7 @@ if (!defined('AIPS_TELEMETRY_QUERY_SAMPLE_LIMIT')) {
 
 // Define plugin constants
 if (!defined('AIPS_VERSION')) {
-    define('AIPS_VERSION', '3.0.0');
+    define('AIPS_VERSION', '3.1.0');
 }
 
 if (!defined('AIPS_PLUGIN_DIR')) {
@@ -64,6 +64,14 @@ if (!defined('AIPS_PLUGIN_BASENAME')) {
 // it will automatically enable when WP_DEBUG is true.
 if (!defined('AIPS_AI_DEBUG_LOG_PROMPTS')) {
     define('AIPS_AI_DEBUG_LOG_PROMPTS', defined('WP_DEBUG') && WP_DEBUG);
+}
+
+if (!defined('AIPS_DEBUG')) {
+    define('AIPS_DEBUG', defined('WP_DEBUG') && WP_DEBUG);
+}
+
+if (!defined('AIPS_DEBUG_LEVEL')) {
+    define('AIPS_DEBUG_LEVEL', defined('WP_DEBUG') && WP_DEBUG ? 1 : 0);
 }
 
 final class AI_Post_Scheduler {
@@ -716,8 +724,8 @@ final class AI_Post_Scheduler {
                     return $post_id;
                 }
 
-                update_post_meta( $post_id, '_aips_trending_topic_id',  absint( $item['id'] ) );
-                update_post_meta( $post_id, '_aips_trending_topic_text', sanitize_text_field( (string) $item['topic'] ) );
+                update_post_meta( $post_id, AIPS_Post_Manager::META_TRENDING_TOPIC_ID,  absint( $item['id'] ) );
+                update_post_meta( $post_id, AIPS_Post_Manager::META_TRENDING_TOPIC_TEXT, sanitize_text_field( (string) $item['topic'] ) );
 
                 return $post_id;
             }

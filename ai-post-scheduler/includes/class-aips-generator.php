@@ -1283,6 +1283,17 @@ class AIPS_Generator {
         // ever downgrade further, never upgrade back to the intended status.
         $initial_post_status = $pre_image_incomplete ? 'draft' : $intended_post_status;
 
+        // Generation-time affiliate link injection (when enabled on the template/author).
+        if ( $context instanceof AIPS_Generation_Context && $context->get_affiliate_links_enabled() && ! empty( $content ) ) {
+            $raw_tags = $context->get_post_tags();
+            if ( ! empty( $raw_tags ) ) {
+                $tag_names = array_filter( array_map( 'trim', explode( ',', $raw_tags ) ) );
+                if ( ! empty( $tag_names ) ) {
+                    $content = ( new AIPS_Affiliate_Links_Service() )->inject_into_content( $content, $tag_names );
+                }
+            }
+        }
+
         // Use Post Manager Service to save the generated post in WP
         $post_creation_data = array(
             'title' => $title,

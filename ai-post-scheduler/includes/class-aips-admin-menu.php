@@ -227,6 +227,15 @@ class AIPS_Admin_Menu {
         );
 
         add_submenu_page(
+            null,
+            __('Affiliate Links', 'ai-post-scheduler'),
+            __('Affiliate Links', 'ai-post-scheduler'),
+            'manage_options',
+            'aips-affiliate-links',
+            array($this, 'render_affiliate_links_page')
+        );
+
+        add_submenu_page(
             'ai-post-scheduler',
             __('Settings', 'ai-post-scheduler'),
             __('Settings', 'ai-post-scheduler'),
@@ -284,6 +293,15 @@ class AIPS_Admin_Menu {
             );
         }
 
+        add_submenu_page(
+            null,
+            __('Stress Test', 'ai-post-scheduler'),
+            __('Stress Test', 'ai-post-scheduler'),
+            'manage_options',
+            AIPS_Stress_Test_Controller::PAGE_SLUG,
+            array($this, 'render_stress_test_page')
+        );
+
         if (AIPS_Config::get_instance()->get_option('aips_cache_monitor_enabled')) {
             add_submenu_page(
                 null,
@@ -294,6 +312,7 @@ class AIPS_Admin_Menu {
                 array($this, 'render_cache_monitor_page')
             );
         }
+      
         if (AIPS_Config::get_instance()->get_option('aips_developer_mode')) {
             add_submenu_page(
                 null,
@@ -360,6 +379,7 @@ class AIPS_Admin_Menu {
                 'aips-seeder',
                 'aips-dev-tools',
                 'aips-cache-monitor',
+                AIPS_Stress_Test_Controller::PAGE_SLUG,
             ),
             true
         );
@@ -383,6 +403,7 @@ class AIPS_Admin_Menu {
                 'aips-source-data',
                 'aips-taxonomy',
                 'aips-internal-links',
+                'aips-affiliate-links',
                 'aips-author-topics',
                 AIPS_Campaigns_Controller::PAGE_SLUG,
                 AIPS_Campaigns_Controller::DETAIL_PAGE_SLUG,
@@ -744,6 +765,18 @@ class AIPS_Admin_Menu {
     }
 
     /**
+     * Render the Stress Test page.
+     *
+     * Delegates rendering to AIPS_Stress_Test_Controller.
+     *
+     * @return void
+     */
+    public function render_stress_test_page() {
+        $controller = new AIPS_Stress_Test_Controller();
+        $controller->render_page();
+    }
+
+    /**
      * Render the Dev Tools page.
      *
      * Delegates rendering to the AIPS_Dev_Tools class.
@@ -777,6 +810,11 @@ class AIPS_Admin_Menu {
      *
      * @return void
      */
+    public function render_affiliate_links_page() {
+        $controller = new AIPS_Affiliate_Links_Controller();
+        $controller->render_page();
+    }
+
     public function render_internal_links_page() {
         global $aips_internal_links_controller;
 

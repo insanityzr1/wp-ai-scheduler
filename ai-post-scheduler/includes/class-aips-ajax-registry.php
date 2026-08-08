@@ -290,8 +290,22 @@ class AIPS_Ajax_Registry {
 		'aips_cache_monitor_events'            => 'AIPS_Cache_Monitor_Controller',
 		'aips_cache_monitor_maintenance'       => 'AIPS_Cache_Monitor_Controller',
 
+		// Stress Test Controller
+		'aips_stress_test_run'                 => 'AIPS_Stress_Test_Controller',
+		'aips_stress_test_cleanup'             => 'AIPS_Stress_Test_Controller',
+		'aips_stress_test_status'              => 'AIPS_Stress_Test_Controller',
+
 		// Dashboard Controller
 		'aips_get_dashboard_data'              => 'AIPS_Dashboard_Controller',
+
+		// Affiliate Links Controller
+		'aips_affiliate_links_list'          => 'AIPS_Affiliate_Links_Controller',
+		'aips_affiliate_links_get'           => 'AIPS_Affiliate_Links_Controller',
+		'aips_affiliate_links_create'        => 'AIPS_Affiliate_Links_Controller',
+		'aips_affiliate_links_update'        => 'AIPS_Affiliate_Links_Controller',
+		'aips_affiliate_links_delete'        => 'AIPS_Affiliate_Links_Controller',
+		'aips_affiliate_links_toggle'        => 'AIPS_Affiliate_Links_Controller',
+		'aips_affiliate_links_inject_post'   => 'AIPS_Affiliate_Links_Controller',
 	);
 
 	/**

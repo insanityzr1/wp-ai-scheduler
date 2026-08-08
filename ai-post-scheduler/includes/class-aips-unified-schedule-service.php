@@ -184,17 +184,18 @@ class AIPS_Unified_Schedule_Service {
 	 * @param int      $id       Numeric ID.
 	 * @param string   $type     One of the TYPE_* constants.
 	 * @param int|null $quantity Optional quantity override for author_post_gen.
+	 * @param bool     $advance_schedule Whether this run consumes the next scheduled occurrence.
 	 * @return mixed
 	 */
-	public function run_now($id, $type, $quantity = null) {
+	public function run_now($id, $type, $quantity = null, $advance_schedule = true) {
 		switch ($type) {
 			case self::TYPE_TEMPLATE:
 				$scheduler = new AIPS_Scheduler();
-				return $scheduler->run_schedule_now($id);
+				return $scheduler->run_schedule_now($id, null, $advance_schedule);
 
 			case self::TYPE_AUTHOR_TOPIC:
 				$scheduler = new AIPS_Author_Topics_Scheduler();
-				return $scheduler->generate_now($id);
+				return $scheduler->generate_now($id, $advance_schedule);
 
 			case self::TYPE_AUTHOR_POST:
 				$generator = new AIPS_Author_Post_Generator();
@@ -202,7 +203,7 @@ class AIPS_Unified_Schedule_Service {
 				if (!$author) {
 					return new WP_Error('not_found', __('Author not found.', 'ai-post-scheduler'));
 				}
-				return $generator->generate_posts_for_author($author, $quantity, 'manual', true);
+				return $generator->generate_posts_for_author($author, $quantity, 'manual', $advance_schedule);
 
 			default:
 				return new WP_Error('invalid_type', __('Invalid schedule type.', 'ai-post-scheduler'));

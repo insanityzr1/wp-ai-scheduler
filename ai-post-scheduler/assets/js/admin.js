@@ -354,6 +354,8 @@
             $(document).on('click', '.aips-run-now-schedule', this.runNowSchedule);
             $(document).on('click', '.aips-save-schedule', this.saveSchedule);
             $(document).on('click', '.aips-save-schedule-wizard', this.saveScheduleWizard);
+            $(document).on('change', '#schedule_frequency', this.onScheduleFrequencyChange);
+            $(document).on('click', '.aips-schedule-day-btn', this.onScheduleDayPick);
             $(document).on('click', '.aips-delete-schedule', this.deleteSchedule);
             $(document).on('change', '.aips-toggle-schedule', this.toggleSchedule);
             $(document).on('click', '.aips-view-schedule-history', this.viewScheduleHistory);
@@ -1490,6 +1492,67 @@
         },
 
         /**
+         * Reset the legacy modal's "Repeat on" day picker: hide it, clear the
+         * hidden day value, and un-highlight all day buttons.
+         */
+        resetScheduleDayPicker: function() {
+            $('#schedule_repeat_day').val('');
+            $('.aips-schedule-day-btn').removeClass('aips-btn-primary').addClass('aips-btn-secondary');
+            $('#aips-schedule-repeat-on-row').hide();
+        },
+
+        /**
+         * Apply a `frequency` value (as stored on a schedule row) to the legacy
+         * modal's Frequency select and "Repeat on" day picker.
+         *
+         * The Frequency dropdown no longer lists the 7 day-specific values
+         * (`every_monday` ... `every_sunday`) directly, so a day-specific
+         * frequency is presented as "Weekly" with the matching day pre-selected.
+         *
+         * @param {string} frequency
+         */
+        applyScheduleFrequencyToForm: function(frequency) {
+            var dayMatch = /^every_(monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/.exec(frequency || '');
+            AIPS.resetScheduleDayPicker();
+            if (dayMatch) {
+                var day = dayMatch[1];
+                $('#schedule_frequency').val('weekly');
+                $('#schedule_repeat_day').val(day);
+                $('.aips-schedule-day-btn[data-day="' + day + '"]').removeClass('aips-btn-secondary').addClass('aips-btn-primary');
+                $('#aips-schedule-repeat-on-row').show();
+            } else {
+                $('#schedule_frequency').val(frequency);
+                $('#aips-schedule-repeat-on-row').toggle(frequency === 'weekly');
+            }
+        },
+
+        /**
+         * Show/hide the "Repeat on" day picker when the Frequency select changes.
+         *
+         * @param {Event} e - Change event from `#schedule_frequency`.
+         */
+        onScheduleFrequencyChange: function(e) {
+            if ($(this).val() === 'weekly') {
+                $('#aips-schedule-repeat-on-row').show();
+            } else {
+                AIPS.resetScheduleDayPicker();
+            }
+        },
+
+        /**
+         * Single-select a day-of-week button in the "Repeat on" picker.
+         *
+         * @param {Event} e - Click event from an `.aips-schedule-day-btn` element.
+         */
+        onScheduleDayPick: function(e) {
+            e.preventDefault();
+            var $btn = $(this);
+            $('.aips-schedule-day-btn').removeClass('aips-btn-primary').addClass('aips-btn-secondary');
+            $btn.removeClass('aips-btn-secondary').addClass('aips-btn-primary');
+            $('#schedule_repeat_day').val($btn.data('day'));
+        },
+
+        /**
          * Open the schedule wizard in "Add New" mode.
          *
          * Resets the wizard form, initialises the wizard to step 1, and shows
@@ -1505,6 +1568,7 @@
                 // Fallback to legacy modal if wizard not present
                 $('#aips-schedule-form')[0].reset();
                 $('#schedule_id').val('');
+                AIPS.resetScheduleDayPicker();
                 $('#aips-schedule-modal').find('.aips-modal-title').text('Add New Schedule');
                 $('#aips-schedule-modal').show();
                 return;
@@ -1543,18 +1607,14 @@
                 $('#schedule_id').val(scheduleId);
                 $('#schedule_title').val(scheduleTitle || '');
                 $('#schedule_template').val(templateId);
-                $('#schedule_frequency').val(frequency);
+                AIPS.applyScheduleFrequencyToForm(frequency);
                 $('#schedule_topic').val(topic || '');
                 $('#article_structure_id').val(articleStructureId || '');
                 $('#rotation_pattern').val(rotationPattern || '');
                 $('#schedule_is_active').prop('checked', isActive == 1);
                 if (nextRun) {
-                    var dt0 = AIPS.DateTime.parse(nextRun);
-                    if (dt0) {
-                        var pad0 = function(n) { return n < 10 ? '0' + n : n; };
-                        $('#schedule_start_time').val(dt0.getFullYear() + '-' + pad0(dt0.getMonth() + 1) + '-' + pad0(dt0.getDate()) +
-                            'T' + pad0(dt0.getHours()) + ':' + pad0(dt0.getMinutes()));
-                    }
+                    var offsetSeconds = (typeof aipsScheduleL10n !== 'undefined') ? aipsScheduleL10n.gmtOffsetSeconds : 0;
+                    $('#schedule_start_time').val(AIPS.DateTime.toLocalInputValue(nextRun, offsetSeconds));
                 }
                 $('#aips-schedule-modal').find('.aips-modal-title').text('Edit Schedule');
                 $('#aips-schedule-modal').show();
@@ -1614,7 +1674,7 @@
                 $('#schedule_id').val('');
                 $('#schedule_title').val(scheduleTitle || '');
                 $('#schedule_template').val(templateId);
-                $('#schedule_frequency').val(frequency);
+                AIPS.applyScheduleFrequencyToForm(frequency);
                 $('#schedule_topic').val(topic);
                 $('#article_structure_id').val(articleStructureId);
                 $('#rotation_pattern').val(rotationPattern);
@@ -1664,6 +1724,13 @@
 
             AIPS.Utilities.setButtonLoading($btn, aipsAdminL10n.saving);
 
+            // "Weekly" + a selected day maps to the day-specific backend frequency
+            // (e.g. 'every_monday') so the existing recurrence math is reused unchanged.
+            var repeatDay = $('#schedule_repeat_day').val();
+            var frequency = ($('#schedule_frequency').val() === 'weekly' && repeatDay)
+                ? 'every_' + repeatDay
+                : $('#schedule_frequency').val();
+
             $.ajax({
                 url: aipsAjax.ajaxUrl,
                 type: 'POST',
@@ -1673,7 +1740,7 @@
                     schedule_id: $('#schedule_id').val(),
                     schedule_title: $('#schedule_title').val(),
                     template_id: $('#schedule_template').val(),
-                    frequency: $('#schedule_frequency').val(),
+                    frequency: frequency,
                     start_time: $('#schedule_start_time').val(),
                     topic: $('#schedule_topic').val(),
                     article_structure_id: $('#article_structure_id').val(),
@@ -2934,6 +3001,23 @@
 
             if (!id || !type) { return; }
 
+            AIPS.Utilities.confirm(
+                aipsScheduleL10n.runNowChoice || 'How should this manual run affect the schedule?',
+                aipsScheduleL10n.runNow || 'Run Now',
+                [
+                    { label: aipsScheduleL10n.cancel || 'Cancel', className: 'aips-btn aips-btn-secondary' },
+                    { label: aipsScheduleL10n.runNowIndependent || 'Run now, independently from schedule', className: 'aips-btn aips-btn-secondary', action: function() {
+                        AIPS.executeUnifiedRunNow($btn, id, type, false);
+                    }},
+                    { label: aipsScheduleL10n.runNowAndAdvance || 'Run next scheduled run now and advance', className: 'aips-btn aips-btn-primary', action: function() {
+                        AIPS.executeUnifiedRunNow($btn, id, type, true);
+                    }}
+                ]
+            );
+        },
+
+        /** Execute a unified schedule using the selected schedule-advance mode. */
+        executeUnifiedRunNow: function($btn, id, type, advanceSchedule) {
             AIPS.Utilities.setButtonLoading($btn, '<span class="dashicons dashicons-update aips-spin"></span>', { isHtml: true });
 
             $.ajax({
@@ -2943,7 +3027,8 @@
                     action: 'aips_unified_run_now',
                     nonce: aipsAjax.nonce,
                     id: id,
-                    type: type
+                    type: type,
+                    advance_schedule: advanceSchedule ? 1 : 0
                 },
                 success: function(response) {
                     if (response.success) {

@@ -171,10 +171,6 @@ class AIPS_Ajax_Registry {
 		// Seeder Admin
 		'aips_process_seeder'             => 'AIPS_Seeder_Admin',
 
-		// Data Management
-		'aips_export_data'                => 'AIPS_Data_Management',
-		'aips_import_data'                => 'AIPS_Data_Management',
-
 		// DB Manager
 		'aips_repair_db'                  => 'AIPS_DB_Manager',
 		'aips_fix_datetime_values'        => 'AIPS_DB_Manager',
@@ -216,7 +212,6 @@ class AIPS_Ajax_Registry {
 		// Settings Ajax
 		'aips_save_settings'              => 'AIPS_Settings_Ajax',
 		'aips_test_connection'            => 'AIPS_Settings_Ajax',
-		'aips_notifications_data_hygiene' => 'AIPS_Settings_Ajax',
 
 		// Sources Controller
 		'aips_get_sources'                => 'AIPS_Sources_Controller',

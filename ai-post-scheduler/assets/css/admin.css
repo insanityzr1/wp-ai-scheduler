@@ -4669,11 +4669,59 @@ li.toplevel_page_ai-post-scheduler li:has(> a[href*="aips-author-topics"]) {
     min-width: 220px;
 }
 
-.aips-refresh-system-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+/* Refresh System: 3/9 split — large action button beside the task checkboxes */
+.aips-refresh-system-layout {
+    display: grid;
+    grid-template-columns: 3fr 9fr;
+    gap: 14px;
+    align-items: stretch;
     margin-bottom: 12px;
+}
+
+.aips-refresh-system-layout .aips-refresh-task-selector {
+    margin: 0;
+}
+
+.aips-refresh-system-action {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+}
+
+.aips-refresh-system-lg {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 100%;
+    min-height: 96px;
+    padding: 16px;
+    font-size: var(--aips-text-base);
+    font-weight: var(--aips-font-semibold);
+    line-height: 1.2;
+}
+
+.aips-refresh-system-lg .dashicons {
+    font-size: 30px;
+    width: 30px;
+    height: 30px;
+}
+
+.aips-refresh-system-action .spinner {
+    align-self: center;
+    margin: 0;
+}
+
+@media (max-width: 782px) {
+    .aips-refresh-system-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .aips-refresh-system-lg {
+        min-height: 0;
+    }
 }
 
 .aips-refresh-system-results {
@@ -4728,17 +4776,20 @@ li.toplevel_page_ai-post-scheduler li:has(> a[href*="aips-author-topics"]) {
     color: var(--aips-gray-500);
 }
 
-/* Diagnostics grid: compact two-column card layout */
+/* Diagnostics grid: masonry-style columns so short cards fill the gap left by
+   a taller neighbour instead of leaving dead space beneath them. */
 .aips-status-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
-    align-items: start;
+    column-count: 2;
+    column-gap: 16px;
     margin-bottom: 20px;
 }
 
 .aips-status-grid .aips-status-card {
-    margin-bottom: 0;
+    display: inline-block;
+    width: 100%;
+    margin: 0 0 16px;
+    break-inside: avoid;
+    -webkit-column-break-inside: avoid;
 }
 
 .aips-status-card .aips-panel-header {
@@ -4780,7 +4831,7 @@ li.toplevel_page_ai-post-scheduler li:has(> a[href*="aips-author-topics"]) {
 
 @media (max-width: 1100px) {
     .aips-status-grid {
-        grid-template-columns: 1fr;
+        column-count: 1;
     }
 }
 
@@ -5054,7 +5105,6 @@ li.toplevel_page_ai-post-scheduler li:has(> a[href*="aips-author-topics"]) {
 }
 
 /* Async-action result containers (hidden until JS populates them) */
-.aips-notifications-hygiene-result,
 .aips-flush-cron-result {
     display: none;
 }

@@ -110,40 +110,6 @@ class Test_AIPS_Settings_Ajax extends WP_UnitTestCase {
 		$this->assertSame(array('error_code' => 'ai_failed'), $container->failure_data);
 	}
 
-	public function test_ajax_notifications_data_hygiene_records_summary_history() {
-		$history_service = new Test_AIPS_Settings_Ajax_Fake_History_Service();
-		$controller = new AIPS_Settings_AJAX(
-			new Test_AIPS_Settings_Ajax_Fake_AI_Service('unused'),
-			$history_service
-		);
-
-		wp_set_current_user($this->admin_user_id);
-		$_POST['nonce'] = wp_create_nonce('aips_ajax_nonce');
-		$_REQUEST['nonce'] = $_POST['nonce'];
-
-		update_option('aips_review_notifications_enabled', 1);
-
-		$response = $this->capture_ajax(array($controller, 'ajax_notifications_data_hygiene'));
-
-		$this->assertTrue($response['success']);
-		$this->assertSame(1, $response['data']['details']['removed_options']);
-		$this->assertContains($response['data']['details']['rollup_scheduled'], array(0, 1));
-
-		$this->assertCount(1, $history_service->created);
-		$this->assertSame('settings_notifications_hygiene', $history_service->created[0]['type']);
-
-		$container = $history_service->created[0]['container'];
-		$record_types = array_column($container->records, 'type');
-		$this->assertSame('activity', $record_types[0]);
-		$this->assertSame('activity', $record_types[count($record_types) - 1]);
-
-		if (0 === (int) $response['data']['details']['rollup_scheduled']) {
-			$this->assertContains('warning', $record_types);
-		}
-
-		$this->assertSame($response['data']['details'], $container->success_data);
-	}
-
 	public function test_ajax_save_settings_sanitizes_and_updates_registered_options() {
 		$settings = new AIPS_Settings();
 		$settings->register_settings();

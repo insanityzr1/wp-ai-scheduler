@@ -75,6 +75,19 @@ Current tables managed by the plugin:
 Structural changes that `dbDelta()` cannot perform live in `AIPS_DB_Migrations`
 (see the class docblock). Notable recent migrations:
 
+### 3.3.0 — Resilient scheduling & retry state
+
+- Adds the `aips_generation_state` table (created by `dbDelta` via
+  `install_tables()`), backing `AIPS_Generation_State_Repository` — one row per
+  (flow_type, author_id) recording last attempt/success, last outcome, last
+  error, consecutive failures, and the next scheduled retry. Enables the
+  outcome-driven scheduling policy (`AIPS_Generation_Outcome`) and bounded
+  backoff retries (`AIPS_Generation_Retry_Scheduler`).
+- New retry cron hooks: `aips_retry_author_topic_generation` and
+  `aips_retry_author_post_generation` (args: author_id, correlation_id, attempt).
+- Retry behaviour is filterable via `aips_generation_retry_max_attempts`,
+  `aips_generation_retry_delays`, and `aips_generation_retry_jitter`.
+
 ### 3.2.0 — Author generation integrity
 
 - Adds `generation_run_id varchar(64)` (plus index) to `aips_author_topics` so a

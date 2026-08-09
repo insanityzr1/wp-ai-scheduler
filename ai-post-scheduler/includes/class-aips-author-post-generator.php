@@ -109,6 +109,16 @@ class AIPS_Author_Post_Generator extends AIPS_Author_Slice_Scheduler_Base implem
 	private $claims_repository;
 
 	/**
+	 * @var AIPS_Generation_State_Repository Persisted attempt/retry state.
+	 */
+	private $state_repository;
+
+	/**
+	 * @var AIPS_Generation_Retry_Scheduler Outcome-driven scheduling/retry policy.
+	 */
+	private $retry_scheduler;
+
+	/**
 	 * Initialize the generator.
 	 */
 	public function __construct() {
@@ -123,6 +133,79 @@ class AIPS_Author_Post_Generator extends AIPS_Author_Slice_Scheduler_Base implem
 		$this->runner = new AIPS_Generation_Execution_Runner($this->history_service, $this->logger);
 		$this->job_scheduler = new AIPS_Job_Scheduler();
 		$this->claims_repository = new AIPS_Generation_Claims_Repository();
+		$this->state_repository = new AIPS_Generation_State_Repository();
+		$this->retry_scheduler = new AIPS_Generation_Retry_Scheduler($this->state_repository, $this->job_scheduler, $this->logger);
+	}
+
+	/**
+	 * Run scheduled post generation for one author and apply the outcome-driven
+	 * scheduling policy (advance vs. bounded retry).
+	 *
+	 * Generation itself does NOT auto-advance the schedule here; the recurring
+	 * schedule only advances when the classified outcome warrants it (finding 3).
+	 *
+	 * @param object $author Author object from database.
+	 * @return AIPS_Author_Post_Generation_Result
+	 */
+	public function run_scheduled_generation($author): AIPS_Author_Post_Generation_Result {
+		$correlation_id = (string) AIPS_Correlation_ID::get();
+		$this->state_repository->record_attempt(
+			AIPS_Generation_State_Repository::FLOW_AUTHOR_POST,
+			(int) $author->id,
+			$correlation_id
+		);
+
+		// advance_schedule=false: the policy below decides advancement.
+		$result  = $this->generate_posts_for_author($author, null, 'scheduled', false);
+		$outcome = AIPS_Generation_Outcome::from_post_result($result);
+
+		$decision = $this->retry_scheduler->handle_outcome(
+			AIPS_Generation_State_Repository::FLOW_AUTHOR_POST,
+			$author,
+			$outcome,
+			$correlation_id
+		);
+
+		if ($decision['advance']) {
+			$this->update_author_schedule($author);
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Retry cron callback: re-run scheduled post generation for one author.
+	 *
+	 * @param int    $author_id      Author ID.
+	 * @param string $correlation_id Correlation ID for tracing.
+	 * @param int    $attempt        Retry attempt number (for logging).
+	 * @return void
+	 */
+	public function retry_post_generation(int $author_id, string $correlation_id = '', int $attempt = 0): void {
+		if ('' !== $correlation_id) {
+			AIPS_Correlation_ID::set($correlation_id);
+		}
+
+		try {
+			$author = $this->authors_repository->get_by_id($author_id);
+			if (!$author) {
+				$this->logger->log("Post generation retry: author {$author_id} not found — skipping.", 'warning');
+				return;
+			}
+
+			$this->logger->log("Retrying post generation for author {$author_id} (attempt {$attempt}).", 'info');
+			$this->runner->run(
+				function() use ($author) {
+					$this->run_scheduled_generation($author);
+				},
+				'author_post_generation',
+				array('author_id' => $author->id)
+			);
+		} finally {
+			if ('' !== $correlation_id) {
+				AIPS_Correlation_ID::reset();
+			}
+		}
 	}
 
 	/**
@@ -216,13 +299,13 @@ class AIPS_Author_Post_Generator extends AIPS_Author_Slice_Scheduler_Base implem
 		foreach ($due_authors as $author) {
 			$this->runner->run(
 				function() use ($author) {
-					$this->generate_posts_for_author($author, null, 'scheduled', true);
+					$this->run_scheduled_generation($author);
 				},
 				'author_post_generation',
 				array('author_id' => $author->id)
 			);
 		}
-		
+
 		$this->logger->log('Completed scheduled author post generation', 'info');
 	}
 
@@ -254,7 +337,7 @@ class AIPS_Author_Post_Generator extends AIPS_Author_Slice_Scheduler_Base implem
 
 		$this->runner->run(
 			function() use ($author) {
-				$this->generate_posts_for_author($author, null, 'scheduled', true);
+				$this->run_scheduled_generation($author);
 			},
 			'author_post_generation',
 			array('author_id' => $author->id)

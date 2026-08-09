@@ -81,6 +81,16 @@ class AIPS_Author_Topics_Scheduler extends AIPS_Author_Slice_Scheduler_Base {
 	private $claims_repository;
 
 	/**
+	 * @var AIPS_Generation_State_Repository Persisted attempt/retry state.
+	 */
+	private $state_repository;
+
+	/**
+	 * @var AIPS_Generation_Retry_Scheduler Outcome-driven scheduling/retry policy.
+	 */
+	private $retry_scheduler;
+
+	/**
 	 * Initialize the scheduler.
 	 */
 	public function __construct() {
@@ -92,6 +102,8 @@ class AIPS_Author_Topics_Scheduler extends AIPS_Author_Slice_Scheduler_Base {
 		$this->notifications = new AIPS_Notifications();
 		$this->job_scheduler = new AIPS_Job_Scheduler();
 		$this->claims_repository = new AIPS_Generation_Claims_Repository();
+		$this->state_repository = new AIPS_Generation_State_Repository();
+		$this->retry_scheduler = new AIPS_Generation_Retry_Scheduler($this->state_repository, $this->job_scheduler, $this->logger, $this->notifications);
 	}
 
 	/**
@@ -285,13 +297,33 @@ class AIPS_Author_Topics_Scheduler extends AIPS_Author_Slice_Scheduler_Base {
 	 * @return bool True on success, false on failure.
 	 */
 	private function run_topic_generation($author) {
-		// Generate topics using the generator
-		$result = $this->topics_generator->generate_topics($author);
+		$correlation_id = (string) AIPS_Correlation_ID::get();
+		$this->state_repository->record_attempt(
+			AIPS_Generation_State_Repository::FLOW_AUTHOR_TOPIC,
+			(int) $author->id,
+			$correlation_id
+		);
 
-		if (is_wp_error($result)) {
-			$this->logger->log("Failed to generate topics for author {$author->id}: " . $result->get_error_message(), 'error');
-			
-			// Log using History Container
+		// Generate topics using the generator (rich result object).
+		$result  = $this->topics_generator->generate_topics_with_result($author);
+		$outcome = AIPS_Generation_Outcome::from_topic_result($result);
+
+		// Apply the outcome-driven scheduling policy: records state and, for
+		// transient failures, schedules a bounded retry with backoff.
+		$decision = $this->retry_scheduler->handle_outcome(
+			AIPS_Generation_State_Repository::FLOW_AUTHOR_TOPIC,
+			$author,
+			$outcome,
+			$correlation_id
+		);
+
+		if (!$result->is_success()) {
+			$error_message = $result->get_error() instanceof WP_Error
+				? $result->get_error()->get_error_message()
+				: __('No topics were generated', 'ai-post-scheduler');
+
+			$this->logger->log("Failed to generate topics for author {$author->id}: {$error_message} (outcome: {$outcome->get_outcome()})", 'error');
+
 			$fail_history = $this->history_service->create('author_topic_generation', array(
 				'author_id' => $author->id,
 			));
@@ -300,63 +332,106 @@ class AIPS_Author_Topics_Scheduler extends AIPS_Author_Slice_Scheduler_Base {
 				sprintf(
 					__('Failed to generate topics for author "%s": %s', 'ai-post-scheduler'),
 					$author->name,
-					$result->get_error_message()
+					$error_message
 				),
 				array(
-					'event_type' => 'author_topic_generation',
+					'event_type'   => 'author_topic_generation',
 					'event_status' => 'failed',
 				),
 				null,
 				array(
-					'author_id' => $author->id,
-					'author_name' => $author->name,
-					'field_niche' => $author->field_niche,
+					'author_id'          => $author->id,
+					'author_name'        => $author->name,
+					'field_niche'        => $author->field_niche,
 					'requested_quantity' => $author->topic_generation_quantity,
-					'error' => $result->get_error_message(),
+					'error'              => $error_message,
+					'outcome'            => $outcome->get_outcome(),
+					'retry_scheduled'    => $decision['retry_scheduled'],
 				)
 			);
-			
-			// Still update the schedule to avoid getting stuck
-			$this->update_author_schedule($author);
+
+			// Only advance the recurring schedule when the policy says so — a
+			// transient failure leaves the schedule in place so the retry (not a
+			// full interval) is what re-attempts the work.
+			if ($decision['advance']) {
+				$this->update_author_schedule($author);
+			}
 			return false;
 		}
-		
-		// Update the author's next run time
-		$this->update_author_schedule($author);
-		
-		// Log successful topic generation using History Container
-		// $result is an array of topic data on success
-		$topic_count = is_array($result) ? count($result) : 0;
+
+		if ($decision['advance']) {
+			$this->update_author_schedule($author);
+		}
+
+		$topic_count = $result->get_persisted_count();
+		$event_status = $result->is_partial() ? 'partial' : 'success';
 		$success_history = $this->history_service->create('author_topic_generation', array(
 			'author_id' => $author->id,
 		));
 		$success_history->record(
 			'activity',
 			sprintf(
-				__('Generated %d topics for author "%s"', 'ai-post-scheduler'),
+				$result->is_partial()
+					? __('Generated %1$d of %2$d requested topics for author "%3$s"', 'ai-post-scheduler')
+					: __('Generated %1$d topics for author "%3$s"', 'ai-post-scheduler'),
 				$topic_count,
+				(int) $author->topic_generation_quantity,
 				$author->name
 			),
 			array(
-				'event_type' => 'author_topic_generation',
-				'event_status' => 'success',
+				'event_type'   => 'author_topic_generation',
+				'event_status' => $event_status,
 			),
 			null,
 			array(
-				'author_id' => $author->id,
-				'author_name' => $author->name,
-				'field_niche' => $author->field_niche,
-				'topics_generated' => $topic_count,
+				'author_id'          => $author->id,
+				'author_name'        => $author->name,
+				'field_niche'        => $author->field_niche,
+				'topics_generated'   => $topic_count,
 				'requested_quantity' => $author->topic_generation_quantity,
+				'outcome'            => $outcome->get_outcome(),
 			)
 		);
-		
-		$this->logger->log("Successfully generated topics for author {$author->id}", 'info');
+
+		$this->logger->log("Successfully generated topics for author {$author->id} (outcome: {$outcome->get_outcome()})", 'info');
 
 		// Create admin bar notification
 		$this->notifications->author_topics_generated($author->name, $topic_count, $author->id);
 
 		return true;
+	}
+
+	/**
+	 * Retry cron callback: re-run scheduled topic generation for one author.
+	 *
+	 * Fired by the aips_retry_author_topic_generation hook. Re-enters the same
+	 * scheduled path (claim + outcome policy), which will schedule the next
+	 * bounded retry if this attempt also fails.
+	 *
+	 * @param int    $author_id      Author ID.
+	 * @param string $correlation_id Correlation ID for tracing.
+	 * @param int    $attempt        Retry attempt number (for logging).
+	 * @return void
+	 */
+	public function retry_topic_generation(int $author_id, string $correlation_id = '', int $attempt = 0): void {
+		if ('' !== $correlation_id) {
+			AIPS_Correlation_ID::set($correlation_id);
+		}
+
+		try {
+			$author = $this->authors_repository->get_by_id($author_id);
+			if (!$author) {
+				$this->logger->log("Topic generation retry: author {$author_id} not found — skipping.", 'warning');
+				return;
+			}
+
+			$this->logger->log("Retrying topic generation for author {$author_id} (attempt {$attempt}).", 'info');
+			$this->generate_topics_for_author($author);
+		} finally {
+			if ('' !== $correlation_id) {
+				AIPS_Correlation_ID::reset();
+			}
+		}
 	}
 	
 	/**
@@ -379,11 +454,15 @@ class AIPS_Author_Topics_Scheduler extends AIPS_Author_Slice_Scheduler_Base {
 	/**
 	 * Manually trigger topic generation for an author (e.g., from admin UI).
 	 *
+	 * Manual runs do NOT advance the recurring schedule by default (finding 4):
+	 * a manual "Run Now" is a one-off and should not shift the next scheduled
+	 * occurrence unless the administrator explicitly asks to reset it.
+	 *
 	 * @param int  $author_id        Author ID.
-	 * @param bool $advance_schedule Whether to update the author's next run.
+	 * @param bool $advance_schedule Whether to reset the author's next run from now.
 	 * @return array|WP_Error Array of generated topics or WP_Error on failure.
 	 */
-	public function generate_now($author_id, $advance_schedule = true) {
+	public function generate_now($author_id, $advance_schedule = false) {
 		$author = $this->authors_repository->get_by_id($author_id);
 
 		if (!$author) {

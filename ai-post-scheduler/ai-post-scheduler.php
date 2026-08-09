@@ -3,7 +3,7 @@
  * Plugin Name: AI Post Scheduler
  * Plugin URI: https://nunezserver.com/nunezscheduler
  * Description: Schedule AI-generated posts using advanced features & scheduling options.
- * Version: 3.2.0
+ * Version: 3.3.0
  * Author: Raymond Nunez
  * Author URI: https://nunezserver.com
  * License: GPL v2 or later
@@ -44,7 +44,7 @@ if (!defined('AIPS_TELEMETRY_QUERY_SAMPLE_LIMIT')) {
 
 // Define plugin constants
 if (!defined('AIPS_VERSION')) {
-    define('AIPS_VERSION', '3.2.0');
+    define('AIPS_VERSION', '3.3.0');
 }
 
 if (!defined('AIPS_PLUGIN_DIR')) {
@@ -636,6 +636,26 @@ final class AI_Post_Scheduler {
                 (string) $correlation_id
             );
         }, 10, 2);
+
+        // Outcome-driven bounded retry for a transient topic-generation failure.
+        // Args: author_id, correlation_id, attempt.
+        add_action('aips_retry_author_topic_generation', function( $author_id, $correlation_id = '', $attempt = 0 ) {
+            AIPS_Author_Topics_Scheduler::instance()->retry_topic_generation(
+                (int) $author_id,
+                (string) $correlation_id,
+                (int) $attempt
+            );
+        }, 10, 3);
+
+        // Outcome-driven bounded retry for a transient post-generation failure.
+        // Args: author_id, correlation_id, attempt.
+        add_action('aips_retry_author_post_generation', function( $author_id, $correlation_id = '', $attempt = 0 ) {
+            AIPS_Author_Post_Generator::instance()->retry_post_generation(
+                (int) $author_id,
+                (string) $correlation_id,
+                (int) $attempt
+            );
+        }, 10, 3);
 
         // Async bulk-batch processing: each single event processes one slice of a stored job.
         // Args: job_id, start_index, batch_size, total_quantity, correlation_id.

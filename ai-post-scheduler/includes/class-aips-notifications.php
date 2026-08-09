@@ -236,6 +236,165 @@ class AIPS_Notifications {
 	}
 
 	/**
+	 * Notify that a bounded retry has been scheduled for a generation flow.
+	 *
+	 * @param string $flow      Flow type ('author_topic'|'author_post').
+	 * @param object $author    Author object.
+	 * @param string $outcome   Outcome constant.
+	 * @param int    $attempt   Retry attempt number.
+	 * @param int    $max       Maximum retry attempts.
+	 * @param int    $retry_at  Unix timestamp of the scheduled retry.
+	 * @return void
+	 */
+	public function generation_retry_scheduled($flow, $author, $outcome, $attempt, $max, $retry_at) {
+		$flow_label = $this->flow_label($flow);
+		$when       = AIPS_DateTime::fromTimestamp((int) $retry_at)->format('Y-m-d H:i');
+		$message    = sprintf(
+			/* translators: 1: flow label, 2: author name, 3: attempt, 4: max, 5: datetime */
+			__('%1$s for "%2$s" failed transiently — retry %3$d/%4$d scheduled for %5$s.', 'ai-post-scheduler'),
+			$flow_label,
+			isset($author->name) ? $author->name : '',
+			(int) $attempt,
+			(int) $max,
+			$when
+		);
+
+		$this->send(
+			'generation_retry_scheduled',
+			array(),
+			array(self::CHANNEL_DB),
+			'',
+			$this->author_history_url($author),
+			$message,
+			array(
+				'level'         => 'warning',
+				'dedupe_key'    => 'retry_scheduled_' . sanitize_key($flow) . '_' . (isset($author->id) ? (int) $author->id : 0) . '_' . (int) $attempt,
+				'dedupe_window' => 300,
+			)
+		);
+	}
+
+	/**
+	 * Notify that the retry budget for a generation flow has been exhausted.
+	 *
+	 * @param string $flow          Flow type.
+	 * @param object $author        Author object.
+	 * @param string $error_message Last error message.
+	 * @param int    $attempts      Attempts made.
+	 * @return void
+	 */
+	public function generation_retry_exhausted($flow, $author, $error_message, $attempts) {
+		$message = sprintf(
+			/* translators: 1: flow label, 2: author name, 3: attempts, 4: error */
+			__('%1$s for "%2$s" failed after %3$d retries and will not be retried again: %4$s', 'ai-post-scheduler'),
+			$this->flow_label($flow),
+			isset($author->name) ? $author->name : '',
+			(int) $attempts,
+			$error_message
+		);
+
+		$this->send(
+			'generation_retry_exhausted',
+			array(),
+			array(self::CHANNEL_DB),
+			'',
+			$this->author_history_url($author),
+			$message,
+			array(
+				'level'         => 'error',
+				'dedupe_key'    => 'retry_exhausted_' . sanitize_key($flow) . '_' . (isset($author->id) ? (int) $author->id : 0),
+				'dedupe_window' => 1800,
+			)
+		);
+	}
+
+	/**
+	 * Notify about a permanent (non-retryable) configuration error.
+	 *
+	 * @param string $flow          Flow type.
+	 * @param object $author        Author object.
+	 * @param string $error_code    Error code.
+	 * @param string $error_message Error message.
+	 * @return void
+	 */
+	public function generation_permanent_error($flow, $author, $error_code, $error_message) {
+		$message = sprintf(
+			/* translators: 1: flow label, 2: author name, 3: error */
+			__('%1$s for "%2$s" hit a configuration error that must be fixed: %3$s', 'ai-post-scheduler'),
+			$this->flow_label($flow),
+			isset($author->name) ? $author->name : '',
+			'' !== $error_message ? $error_message : $error_code
+		);
+
+		$this->send(
+			'generation_permanent_error',
+			array(),
+			array(self::CHANNEL_DB),
+			'',
+			$this->author_history_url($author),
+			$message,
+			array(
+				'level'         => 'error',
+				'dedupe_key'    => 'permanent_error_' . sanitize_key($flow) . '_' . (isset($author->id) ? (int) $author->id : 0) . '_' . sanitize_key((string) $error_code),
+				'dedupe_window' => 1800,
+			)
+		);
+	}
+
+	/**
+	 * Notify that a scheduled post run found no approved topics.
+	 *
+	 * @param object $author Author object.
+	 * @return void
+	 */
+	public function no_approved_topics($author) {
+		$message = sprintf(
+			/* translators: %s: author name */
+			__('No approved topics were available for "%s" — scheduled post generation had nothing to do.', 'ai-post-scheduler'),
+			isset($author->name) ? $author->name : ''
+		);
+
+		$this->send(
+			'no_approved_topics',
+			array(),
+			array(self::CHANNEL_DB),
+			'',
+			$this->author_history_url($author),
+			$message,
+			array(
+				'level'         => 'info',
+				'dedupe_key'    => 'no_approved_topics_' . (isset($author->id) ? (int) $author->id : 0),
+				'dedupe_window' => 3600,
+			)
+		);
+	}
+
+	/**
+	 * Human-readable label for a generation flow.
+	 *
+	 * @param string $flow Flow type.
+	 * @return string
+	 */
+	private function flow_label($flow) {
+		return 'author_post' === $flow
+			? __('Post generation', 'ai-post-scheduler')
+			: __('Topic generation', 'ai-post-scheduler');
+	}
+
+	/**
+	 * Build a best-effort history/schedule URL for an author notification link.
+	 *
+	 * @param object $author Author object.
+	 * @return string
+	 */
+	private function author_history_url($author) {
+		if (class_exists('AIPS_Admin_Menu_Helper')) {
+			return AIPS_Admin_Menu_Helper::get_page_url('history');
+		}
+		return '';
+	}
+
+	/**
 	 * Send a high-priority quota alert notification.
 	 *
 	 * @param array $payload Alert payload.

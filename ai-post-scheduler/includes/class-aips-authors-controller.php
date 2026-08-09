@@ -417,12 +417,19 @@ class AIPS_Authors_Controller {
 		}
 		
 		$author_id = isset($_POST['author_id']) ? absint($_POST['author_id']) : 0;
-		
+
 		if (!$author_id) {
 			AIPS_Ajax_Response::error(__('Invalid author ID.', 'ai-post-scheduler'));
 		}
-		
-		$result = $this->topics_scheduler->generate_now($author_id);
+
+		// Manual runs preserve the recurring schedule by default (finding 4). The
+		// administrator opts in to resetting the next run via `reset_schedule`.
+		$reset_schedule = isset($_POST['reset_schedule']) && rest_sanitize_boolean(wp_unslash($_POST['reset_schedule']));
+
+		$before = $this->repository->get_by_id($author_id);
+		$previous_next_run = $before ? (int) $before->topic_generation_next_run : 0;
+
+		$result = $this->topics_scheduler->generate_now($author_id, $reset_schedule);
 
 		if (is_wp_error($result)) {
 			AIPS_Ajax_Response::error(array('message' => $result->get_error_message()));
@@ -434,9 +441,19 @@ class AIPS_Authors_Controller {
 			$this->notifications->author_topics_generated($author->name, count($result), $author_id);
 		}
 
+		$current_next_run = $author ? (int) $author->topic_generation_next_run : $previous_next_run;
+		$count = is_array($result) ? count($result) : 0;
+
 		AIPS_Ajax_Response::success(array(
-			'message' => __('Topics generated successfully.', 'ai-post-scheduler'),
-			'topics' => $result
+			'message' => sprintf(
+				_n('%d topic generated successfully.', '%d topics generated successfully.', $count, 'ai-post-scheduler'),
+				$count
+			),
+			'topics' => $result,
+			'previous_next_run' => $previous_next_run,
+			'current_next_run'  => $current_next_run,
+			'schedule_changed'  => ($previous_next_run !== $current_next_run),
+			'schedule_reset'    => $reset_schedule,
 		));
 	}
 	

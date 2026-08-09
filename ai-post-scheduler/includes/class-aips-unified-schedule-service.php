@@ -161,13 +161,17 @@ class AIPS_Unified_Schedule_Service {
 	 *  – author_topic_gen  : array of topics (or WP_Error)
 	 *  – author_post_gen   : array of generated post IDs (or WP_Error)
 	 *
+	 * Manual "Run Now" preserves the recurring schedule by default (finding 4):
+	 * $advance_schedule is false unless the caller explicitly asks to reset the
+	 * next scheduled occurrence from now.
+	 *
 	 * @param int      $id       Numeric ID.
 	 * @param string   $type     One of the TYPE_* constants.
 	 * @param int|null $quantity Optional quantity override for author_post_gen.
-	 * @param bool     $advance_schedule Whether this run consumes the next scheduled occurrence.
+	 * @param bool     $advance_schedule Whether this run resets the next scheduled occurrence.
 	 * @return mixed
 	 */
-	public function run_now($id, $type, $quantity = null, $advance_schedule = true) {
+	public function run_now($id, $type, $quantity = null, $advance_schedule = false) {
 		switch ($type) {
 			case self::TYPE_TEMPLATE:
 				$scheduler = new AIPS_Scheduler();

@@ -35,6 +35,7 @@ class AIPS_DB_Manager {
         'aips_cache_index',
         'aips_cache_events',
         'aips_generation_claims',
+        'aips_generation_state',
     );
 
     public function __construct() {
@@ -98,6 +99,7 @@ class AIPS_DB_Manager {
         $table_cache_index          = $tables['aips_cache_index'];
         $table_cache_events         = $tables['aips_cache_events'];
         $table_generation_claims    = $tables['aips_generation_claims'];
+        $table_generation_state     = $tables['aips_generation_state'];
 
         $sql = array();
 
@@ -679,6 +681,28 @@ class AIPS_DB_Manager {
             UNIQUE KEY claim_resource (claim_type, resource_id),
             KEY expires_at (expires_at),
             KEY claim_token (claim_token)
+        ) $charset_collate;";
+
+        $sql[] = "CREATE TABLE $table_generation_state (
+            id bigint(20) NOT NULL AUTO_INCREMENT,
+            flow_type varchar(30) NOT NULL,
+            author_id bigint(20) NOT NULL,
+            last_attempt_at bigint(20) unsigned NOT NULL DEFAULT 0,
+            last_success_at bigint(20) unsigned NOT NULL DEFAULT 0,
+            last_outcome varchar(40) DEFAULT NULL,
+            last_error_code varchar(100) DEFAULT NULL,
+            last_error_message text DEFAULT NULL,
+            consecutive_failures int NOT NULL DEFAULT 0,
+            retry_attempts int NOT NULL DEFAULT 0,
+            next_retry_at bigint(20) unsigned NOT NULL DEFAULT 0,
+            correlation_id varchar(64) DEFAULT NULL,
+            run_id varchar(64) DEFAULT NULL,
+            updated_at bigint(20) unsigned NOT NULL DEFAULT 0,
+            PRIMARY KEY  (id),
+            UNIQUE KEY flow_resource (flow_type, author_id),
+            KEY author_id (author_id),
+            KEY next_retry_at (next_retry_at),
+            KEY last_outcome (last_outcome)
         ) $charset_collate;";
 
         return $sql;

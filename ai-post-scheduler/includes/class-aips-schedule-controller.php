@@ -777,11 +777,25 @@ class AIPS_Schedule_Controller {
         $id       = isset($_POST['id']) ? absint($_POST['id']) : 0;
         $type     = isset($_POST['type']) ? sanitize_key(wp_unslash($_POST['type'])) : '';
         $quantity = isset($_POST['quantity']) ? min(AIPS_Author_Post_Generator::MAX_POSTS_PER_RUN, max(1, absint($_POST['quantity']))) : null;
-        $advance_schedule = !isset($_POST['advance_schedule']) || rest_sanitize_boolean(wp_unslash($_POST['advance_schedule']));
+
+        // Manual runs preserve the recurring schedule by default (finding 4). The
+        // administrator opts in to resetting the next run via `reset_schedule`
+        // (legacy `advance_schedule` is still honoured when explicitly sent).
+        if (isset($_POST['reset_schedule'])) {
+            $advance_schedule = rest_sanitize_boolean(wp_unslash($_POST['reset_schedule']));
+        } elseif (isset($_POST['advance_schedule'])) {
+            $advance_schedule = rest_sanitize_boolean(wp_unslash($_POST['advance_schedule']));
+        } else {
+            $advance_schedule = false;
+        }
 
         if (!$id || empty($type)) {
             AIPS_Ajax_Response::error(__('Invalid parameters.', 'ai-post-scheduler'));
         }
+
+        // Capture the schedule state before the run so the response can report
+        // whether (and how) the next scheduled occurrence changed.
+        $previous_next_run = $this->get_schedule_next_run($id, $type);
 
         $service = new AIPS_Unified_Schedule_Service();
         $result  = $service->run_now($id, $type, $quantity, $advance_schedule);
@@ -789,6 +803,14 @@ class AIPS_Schedule_Controller {
         if (is_wp_error($result)) {
             AIPS_Ajax_Response::error(array('message' => $result->get_error_message()));
         }
+
+        $current_next_run = $this->get_schedule_next_run($id, $type);
+        $schedule_info    = array(
+            'previous_next_run' => $previous_next_run,
+            'current_next_run'  => $current_next_run,
+            'schedule_changed'  => ($previous_next_run !== $current_next_run),
+            'schedule_reset'    => (bool) $advance_schedule,
+        );
 
         // Format the success message based on type.
         if ($type === AIPS_Unified_Schedule_Service::TYPE_TEMPLATE) {
@@ -801,25 +823,25 @@ class AIPS_Schedule_Controller {
                 count($post_ids)
             );
 
-            AIPS_Ajax_Response::success(array(
+            AIPS_Ajax_Response::success(array_merge(array(
                 'message'  => $msg,
                 'post_ids' => $post_ids,
                 'post_id'  => $first_post_id, // keep post_id for backward compatibility
                 'edit_url' => $edit_url,
-            ));
+            ), $schedule_info));
         } elseif ($type === AIPS_Unified_Schedule_Service::TYPE_AUTHOR_TOPIC) {
             $count = is_array($result) ? count($result) : 0;
-            AIPS_Ajax_Response::success(array(
+            AIPS_Ajax_Response::success(array_merge(array(
                 'message' => sprintf(
                     _n('%d topic generated successfully!', '%d topics generated successfully!', $count, 'ai-post-scheduler'),
                     $count
                 ),
-            ));
+            ), $schedule_info));
         } elseif ($type === AIPS_Unified_Schedule_Service::TYPE_AUTHOR_POST) {
             $post_ids = is_array($result) ? array_values(array_filter(array_map('absint', $result))) : array();
             $post_id  = !empty($post_ids) ? $post_ids[0] : 0;
             $edit_url = 1 === count($post_ids) && $post_id ? esc_url_raw(get_edit_post_link($post_id, 'raw')) : '';
-            AIPS_Ajax_Response::success(array(
+            AIPS_Ajax_Response::success(array_merge(array(
                 'message'  => sprintf(
                     _n('%d post generated successfully from author topics!', '%d posts generated successfully from author topics!', count($post_ids), 'ai-post-scheduler'),
                     count($post_ids)
@@ -827,10 +849,39 @@ class AIPS_Schedule_Controller {
                 'post_ids' => $post_ids,
                 'post_id'  => $post_id,
                 'edit_url' => $edit_url,
-            ));
+            ), $schedule_info));
         } else {
-            AIPS_Ajax_Response::success(array(), __('Schedule executed successfully.', 'ai-post-scheduler'));
+            AIPS_Ajax_Response::success($schedule_info, __('Schedule executed successfully.', 'ai-post-scheduler'));
         }
+    }
+
+    /**
+     * Read the current next-run timestamp for a unified schedule entry.
+     *
+     * Used to report whether a manual run changed the recurring schedule.
+     *
+     * @param int    $id   Numeric ID.
+     * @param string $type One of the AIPS_Unified_Schedule_Service::TYPE_* constants.
+     * @return int Unix timestamp of the next scheduled run (0 when unknown).
+     */
+    private function get_schedule_next_run($id, $type) {
+        if ($type === AIPS_Unified_Schedule_Service::TYPE_AUTHOR_TOPIC
+            || $type === AIPS_Unified_Schedule_Service::TYPE_AUTHOR_POST) {
+            $author = (new AIPS_Authors_Repository())->get_by_id($id);
+            if (!$author) {
+                return 0;
+            }
+            return $type === AIPS_Unified_Schedule_Service::TYPE_AUTHOR_TOPIC
+                ? (int) $author->topic_generation_next_run
+                : (int) $author->post_generation_next_run;
+        }
+
+        if ($type === AIPS_Unified_Schedule_Service::TYPE_TEMPLATE) {
+            $schedule = (new AIPS_Schedule_Repository())->get_by_id($id);
+            return $schedule && isset($schedule->next_run) ? (int) $schedule->next_run : 0;
+        }
+
+        return 0;
     }
 
     /**

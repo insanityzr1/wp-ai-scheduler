@@ -16,6 +16,18 @@ if (!defined('ABSPATH')) {
 class AIPS_Schedule_Processor {
 
     /**
+     * Number of consecutive pure-failure runs (zero posts generated) that trips
+     * a schedule's circuit breaker to the 'open' state.
+     */
+    const CIRCUIT_FAILURE_THRESHOLD = 5;
+
+    /**
+     * Seconds an open circuit waits before allowing a single half-open probe run.
+     * Filterable via `aips_schedule_circuit_cooldown_seconds`.
+     */
+    const CIRCUIT_COOLDOWN_SECONDS = HOUR_IN_SECONDS;
+
+    /**
      * @var AIPS_Schedule_Repository_Interface
      */
     private $repository;
@@ -682,6 +694,47 @@ class AIPS_Schedule_Processor {
      * @return int|WP_Error Post ID or WP_Error.
      */
     private function execute_schedule_logic($schedule, $is_manual = false, $quantity_override = null, $advance_schedule = true) {
+        // ── Per-schedule circuit breaker (automated runs only) ──────────────
+        // After CIRCUIT_FAILURE_THRESHOLD consecutive pure failures a schedule's
+        // circuit trips 'open' and generation is skipped to stop hammering a
+        // failing schedule. After a cooldown, one 'half_open' probe run is
+        // allowed: success closes the circuit, failure re-opens it. Manual runs
+        // always bypass the breaker so operators can force a run and recover.
+        $old_run_state  = $is_manual ? array() : $this->get_decoded_run_state($schedule);
+        $prior_failures = isset($old_run_state['consecutive_failures']) ? (int) $old_run_state['consecutive_failures'] : 0;
+        $is_probe       = false;
+
+        if (!$is_manual && isset($schedule->circuit_state) && (string) $schedule->circuit_state === 'open') {
+            $opened_at = isset($old_run_state['circuit_opened_at']) ? (int) $old_run_state['circuit_opened_at'] : 0;
+            $cooldown  = (int) apply_filters('aips_schedule_circuit_cooldown_seconds', self::CIRCUIT_COOLDOWN_SECONDS, $schedule->schedule_id);
+            $now       = AIPS_DateTime::now()->timestamp();
+
+            if ($opened_at > 0 && ($now - $opened_at) >= $cooldown) {
+                // Cooldown elapsed — allow a single half-open probe.
+                $is_probe = true;
+                $this->repository->update($schedule->schedule_id, array('circuit_state' => 'half_open'));
+                $this->logger->log('Circuit half-open probe for schedule ' . $schedule->schedule_id, 'info');
+            } else {
+                // Still open and within cooldown — skip this run entirely.
+                $this->logger->log('Circuit open — skipping schedule ' . $schedule->schedule_id, 'warning');
+                $skip_history = $this->result_handler->get_or_create_schedule_history($schedule->schedule_id);
+                if (is_object($skip_history) && method_exists($skip_history, 'record')) {
+                    $skip_history->record(
+                        'warning',
+                        sprintf(
+                            /* translators: %s: schedule name */
+                            __('Schedule "%s" skipped: circuit breaker is open.', 'ai-post-scheduler'),
+                            isset($schedule->name) ? $schedule->name : ''
+                        ),
+                        array('event_type' => 'circuit_open_skipped', 'event_status' => 'failed'),
+                        null,
+                        array('schedule_id' => $schedule->schedule_id)
+                    );
+                }
+                return;
+            }
+        }
+
         if (!$is_manual) {
             // Dispatch schedule execution started event
             do_action('aips_schedule_execution_started', $schedule->schedule_id);
@@ -965,18 +1018,54 @@ class AIPS_Schedule_Processor {
             $result = $this->generator->generate_post($context);
             if (is_wp_error($result)) {
                 $errors[] = $result;
-                // Persist the current run state so operators and future
-                // circuit-breaker logic can inspect what happened.
+                // Persist the current run state and drive the circuit breaker.
                 if (!$is_manual) {
                     $completed_so_far = $prior_completed + count($successful_post_ids);
-                    $this->repository->update_run_state($schedule->schedule_id, array(
-                        'status'        => $completed_so_far > 0 ? 'partial' : 'failed',
-                        'error_code'    => $result->get_error_code(),
-                        'error_message' => $result->get_error_message(),
-                        'completed'     => $completed_so_far,
-                        'total'         => $post_quantity,
-                        'timestamp'     => AIPS_DateTime::now()->toIso8601(),
-                    ));
+
+                    // Only a pure failure (nothing generated this run) counts
+                    // toward the consecutive-failure trip. A partial run made
+                    // progress, so it neither trips nor resets the counter.
+                    $is_pure_failure = ($completed_so_far === 0);
+                    $new_failures    = $is_pure_failure ? ($prior_failures + 1) : $prior_failures;
+                    $trip            = $is_pure_failure && ($new_failures >= self::CIRCUIT_FAILURE_THRESHOLD);
+
+                    $failure_run_state = array(
+                        'status'               => $completed_so_far > 0 ? 'partial' : 'failed',
+                        'error_code'           => $result->get_error_code(),
+                        'error_message'        => $result->get_error_message(),
+                        'completed'            => $completed_so_far,
+                        'total'                => $post_quantity,
+                        'consecutive_failures' => $new_failures,
+                        'circuit_opened_at'    => $trip
+                            ? AIPS_DateTime::now()->timestamp()
+                            : (isset($old_run_state['circuit_opened_at']) ? (int) $old_run_state['circuit_opened_at'] : 0),
+                        'timestamp'            => AIPS_DateTime::now()->toIso8601(),
+                    );
+
+                    if ($trip) {
+                        $this->repository->update_circuit_and_run_state($schedule->schedule_id, 'open', $failure_run_state);
+                        $this->logger->log(
+                            sprintf('Circuit tripped OPEN for schedule %d after %d consecutive failures.', $schedule->schedule_id, $new_failures),
+                            'warning'
+                        );
+                        $trip_history = $this->result_handler->get_or_create_schedule_history($schedule->schedule_id);
+                        if (is_object($trip_history) && method_exists($trip_history, 'record')) {
+                            $trip_history->record(
+                                'warning',
+                                sprintf(
+                                    /* translators: 1: schedule name, 2: consecutive failure count */
+                                    __('Circuit breaker opened for schedule "%1$s" after %2$d consecutive failures.', 'ai-post-scheduler'),
+                                    isset($schedule->name) ? $schedule->name : '',
+                                    $new_failures
+                                ),
+                                array('event_type' => 'circuit_opened', 'event_status' => 'failed'),
+                                null,
+                                array('schedule_id' => $schedule->schedule_id, 'consecutive_failures' => $new_failures)
+                            );
+                        }
+                    } else {
+                        $this->repository->update_run_state($schedule->schedule_id, $failure_run_state);
+                    }
                 }
                 // Stop the batch so batch_progress is preserved for resumption.
                 break;
@@ -1010,12 +1099,41 @@ class AIPS_Schedule_Processor {
                 // All posts generated — clear batch progress and persist a
                 // success run_state to indicate a clean completion.
                 $this->repository->clear_batch_progress($schedule->schedule_id);
-                $this->repository->update_run_state($schedule->schedule_id, array(
-                    'status'    => 'success',
-                    'completed' => $total_completed,
-                    'total'     => $post_quantity,
-                    'timestamp' => AIPS_DateTime::now()->toIso8601(),
-                ));
+
+                // Reset the circuit breaker on a clean run: zero the consecutive
+                // failure counter and close the circuit if it was open/half-open
+                // (e.g. a successful half-open probe).
+                $success_run_state = array(
+                    'status'               => 'success',
+                    'completed'            => $total_completed,
+                    'total'                => $post_quantity,
+                    'consecutive_failures' => 0,
+                    'circuit_opened_at'    => 0,
+                    'timestamp'            => AIPS_DateTime::now()->toIso8601(),
+                );
+
+                $circuit_was_open = $is_probe
+                    || (isset($schedule->circuit_state) && (string) $schedule->circuit_state !== 'closed');
+
+                if ($circuit_was_open) {
+                    $this->repository->update_circuit_and_run_state($schedule->schedule_id, 'closed', $success_run_state);
+                    $close_history = $this->result_handler->get_or_create_schedule_history($schedule->schedule_id);
+                    if (is_object($close_history) && method_exists($close_history, 'record')) {
+                        $close_history->record(
+                            'activity',
+                            sprintf(
+                                /* translators: %s: schedule name */
+                                __('Circuit breaker closed for schedule "%s" after a successful run.', 'ai-post-scheduler'),
+                                isset($schedule->name) ? $schedule->name : ''
+                            ),
+                            array('event_type' => 'circuit_closed', 'event_status' => 'success'),
+                            null,
+                            array('schedule_id' => $schedule->schedule_id)
+                        );
+                    }
+                } else {
+                    $this->repository->update_run_state($schedule->schedule_id, $success_run_state);
+                }
             }
         }
 

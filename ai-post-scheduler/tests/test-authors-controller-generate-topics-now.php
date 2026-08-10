@@ -59,35 +59,29 @@ class AIPS_Authors_Controller_Generate_Topics_Now_Test extends WP_UnitTestCase {
 	public function test_generate_topics_now_returns_count_and_author_topics_url() {
 		wp_set_current_user($this->admin_user_id);
 
-		$controller = new AIPS_Authors_Controller();
+		$controller = new AIPS_Authors_Controller(new class {
+			public function get_for_authors($author_ids) { return array(42 => array('counts' => array('pending' => 3))); }
+		});
 		$generated_topics = array(
-			(object) array('id' => 11, 'topic_title' => 'Topic One'),
-			(object) array('id' => 12, 'topic_title' => 'Topic Two'),
-			(object) array('id' => 13, 'topic_title' => 'Topic Three'),
+			array('id' => 11, 'topic_title' => 'Topic One'),
+			array('id' => 12, 'topic_title' => 'Topic Two'),
+			array('id' => 13, 'topic_title' => 'Topic Three'),
 		);
-		$notifications = new class() {
-			public $calls = array();
-
-			public function author_topics_generated($author_name, $count, $author_id) {
-				$this->calls[] = array(
-					'author_name' => $author_name,
-					'count'       => $count,
-					'author_id'   => $author_id,
-				);
-			}
-		};
+		$generation_result = new AIPS_Author_Topic_Generation_Result(42, 3, 'run-1', 'corr-1');
+		$generation_result->set_persisted_topics($generated_topics);
+		$generation_result->finalize();
 
 		$this->set_private_property(
 			$controller,
 			'topics_scheduler',
-			new class($generated_topics) {
+			new class($generation_result) {
 				private $result;
 
 				public function __construct($result) {
 					$this->result = $result;
 				}
 
-				public function generate_now($author_id) {
+				public function generate_now($author_id, $reset_schedule = false) {
 					return $this->result;
 				}
 			}
@@ -98,14 +92,14 @@ class AIPS_Authors_Controller_Generate_Topics_Now_Test extends WP_UnitTestCase {
 			new class() {
 				public function get_by_id($author_id) {
 					return (object) array(
-						'id'   => $author_id,
-						'name' => 'Test Author',
+						'id'                         => $author_id,
+						'name'                       => 'Test Author',
+						'topic_generation_next_run'  => 0,
+						'topic_generation_quantity'  => 3,
 					);
 				}
 			}
 		);
-		$this->set_private_property($controller, 'notifications', $notifications);
-
 		$_POST = array(
 			'nonce'     => wp_create_nonce('aips_ajax_nonce'),
 			'author_id' => 42,
@@ -116,19 +110,11 @@ class AIPS_Authors_Controller_Generate_Topics_Now_Test extends WP_UnitTestCase {
 		$expected_url = AIPS_Admin_Menu_Helper::get_page_url('author_topics', array('author_id' => 42));
 
 		$this->assertTrue($response['success']);
-		$this->assertSame('3 topics generated', $response['data']['message']);
-		$this->assertSame(3, $response['data']['topics_count']);
+		$this->assertSame('Generated 3 of 3 requested topics.', $response['data']['message']);
+		$this->assertSame(3, $response['data']['persisted_count']);
 		$this->assertSame(42, $response['data']['author_id']);
-		$this->assertSame($expected_url, $response['data']['author_topics_url']);
+		$this->assertSame($expected_url, $response['data']['review_url']);
 		$this->assertSame($generated_topics, $response['data']['topics']);
-		$this->assertCount(1, $notifications->calls);
-		$this->assertSame(
-			array(
-				'author_name' => 'Test Author',
-				'count'       => 3,
-				'author_id'   => 42,
-			),
-			$notifications->calls[0]
-		);
+		$this->assertSame(3, $response['data']['author_counts']['pending']);
 	}
 }

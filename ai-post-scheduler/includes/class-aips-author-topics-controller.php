@@ -85,6 +85,7 @@ class AIPS_Author_Topics_Controller {
 	 * @var AIPS_Job_Scheduler Job scheduler service
 	 */
 	private $job_scheduler;
+	private $status_repository;
 
 	/**
 	 * Initialize the controller.
@@ -94,7 +95,7 @@ class AIPS_Author_Topics_Controller {
 	 * @param AIPS_Bulk_Generator_Service|null   $bulk_generator_service Bulk generator service.
 	 * @param AIPS_Job_Scheduler|null            $job_scheduler          Job scheduler service.
 	 */
-	public function __construct($expansion_service = null, ?AIPS_History_Repository_Interface $history_repository = null, $bulk_generator_service = null, ?AIPS_Job_Scheduler $job_scheduler = null) {
+	public function __construct($expansion_service = null, ?AIPS_History_Repository_Interface $history_repository = null, $bulk_generator_service = null, ?AIPS_Job_Scheduler $job_scheduler = null, $status_repository = null) {
 		$container = AIPS_Container::get_instance();
 		$this->repository             = new AIPS_Author_Topics_Repository();
 		$this->logs_repository        = new AIPS_Author_Topic_Logs_Repository();
@@ -106,6 +107,9 @@ class AIPS_Author_Topics_Controller {
 		$this->history_repository     = $history_repository ?: ($container->has(AIPS_History_Repository_Interface::class) ? $container->make(AIPS_History_Repository_Interface::class) : new AIPS_History_Repository());
 		$this->bulk_generator_service = $bulk_generator_service ?: new AIPS_Bulk_Generator_Service( $this->history_service );
 		$this->job_scheduler          = $job_scheduler ?: new AIPS_Job_Scheduler();
+		$this->status_repository      = $status_repository ?: $container->makeIfExists(AIPS_Author_Generation_Status_Repository::class, function() {
+			return new AIPS_Author_Generation_Status_Repository();
+		});
 
 		// Register AJAX endpoints
 		add_action('wp_ajax_aips_approve_topic', array($this, 'ajax_approve_topic'));
@@ -391,10 +395,15 @@ class AIPS_Author_Topics_Controller {
 			'topic_id' => $topic_id
 		));
 		$history->complete_success(array('post_id' => $result, 'topic_id' => $topic_id));
+		$status_map = $this->status_repository->get_for_authors(array((int) $topic->author_id));
+		$counts = isset($status_map[(int) $topic->author_id]['counts']) ? $status_map[(int) $topic->author_id]['counts'] : array();
 
 		AIPS_Ajax_Response::success(array(
-			'message' => __('Post generated successfully.', 'ai-post-scheduler'),
-			'post_id' => $result
+			'message'       => __('Post generated successfully.', 'ai-post-scheduler'),
+			'post_id'       => $result,
+			'edit_url'      => esc_url_raw(get_edit_post_link((int) $result, 'raw')),
+			'author_id'     => (int) $topic->author_id,
+			'author_counts' => $counts,
 		));
 	}
 

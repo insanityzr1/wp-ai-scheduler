@@ -79,6 +79,14 @@ class AIPS_Generation_State_Repository {
 		));
 	}
 
+	/** Record the requested and generated totals for the most recent run. */
+	public function record_result_counts(string $flow, int $author_id, int $requested_count, int $generated_count): void {
+		$this->upsert($flow, $author_id, array(
+			'last_requested_count' => max(0, $requested_count),
+			'last_generated_count' => max(0, $generated_count),
+		));
+	}
+
 	/**
 	 * Record a successful run: stamp last_success_at and reset failure/retry state.
 	 *
@@ -96,6 +104,7 @@ class AIPS_Generation_State_Repository {
 			'last_error_message'   => null,
 			'consecutive_failures' => 0,
 			'retry_attempts'       => 0,
+			'claim_recheck_attempts' => 0,
 			'next_retry_at'        => 0,
 		));
 	}
@@ -119,6 +128,7 @@ class AIPS_Generation_State_Repository {
 			'last_error_code'      => $error_code,
 			'last_error_message'   => $error_message,
 			'consecutive_failures' => $new_count,
+			'claim_recheck_attempts' => 0,
 		));
 
 		return $new_count;
@@ -137,6 +147,14 @@ class AIPS_Generation_State_Repository {
 		$this->upsert($flow, $author_id, array(
 			'next_retry_at'  => max(0, $next_retry_at),
 			'retry_attempts' => max(0, $retry_attempt),
+		));
+	}
+
+	/** Persist a claim-contention recheck without consuming generation retries. */
+	public function set_next_claim_recheck(string $flow, int $author_id, int $next_retry_at, int $attempt): void {
+		$this->upsert($flow, $author_id, array(
+			'next_retry_at'         => max(0, $next_retry_at),
+			'claim_recheck_attempts' => max(0, $attempt),
 		));
 	}
 

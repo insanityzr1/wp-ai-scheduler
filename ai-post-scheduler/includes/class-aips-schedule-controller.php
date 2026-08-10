@@ -16,8 +16,9 @@ class AIPS_Schedule_Controller {
      * @var AIPS_History_Repository_Interface
      */
     private $history_repository;
+	private $status_repository;
 
-    public function __construct($scheduler = null, ?AIPS_Schedule_Repository_Interface $schedule_repository = null, ?AIPS_History_Repository_Interface $history_repository = null) {
+    public function __construct($scheduler = null, ?AIPS_Schedule_Repository_Interface $schedule_repository = null, ?AIPS_History_Repository_Interface $history_repository = null, $status_repository = null) {
         $container = AIPS_Container::get_instance();
         $this->scheduler           = $scheduler ?: $container->makeIfExists(AIPS_Scheduler::class, function() {
             return new AIPS_Scheduler();
@@ -28,6 +29,9 @@ class AIPS_Schedule_Controller {
         $this->history_repository  = $history_repository ?: $container->makeIfExists(AIPS_History_Repository_Interface::class, function() {
             return new AIPS_History_Repository();
         });
+		$this->status_repository = $status_repository ?: $container->makeIfExists(AIPS_Author_Generation_Status_Repository::class, function() {
+			return new AIPS_Author_Generation_Status_Repository();
+		});
 
         add_action('wp_ajax_aips_save_schedule', array($this, 'ajax_save_schedule'));
         add_action('wp_ajax_aips_delete_schedule', array($this, 'ajax_delete_schedule'));
@@ -803,22 +807,33 @@ class AIPS_Schedule_Controller {
         if (is_wp_error($result)) {
             AIPS_Ajax_Response::error(array('message' => $result->get_error_message()));
         }
+		$current_next_run = $this->get_schedule_next_run($id, $type);
+		$schedule_info    = array(
+			'previous_next_run' => $previous_next_run,
+			'current_next_run'  => $current_next_run,
+			'schedule_changed'  => ($previous_next_run !== $current_next_run),
+			'schedule_reset'    => (bool) $advance_schedule,
+		);
 		if ($result instanceof AIPS_Generation_Result_Interface && !$result->is_success()) {
 			$result_data = $result->to_array();
+			$status_map = $this->status_repository->get_for_authors(array($id));
+			$counts = isset($status_map[$id]['counts']) ? $status_map[$id]['counts'] : array();
+			if ($result instanceof AIPS_Author_Post_Generation_Result) {
+				$payload = (new AIPS_Author_Generation_Result_Presenter())->present_post($result, $schedule_info, $counts);
+				$payload['result'] = $result_data;
+				AIPS_Ajax_Response::error($payload);
+			}
+			if ($result instanceof AIPS_Author_Topic_Generation_Result) {
+				$review_url = AIPS_Admin_Menu_Helper::get_page_url('author_topics', array('author_id' => $id));
+				$payload = (new AIPS_Author_Generation_Result_Presenter())->present_topic($result, $schedule_info, $review_url, $counts);
+				$payload['result'] = $result_data;
+				AIPS_Ajax_Response::error($payload);
+			}
 			$message = !empty($result_data['error'])
 				? (string) $result_data['error']
 				: sprintf(__('Generation did not complete (%s).', 'ai-post-scheduler'), (string) $result->get_status());
 			AIPS_Ajax_Response::error(array('message' => $message, 'result' => $result_data));
 		}
-
-        $current_next_run = $this->get_schedule_next_run($id, $type);
-        $schedule_info    = array(
-            'previous_next_run' => $previous_next_run,
-            'current_next_run'  => $current_next_run,
-            'schedule_changed'  => ($previous_next_run !== $current_next_run),
-            'schedule_reset'    => (bool) $advance_schedule,
-        );
-
         // Format the success message based on type.
         if ($type === AIPS_Unified_Schedule_Service::TYPE_TEMPLATE) {
             $post_ids = is_array($result) ? $result : array($result);
@@ -840,45 +855,21 @@ class AIPS_Schedule_Controller {
             if (!($result instanceof AIPS_Author_Topic_Generation_Result)) {
                 AIPS_Ajax_Response::error(__('Topic generation returned an invalid result.', 'ai-post-scheduler'));
             }
-            $result_data = $result->to_array();
-            $topics      = $result->get_persisted_topics();
-            $count       = count($topics);
-            AIPS_Ajax_Response::success(array_merge(array(
-                'message' => sprintf(
-                    _n('%d topic generated successfully!', '%d topics generated successfully!', $count, 'ai-post-scheduler'),
-                    $count
-                ),
-                'topics' => $topics,
-                'result' => $result_data,
-            ), $schedule_info));
+			$status_map = $this->status_repository->get_for_authors(array($id));
+			$counts = isset($status_map[$id]['counts']) ? $status_map[$id]['counts'] : array();
+			$review_url = AIPS_Admin_Menu_Helper::get_page_url('author_topics', array('author_id' => $id));
+			$payload = (new AIPS_Author_Generation_Result_Presenter())->present_topic($result, $schedule_info, $review_url, $counts);
+			$payload['result'] = $result->to_array();
+			AIPS_Ajax_Response::success($payload);
         } elseif ($type === AIPS_Unified_Schedule_Service::TYPE_AUTHOR_POST) {
             if (!($result instanceof AIPS_Author_Post_Generation_Result)) {
                 AIPS_Ajax_Response::error(__('Post generation returned an invalid result.', 'ai-post-scheduler'));
             }
-            $result_data = $result->to_array();
-            $post_ids = array_values(array_filter(array_map('absint', $result->get_post_ids())));
-            $post_id  = !empty($post_ids) ? $post_ids[0] : 0;
-            $edit_url = 1 === count($post_ids) && $post_id ? esc_url_raw(get_edit_post_link($post_id, 'raw')) : '';
-			$post_links = array();
-			foreach ($post_ids as $generated_post_id) {
-				$post_links[] = array(
-					'id'       => $generated_post_id,
-					'edit_url' => esc_url_raw(get_edit_post_link($generated_post_id, 'raw')),
-				);
-			}
-            AIPS_Ajax_Response::success(array_merge(array(
-                'message'  => sprintf(
-                    _n('%d post generated successfully from author topics!', '%d posts generated successfully from author topics!', count($post_ids), 'ai-post-scheduler'),
-                    count($post_ids)
-                ),
-                'post_ids' => $post_ids,
-                'post_id'  => $post_id,
-                'edit_url' => $edit_url,
-				'post_links' => $post_links,
-				'failures'   => $result_data['failures'],
-				'skipped'    => $result_data['skipped'],
-				'result'     => $result_data,
-            ), $schedule_info));
+			$status_map = $this->status_repository->get_for_authors(array($id));
+			$counts = isset($status_map[$id]['counts']) ? $status_map[$id]['counts'] : array();
+			$payload = (new AIPS_Author_Generation_Result_Presenter())->present_post($result, $schedule_info, $counts);
+			$payload['result'] = $result->to_array();
+			AIPS_Ajax_Response::success($payload);
         } else {
             AIPS_Ajax_Response::success($schedule_info, __('Schedule executed successfully.', 'ai-post-scheduler'));
         }
@@ -1239,17 +1230,8 @@ class AIPS_Schedule_Controller {
             AIPS_Ajax_Response::error(__('Circuit reset is only available for template schedules.', 'ai-post-scheduler'));
         }
 
-        // Reset the circuit state to 'closed' for this schedule
-        global $wpdb;
-        $table_name = $wpdb->prefix . 'aips_schedule';
-
-        $result = $wpdb->update(
-            $table_name,
-            array('circuit_state' => 'closed'),
-            array('id' => $id),
-            array('%s'),
-            array('%d')
-        );
+        // Persistence remains behind the schedule repository boundary.
+        $result = $this->schedule_repository->update($id, array('circuit_state' => 'closed'));
 
         if ($result !== false) {
             AIPS_Ajax_Response::success(array(

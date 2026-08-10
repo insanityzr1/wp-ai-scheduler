@@ -320,6 +320,12 @@ class AIPS_Author_Topics_Scheduler extends AIPS_Author_Slice_Scheduler_Base {
 		// Generate topics using the generator (rich result object).
 		$result  = $this->topics_generator->generate_topics_with_result($author);
 		$outcome = AIPS_Generation_Outcome::from_topic_result($result);
+		$this->state_repository->record_result_counts(
+			AIPS_Generation_State_Repository::FLOW_AUTHOR_TOPIC,
+			(int) $author->id,
+			$result->get_requested_count(),
+			$result->get_persisted_count()
+		);
 
 		// Apply the outcome-driven scheduling policy: records state and, for
 		// transient failures, schedules a bounded retry with backoff.
@@ -409,7 +415,17 @@ class AIPS_Author_Topics_Scheduler extends AIPS_Author_Slice_Scheduler_Base {
 		$this->logger->log("Successfully generated topics for author {$author->id} (outcome: {$outcome->get_outcome()})", 'info');
 
 		// Create admin bar notification
-		$this->notifications->author_topics_generated($author->name, $topic_count, $author->id);
+		if ($result->is_partial()) {
+			$this->notifications->author_topics_partially_generated(
+				$author->name,
+				$topic_count,
+				$result->get_requested_count(),
+				$author->id,
+				$result->to_array()['refill_attempts']
+			);
+		} else {
+			$this->notifications->author_topics_generated($author->name, $topic_count, $author->id);
+		}
 
 		return true;
 	}
@@ -491,6 +507,21 @@ class AIPS_Author_Topics_Scheduler extends AIPS_Author_Slice_Scheduler_Base {
 
 		try {
 			$result = $this->topics_generator->generate_topics_with_result($author);
+			$generated_count = $result->get_persisted_count();
+			if ($generated_count > 0) {
+				if ($result->is_partial()) {
+					$result_data = $result->to_array();
+					$this->notifications->author_topics_partially_generated(
+						$author->name,
+						$generated_count,
+						$result->get_requested_count(),
+						$author->id,
+						(int) $result_data['refill_attempts']
+					);
+				} else {
+					$this->notifications->author_topics_generated($author->name, $generated_count, $author->id);
+				}
+			}
 
 			// Keep manual "Run Now" behavior aligned with cron runs by advancing
 			// schedule timestamps regardless of success/failure to avoid re-running

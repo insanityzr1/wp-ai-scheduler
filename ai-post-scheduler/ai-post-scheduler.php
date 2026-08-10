@@ -679,7 +679,8 @@ final class AI_Post_Scheduler {
 			AIPS_Author_Topic_Batch_Service::JOB_TYPE,
 			function($author_id, $batch_id, $job) {
 				$item_repository = new AIPS_Author_Topic_Batch_Items_Repository();
-				if (!$item_repository->claim((string) $batch_id, (int) $author_id)) {
+				$item_claim_token = $item_repository->claim((string) $batch_id, (int) $author_id);
+				if (!$item_claim_token) {
 					return new WP_Error('batch_item_not_queued', __('This author batch item was already claimed or completed.', 'ai-post-scheduler'));
 				}
 				try {
@@ -687,7 +688,9 @@ final class AI_Post_Scheduler {
 				} catch (Throwable $exception) {
 					$result = new WP_Error('author_topic_batch_exception', $exception->getMessage());
 				}
-				$item_repository->record_result((string) $batch_id, (int) $author_id, $result);
+				if (!$item_repository->record_result((string) $batch_id, (int) $author_id, $result, (string) $item_claim_token)) {
+					return new WP_Error('batch_item_lease_lost', __('This author batch item was reassigned before its result could be recorded.', 'ai-post-scheduler'));
+				}
 				return $result;
 			}
 		);
@@ -703,10 +706,14 @@ final class AI_Post_Scheduler {
 			$failed = count(array_filter($status['authors'], function($author) {
 				return 'failed' === ($author['status'] ?? '');
 			}));
+			$partial = count(array_filter($status['authors'], function($author) {
+				return 'partial' === ($author['status'] ?? '');
+			}));
 			$message = sprintf(
-				/* translators: 1: processed authors, 2: failed authors */
-				__('Author topic batch completed: %1$d processed, %2$d failed.', 'ai-post-scheduler'),
+				/* translators: 1: processed authors, 2: partial authors, 3: failed authors */
+				__('Author topic batch completed: %1$d processed, %2$d partial, %3$d failed.', 'ai-post-scheduler'),
 				(int) $status['processed'],
+				$partial,
 				$failed
 			);
 			(new AIPS_Notifications())->send(

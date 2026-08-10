@@ -25,6 +25,13 @@ if (!defined('ABSPATH')) {
 	define('ABSPATH', dirname(__DIR__) . '/');
 }
 
+if (!defined('MINUTE_IN_SECONDS')) {
+	define('MINUTE_IN_SECONDS', 60);
+}
+if (!defined('HOUR_IN_SECONDS')) {
+	define('HOUR_IN_SECONDS', 60 * MINUTE_IN_SECONDS);
+}
+
 class WP_UnitTestCase extends PHPUnit\Framework\TestCase {}
 
 class WP_Error {
@@ -182,4 +189,12 @@ function wp_update_post($postarr) {
 
 function wp_delete_post($post_id, $force_delete = false) {
 	return true;
+}
+
+function get_edit_post_link($post_id, $context = 'display') {
+	return '/edit.php?post=' . (int) $post_id;
+}
+
+function esc_url_raw($url) {
+	return (string) $url;
 }

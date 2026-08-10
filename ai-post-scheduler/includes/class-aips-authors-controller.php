@@ -61,21 +61,21 @@ class AIPS_Authors_Controller {
 	 */
 	private $topics_scheduler;
 
-	/**
-	 * @var AIPS_Notifications Notifications service
-	 */
-	private $notifications;
+	private $status_repository;
 
 	/**
 	 * Initialize the controller.
 	 */
-	public function __construct() {
+	public function __construct($status_repository = null) {
+		$container = AIPS_Container::get_instance();
 		$this->repository = new AIPS_Authors_Repository();
 		$this->topics_repository = new AIPS_Author_Topics_Repository();
 		$this->logs_repository = new AIPS_Author_Topic_Logs_Repository();
 		$this->feedback_repository = new AIPS_Feedback_Repository();
 		$this->topics_scheduler = new AIPS_Author_Topics_Scheduler();
-		$this->notifications = new AIPS_Notifications();
+		$this->status_repository = $status_repository ?: $container->makeIfExists(AIPS_Author_Generation_Status_Repository::class, function() {
+			return new AIPS_Author_Generation_Status_Repository();
+		});
 		
 		// Register AJAX endpoints
 		add_action('wp_ajax_aips_save_author', array($this, 'ajax_save_author'));
@@ -432,9 +432,32 @@ class AIPS_Authors_Controller {
 		$previous_next_run = $before ? (int) $before->topic_generation_next_run : 0;
 
 		$result = $this->topics_scheduler->generate_now($author_id, $reset_schedule);
+		$author = $this->repository->get_by_id($author_id);
+		$current_next_run = $author ? (int) $author->topic_generation_next_run : $previous_next_run;
+		$schedule_info = array(
+			'previous_next_run' => $previous_next_run,
+			'current_next_run'  => $current_next_run,
+			'schedule_changed'  => ($previous_next_run !== $current_next_run),
+			'schedule_reset'    => $reset_schedule,
+		);
+		$status_map = $this->status_repository->get_for_authors(array($author_id));
+		$counts = isset($status_map[$author_id]['counts']) ? $status_map[$author_id]['counts'] : array();
+		$review_url = AIPS_Admin_Menu_Helper::get_page_url('author_topics', array('author_id' => $author_id));
 
 		if (is_wp_error($result)) {
-			AIPS_Ajax_Response::error(array('message' => $result->get_error_message()));
+			if ('already_running' === $result->get_error_code()) {
+				$requested = $author && isset($author->topic_generation_quantity) ? (int) $author->topic_generation_quantity : 0;
+				$structured_result = new AIPS_Author_Topic_Generation_Result($author_id, $requested, '', (string) AIPS_Correlation_ID::get());
+				$structured_result->mark_already_running();
+				$payload = (new AIPS_Author_Generation_Result_Presenter())->present_topic($structured_result, $schedule_info, $review_url, $counts);
+				$payload['result'] = $structured_result->to_array();
+				AIPS_Ajax_Response::error($payload);
+			}
+			AIPS_Ajax_Response::error(array_merge($schedule_info, array(
+				'message'       => $result->get_error_message(),
+				'review_url'    => esc_url_raw($review_url),
+				'author_counts' => $counts,
+			)));
 		}
 
 		if (!($result instanceof AIPS_Author_Topic_Generation_Result)) {
@@ -442,42 +465,13 @@ class AIPS_Authors_Controller {
 		}
 
 		$result_data = $result->to_array();
-		$topics      = $result->get_persisted_topics();
-
-		// Create admin bar notification for manual topic generation.
-		$author = $this->repository->get_by_id($author_id);
-		if ($author && !empty($topics)) {
-			$this->notifications->author_topics_generated($author->name, count($topics), $author_id);
+		$payload = (new AIPS_Author_Generation_Result_Presenter())->present_topic($result, $schedule_info, $review_url, $counts);
+		$payload['result'] = $result_data;
+		if (!$result->is_success()) {
+			AIPS_Ajax_Response::error($payload);
 		}
 
-		$current_next_run = $author ? (int) $author->topic_generation_next_run : $previous_next_run;
-		$count = count($topics);
-		$message = sprintf(
-			_n('%d topic generated successfully.', '%d topics generated successfully.', $count, 'ai-post-scheduler'),
-			$count
-		);
-		if ('partial' === $result->get_status()) {
-			$message = sprintf(
-				__('Generated %1$d of %2$d requested topics. Review the quality details below.', 'ai-post-scheduler'),
-				$count,
-				(int) $result_data['requested_count']
-			);
-		} elseif ('failed' === $result->get_status()) {
-			AIPS_Ajax_Response::error(array(
-				'message' => $result_data['error'] ?: __('Topic generation failed.', 'ai-post-scheduler'),
-				'result'  => $result_data,
-			));
-		}
-
-		AIPS_Ajax_Response::success(array(
-			'message' => $message,
-			'topics' => $topics,
-			'result' => $result_data,
-			'previous_next_run' => $previous_next_run,
-			'current_next_run'  => $current_next_run,
-			'schedule_changed'  => ($previous_next_run !== $current_next_run),
-			'schedule_reset'    => $reset_schedule,
-		));
+		AIPS_Ajax_Response::success($payload);
 	}
 	
 	/**

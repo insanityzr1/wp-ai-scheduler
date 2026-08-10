@@ -100,6 +100,31 @@ class AIPS_Notification_Senders {
 		);
 	}
 
+	/** Notify admins that bounded refill produced fewer topics than requested. */
+	public function author_topics_partially_generated( $author_name, $generated_count, $requested_count, $author_id, $refill_attempts = 0 ) {
+		$url = AIPS_Admin_Menu_Helper::get_page_url(
+			'author_topics',
+			array('author_id' => absint($author_id), 'status' => 'pending')
+		);
+		$message = sprintf(
+			/* translators: 1: author name, 2: generated topics, 3: requested topics, 4: refill attempts */
+			__('Author (%1$s) generated %2$d of %3$d requested topics after %4$d refill attempt(s). Review the available topics.', 'ai-post-scheduler'),
+			$author_name,
+			(int) $generated_count,
+			(int) $requested_count,
+			(int) $refill_attempts
+		);
+
+		call_user_func($this->dispatcher, 'partial_generation_completed', array(
+			'channels'      => array(AIPS_Notifications::CHANNEL_DB),
+			'url'           => $url,
+			'message'       => $message,
+			'level'         => 'warning',
+			'dedupe_key'    => 'author_topics_partial_' . absint($author_id),
+			'dedupe_window' => 300,
+		));
+	}
+
 	/**
 	 * Send a high-priority generation failure notification.
 	 *

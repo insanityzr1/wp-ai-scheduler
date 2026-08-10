@@ -92,6 +92,7 @@
 			$(document).on('change', '#aips-authors-select-all', this.toggleSelectAllAuthors.bind(this));
 			$(document).on('click', '#aips-authors-bulk-apply', this.executeAuthorsBulkAction.bind(this));
 			$(document).on('click', '.aips-cancel-author-topic-batch', this.cancelAuthorTopicBatch.bind(this));
+			$(document).on('click', '.aips-retry-failed-author-posts', this.retryFailedAuthorPosts.bind(this));
 
 			// Author Suggestions
 			$(document).on('click', '#aips-suggest-authors-btn', this.openSuggestModal.bind(this));
@@ -200,16 +201,23 @@
 		},
 
 		pollAuthorTopicBatch: function (batchId) {
+			const $panel = $('#aips-author-topic-batch-progress[data-batch-id="' + batchId + '"]');
+			const retryPoll = () => {
+				if ($panel.length) {
+					$panel.find('.aips-author-topic-batch-status').text(aipsAuthorsL10n.retrying || 'Retrying status check');
+					setTimeout(() => this.pollAuthorTopicBatch(batchId), 5000);
+				}
+			};
 			$.post(ajaxurl, {
 				action: 'aips_get_author_topic_batch_status',
 				nonce: aipsAuthorsL10n.nonce,
 				batch_id: batchId
 			}).done((response) => {
 				if (!response || !response.success || !response.data) {
+					retryPoll();
 					return;
 				}
 				const data = response.data;
-				const $panel = $('#aips-author-topic-batch-progress[data-batch-id="' + batchId + '"]');
 				$panel.find('progress').val(data.percent || 0);
 				$panel.find('.aips-author-topic-batch-count').text((data.processed || 0) + ' / ' + (data.total || 0));
 				$panel.find('.aips-author-topic-batch-status').text(data.status || 'running');
@@ -218,13 +226,15 @@
 
 				if (['completed', 'partial', 'failed', 'canceled'].indexOf(data.status) !== -1) {
 					$panel.find('.aips-cancel-author-topic-batch').remove();
-					if (data.status === 'completed' || data.status === 'partial') {
-						setTimeout(() => location.reload(), 1200);
+					if (data.author_counts) {
+						Object.keys(data.author_counts).forEach((authorId) => {
+							this.updateAuthorCounters(parseInt(authorId, 10), data.author_counts[authorId]);
+						});
 					}
 					return;
 				}
 				setTimeout(() => this.pollAuthorTopicBatch(batchId), 2000);
-			});
+			}).fail(retryPoll);
 		},
 
 		cancelAuthorTopicBatch: function (e) {
@@ -235,6 +245,72 @@
 				nonce: aipsAuthorsL10n.nonce,
 				batch_id: batchId
 			}).done(() => this.pollAuthorTopicBatch(batchId));
+		},
+
+		updateAuthorCounters: function (authorId, counts) {
+			const $row = $('.aips-authors-table tbody tr[data-author-id="' + parseInt(authorId, 10) + '"]');
+			if (!$row.length || !counts) {
+				return;
+			}
+			const pending = parseInt(counts.pending || 0, 10);
+			const approved = parseInt(counts.approved || 0, 10);
+			const rejected = parseInt(counts.rejected || 0, 10);
+			const posts = parseInt(counts.generated_posts || 0, 10);
+			const totalTopics = pending + approved + rejected + parseInt(counts.posts_generated || 0, 10);
+
+			$row.find('.aips-author-topic-count-number').text(totalTopics);
+			$row.find('.aips-author-topic-count-label').text(totalTopics === 1 ? (aipsAuthorsL10n.topicSingular || 'Topic') : (aipsAuthorsL10n.topicPlural || 'Topics'));
+			$row.find('.aips-author-pending-count, .aips-topic-flow-pending').text(pending);
+			$row.find('.aips-author-approved-count, .aips-post-flow-eligible').text(approved);
+			$row.find('.aips-author-rejected-count').text(rejected);
+			$row.find('.aips-author-post-count-number').text(posts);
+			$row.find('.aips-author-post-count-label').text(posts === 1 ? (aipsAuthorsL10n.postSingular || 'Post') : (aipsAuthorsL10n.postPlural || 'Posts'));
+		},
+
+		retryFailedAuthorPosts: function (e) {
+			e.preventDefault();
+			const $button = $(e.currentTarget);
+			const topicIds = String($button.attr('data-topic-ids') || '').split(',')
+				.map((value) => parseInt(value, 10))
+				.filter((value) => Number.isInteger(value) && value > 0);
+			if (!topicIds.length) {
+				return;
+			}
+
+			$button.prop('disabled', true);
+			let succeeded = 0;
+			const failedTopicIds = [];
+			let chain = $.Deferred().resolve().promise();
+			topicIds.forEach((topicId) => {
+				chain = chain.then(() => $.post(ajaxurl, {
+					action: 'aips_generate_post_from_topic',
+					nonce: aipsAuthorsL10n.nonce,
+					topic_id: topicId
+				}).then((response) => {
+					if (response && response.success) {
+						succeeded++;
+						if (response.data && response.data.author_counts) {
+							this.updateAuthorCounters(response.data.author_id, response.data.author_counts);
+						}
+					} else {
+						failedTopicIds.push(topicId);
+					}
+				}, () => { failedTopicIds.push(topicId); }));
+			});
+			chain.always(() => {
+				const failed = failedTopicIds.length;
+				AIPS.Utilities.showToast(
+					(aipsAuthorsL10n.retryResults || 'Retry complete: %1$d succeeded, %2$d failed.')
+						.replace('%1$d', succeeded)
+						.replace('%2$d', failed),
+					failed ? 'warning' : 'success'
+				);
+				if (failed) {
+					$button.attr('data-topic-ids', failedTopicIds.join(',')).prop('disabled', false);
+				} else {
+					$button.remove();
+				}
+			});
 		},
 
 		/**
@@ -542,8 +618,8 @@
 							},
 							success: (response) => {
 								if (response.success) {
-									const result = response.data.result || {};
-									const quality = result.quality || {};
+									const result = response.data.result || response.data || {};
+									const quality = response.data.quality || result.quality || {};
 									const scheduleMessage = response.data.schedule_reset
 										? (aipsAuthorsL10n.scheduleReset || ' The recurring schedule was reset.')
 										: (aipsAuthorsL10n.schedulePreserved || ' The recurring schedule was preserved.');
@@ -555,16 +631,31 @@
 											.replace('%3$d', (quality.exact_duplicates || 0) + (quality.fuzzy_duplicates || 0))
 											.replace('%4$d', result.missing_count || 0);
 									}
+									if (parseInt(response.data.refill_attempts || 0, 10) > 0) {
+										qualityMessage += ' ' + (aipsAuthorsL10n.refillAttempts || 'Refill attempts: %d.')
+											.replace('%d', parseInt(response.data.refill_attempts, 10));
+									}
+									let topicMessage = AIPS.Utilities.escapeHtml((response.data.message || aipsAuthorsL10n.topicsGenerated) + scheduleMessage + qualityMessage);
+									const safeReviewUrl = AIPS.Utilities.sanitizeUrl(response.data.review_url || '');
+									if (safeReviewUrl) {
+										topicMessage += ' <a href="' + AIPS.Utilities.escapeAttribute(safeReviewUrl) + '">' + AIPS.Utilities.escapeHtml(aipsAuthorsL10n.reviewTopics || 'Review pending topics') + '</a>';
+									}
 									AIPS.Utilities.showToast(
-										AIPS.Utilities.escapeHtml((response.data.message || aipsAuthorsL10n.topicsGenerated) + scheduleMessage + qualityMessage),
+										topicMessage,
 										result.status === 'partial' ? 'warning' : 'success',
 										{ isHtml: true, duration: 10000 }
 									);
+									this.updateAuthorCounters(authorId, response.data.author_counts);
 								} else {
-									AIPS.Utilities.showToast(
-										response.data && response.data.message ? response.data.message : aipsAuthorsL10n.errorGenerating,
-										'error'
-									);
+									const errorData = response.data || {};
+									let errorMessage = AIPS.Utilities.escapeHtml(errorData.message || aipsAuthorsL10n.errorGenerating);
+									const safeReviewUrl = AIPS.Utilities.sanitizeUrl(errorData.review_url || '');
+									if (safeReviewUrl) {
+										errorMessage += ' <a href="' + AIPS.Utilities.escapeAttribute(safeReviewUrl) + '">' +
+											AIPS.Utilities.escapeHtml(aipsAuthorsL10n.reviewTopics || 'Review pending topics') + '</a>';
+									}
+									AIPS.Utilities.showToast(errorMessage, 'error', { isHtml: true, duration: 10000 });
+									this.updateAuthorCounters(authorId, errorData.author_counts);
 								}
 							},
 							error: () => {
@@ -681,17 +772,41 @@
 													.replace('%1$d', failures.length)
 													.replace('%2$d', skipped.length)
 											);
+											if (failures.length) {
+												message += '<ul class="aips-generation-failures">' + failures.map((failure) =>
+													'<li><strong>' + AIPS.Utilities.escapeHtml(failure.topic_title || aipsAuthorsL10n.unknownTopic || 'Unknown topic') + '</strong>: ' +
+													AIPS.Utilities.escapeHtml(failure.error_message || failure.error_code || aipsAuthorsL10n.unknownError || 'Unknown error') + '</li>'
+												).join('') + '</ul>';
+											}
+										}
+										const retryTopicIds = response.data && Array.isArray(response.data.retry_topic_ids) ? response.data.retry_topic_ids : [];
+										if (retryTopicIds.length) {
+											message += ' <button type="button" class="button-link aips-retry-failed-author-posts" data-topic-ids="' +
+												AIPS.Utilities.escapeAttribute(retryTopicIds.join(',')) + '">' +
+												AIPS.Utilities.escapeHtml(aipsAuthorsL10n.retryFailedItems || 'Retry failed items') + '</button>';
 										}
 
 										const resultStatus = response.data.result && response.data.result.status;
 										AIPS.Utilities.showToast(message, resultStatus === 'partial' ? 'warning' : 'success', { isHtml: true, duration: 10000 });
+										this.updateAuthorCounters(authorId, response.data.author_counts);
 									} else {
-										AIPS.Utilities.showToast(
-											response.data && response.data.message
-												? response.data.message
-												: aipsAuthorsL10n.errorGeneratingPosts,
-											'error'
-										);
+										const errorData = response.data || {};
+										let errorMessage = AIPS.Utilities.escapeHtml(errorData.message || aipsAuthorsL10n.errorGeneratingPosts);
+										const failures = Array.isArray(errorData.failures) ? errorData.failures : [];
+										if (failures.length) {
+											errorMessage += '<ul class="aips-generation-failures">' + failures.map((failure) =>
+												'<li><strong>' + AIPS.Utilities.escapeHtml(failure.topic_title || aipsAuthorsL10n.unknownTopic || 'Unknown topic') + '</strong>: ' +
+												AIPS.Utilities.escapeHtml(failure.error_message || failure.error_code || aipsAuthorsL10n.unknownError || 'Unknown error') + '</li>'
+											).join('') + '</ul>';
+										}
+										const retryTopicIds = Array.isArray(errorData.retry_topic_ids) ? errorData.retry_topic_ids : [];
+										if (retryTopicIds.length) {
+											errorMessage += ' <button type="button" class="button-link aips-retry-failed-author-posts" data-topic-ids="' +
+												AIPS.Utilities.escapeAttribute(retryTopicIds.join(',')) + '">' +
+												AIPS.Utilities.escapeHtml(aipsAuthorsL10n.retryFailedItems || 'Retry failed items') + '</button>';
+										}
+										AIPS.Utilities.showToast(errorMessage, 'error', { isHtml: true, duration: 10000 });
+										this.updateAuthorCounters(authorId, errorData.author_counts);
 									}
 								},
 								error: () => {

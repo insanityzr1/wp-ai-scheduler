@@ -631,6 +631,7 @@ class AIPS_DB_Manager {
 			batch_id varchar(36) NOT NULL,
 			author_id bigint(20) NOT NULL,
 			status varchar(20) NOT NULL DEFAULT 'queued',
+			claim_token varchar(64) DEFAULT NULL,
 			error_code varchar(100) DEFAULT NULL,
 			error_message text DEFAULT NULL,
 			result_json longtext DEFAULT NULL,
@@ -638,7 +639,7 @@ class AIPS_DB_Manager {
 			updated_at bigint(20) unsigned NOT NULL DEFAULT 0,
 			PRIMARY KEY  (id),
 			UNIQUE KEY batch_author (batch_id, author_id),
-			KEY batch_status (batch_id, status),
+			KEY batch_status (batch_id, status, updated_at),
 			KEY author_id (author_id)
 		) $charset_collate;";
 
@@ -712,8 +713,11 @@ class AIPS_DB_Manager {
             last_outcome varchar(40) DEFAULT NULL,
             last_error_code varchar(100) DEFAULT NULL,
             last_error_message text DEFAULT NULL,
+			last_requested_count int unsigned NOT NULL DEFAULT 0,
+			last_generated_count int unsigned NOT NULL DEFAULT 0,
             consecutive_failures int NOT NULL DEFAULT 0,
             retry_attempts int NOT NULL DEFAULT 0,
+			claim_recheck_attempts int NOT NULL DEFAULT 0,
             next_retry_at bigint(20) unsigned NOT NULL DEFAULT 0,
             correlation_id varchar(64) DEFAULT NULL,
             run_id varchar(64) DEFAULT NULL,

@@ -217,18 +217,22 @@ $site_ctx = AIPS_Site_Context::get();
 												<strong><?php esc_html_e('Topics', 'ai-post-scheduler'); ?></strong>
 												<span class="aips-badge <?php echo $topic_flow_enabled ? 'aips-badge-success' : 'aips-badge-neutral'; ?>"><?php echo esc_html($topic_flow_enabled ? __('Enabled', 'ai-post-scheduler') : __('Paused', 'ai-post-scheduler')); ?></span>
 												<span class="cell-meta"><?php echo esc_html($topic_flow['running'] ? __('Running', 'ai-post-scheduler') : ($topic_flow['next_retry_at'] ? __('Retrying', 'ai-post-scheduler') : ($topic_flow['last_outcome'] ?: __('Not run yet', 'ai-post-scheduler')))); ?></span>
-												<span class="cell-meta"><?php printf(esc_html__('Pending: %d', 'ai-post-scheduler'), (int) $status_counts['pending']); ?></span>
+												<span class="cell-meta"><?php esc_html_e('Pending:', 'ai-post-scheduler'); ?> <span class="aips-topic-flow-pending"><?php echo esc_html((int) $status_counts['pending']); ?></span></span>
+												<span class="cell-meta"><?php printf(esc_html__('Last run: %1$d of %2$d generated', 'ai-post-scheduler'), (int) $topic_flow['last_generated_count'], (int) $topic_flow['last_requested_count']); ?></span>
 												<span class="cell-meta"><?php printf(esc_html__('Last attempt: %s', 'ai-post-scheduler'), esc_html($topic_flow['last_attempt_at'] ? date_i18n(get_option('date_format') . ' ' . get_option('time_format'), $topic_flow['last_attempt_at']) : __('Never', 'ai-post-scheduler'))); ?></span>
 												<span class="cell-meta"><?php printf(esc_html__('Last success: %s', 'ai-post-scheduler'), esc_html($topic_flow['last_success_at'] ? date_i18n(get_option('date_format') . ' ' . get_option('time_format'), $topic_flow['last_success_at']) : __('Never', 'ai-post-scheduler'))); ?></span>
+												<?php if (!empty($topic_flow['last_error_message'])): ?><span class="cell-meta aips-text-error"><?php printf(esc_html__('Recent error: %s', 'ai-post-scheduler'), esc_html($topic_flow['last_error_message'])); ?></span><?php endif; ?>
 												<span class="cell-meta"><?php printf(esc_html__('Next run: %s', 'ai-post-scheduler'), esc_html($author->topic_generation_next_run ? date_i18n(get_option('date_format') . ' ' . get_option('time_format'), (int) $author->topic_generation_next_run) : __('Not scheduled', 'ai-post-scheduler'))); ?></span>
 											</div>
 											<div class="aips-author-flow-card" data-flow="post">
 												<strong><?php esc_html_e('Posts', 'ai-post-scheduler'); ?></strong>
 												<span class="aips-badge <?php echo $post_flow_enabled ? 'aips-badge-success' : 'aips-badge-neutral'; ?>"><?php echo esc_html($post_flow_enabled ? __('Enabled', 'ai-post-scheduler') : __('Paused', 'ai-post-scheduler')); ?></span>
 												<span class="cell-meta"><?php echo esc_html($post_flow['running'] ? __('Running', 'ai-post-scheduler') : ($post_flow['next_retry_at'] ? __('Retrying', 'ai-post-scheduler') : ($post_flow['last_outcome'] ?: __('Not run yet', 'ai-post-scheduler')))); ?></span>
-												<span class="cell-meta"><?php printf(esc_html__('Eligible: %d', 'ai-post-scheduler'), (int) $status_counts['approved']); ?></span>
+												<span class="cell-meta"><?php esc_html_e('Eligible:', 'ai-post-scheduler'); ?> <span class="aips-post-flow-eligible"><?php echo esc_html((int) $status_counts['approved']); ?></span></span>
+												<span class="cell-meta"><?php printf(esc_html__('Last run: %1$d of %2$d generated', 'ai-post-scheduler'), (int) $post_flow['last_generated_count'], (int) $post_flow['last_requested_count']); ?></span>
 												<span class="cell-meta"><?php printf(esc_html__('Last attempt: %s', 'ai-post-scheduler'), esc_html($post_flow['last_attempt_at'] ? date_i18n(get_option('date_format') . ' ' . get_option('time_format'), $post_flow['last_attempt_at']) : __('Never', 'ai-post-scheduler'))); ?></span>
 												<span class="cell-meta"><?php printf(esc_html__('Last success: %s', 'ai-post-scheduler'), esc_html($post_flow['last_success_at'] ? date_i18n(get_option('date_format') . ' ' . get_option('time_format'), $post_flow['last_success_at']) : __('Never', 'ai-post-scheduler'))); ?></span>
+												<?php if (!empty($post_flow['last_error_message'])): ?><span class="cell-meta aips-text-error"><?php printf(esc_html__('Recent error: %s', 'ai-post-scheduler'), esc_html($post_flow['last_error_message'])); ?></span><?php endif; ?>
 												<span class="cell-meta"><?php printf(esc_html__('Next run: %s', 'ai-post-scheduler'), esc_html($author->post_generation_next_run ? date_i18n(get_option('date_format') . ' ' . get_option('time_format'), (int) $author->post_generation_next_run) : __('Not scheduled', 'ai-post-scheduler'))); ?></span>
 											</div>
 										</div>
@@ -250,19 +254,19 @@ $site_ctx = AIPS_Site_Context::get();
                                         <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-start;">
                                             <a href="<?php echo esc_url( AIPS_Admin_Menu_Helper::get_page_url( 'author_topics', array( 'author_id' => absint( $author->id ) ) ) ); ?>" class="aips-btn aips-btn-sm aips-btn-secondary">
                                                 <span class="dashicons dashicons-visibility"></span>
-                                                <?php echo esc_html(sprintf(_n('%d Topic', '%d Topics', $total_topics, 'ai-post-scheduler'), $total_topics)); ?>
+												<span class="aips-author-topic-count-number"><?php echo esc_html($total_topics); ?></span> <span class="aips-author-topic-count-label"><?php echo esc_html(_n('Topic', 'Topics', $total_topics, 'ai-post-scheduler')); ?></span>
                                             </a>
                                             <div class="cell-meta" style="font-size: 11px;">
-                                                <span style="color: #d63638;"><?php echo esc_html($status_counts['pending']); ?> pending</span> |
-                                                <span style="color: #00a32a;"><?php echo esc_html($status_counts['approved']); ?> approved</span> |
-                                                <span style="color: #999;"><?php echo esc_html($status_counts['rejected']); ?> rejected</span>
+												<span style="color: #d63638;"><span class="aips-author-pending-count"><?php echo esc_html($status_counts['pending']); ?></span> pending</span> |
+												<span style="color: #00a32a;"><span class="aips-author-approved-count"><?php echo esc_html($status_counts['approved']); ?></span> approved</span> |
+												<span style="color: #999;"><span class="aips-author-rejected-count"><?php echo esc_html($status_counts['rejected']); ?></span> rejected</span>
                                             </div>
                                         </div>
                                     </td>
                                     <td>
                                         <a href="<?php echo esc_url( add_query_arg( array( 'page' => 'aips-generated-posts', 'author_id' => absint( $author->id ) ), admin_url( 'admin.php' ) ) ); ?>" class="aips-btn aips-btn-sm aips-btn-secondary">
                                             <span class="dashicons dashicons-admin-post"></span>
-                                            <?php echo esc_html(sprintf(_n('%d Post', '%d Posts', $posts_count, 'ai-post-scheduler'), $posts_count)); ?>
+											<span class="aips-author-post-count-number"><?php echo esc_html($posts_count); ?></span> <span class="aips-author-post-count-label"><?php echo esc_html(_n('Post', 'Posts', $posts_count, 'ai-post-scheduler')); ?></span>
                                         </a>
                                     </td>
                                     <td>

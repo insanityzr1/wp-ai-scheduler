@@ -121,6 +121,46 @@ class Test_AIPS_DB_Migrations extends WP_UnitTestCase {
 		$this->assertSame(AIPS_VERSION, $saved, 'aips_db_version should remain unchanged when versions match');
 	}
 
+	public function test_upgrade_from_3_3_restores_author_review_schema_idempotently() {
+		AIPS_DB_Manager::install_tables();
+		global $wpdb;
+		$state_table = $wpdb->prefix . 'aips_generation_state';
+		$items_table = $wpdb->prefix . 'aips_author_topic_batch_items';
+		$jobs_table = $wpdb->prefix . 'aips_bulk_batch_jobs';
+
+		$wpdb->query("ALTER TABLE {$state_table} DROP COLUMN last_requested_count");
+		$wpdb->query("ALTER TABLE {$state_table} DROP COLUMN last_generated_count");
+		$wpdb->query("ALTER TABLE {$state_table} DROP COLUMN claim_recheck_attempts");
+		$wpdb->query("ALTER TABLE {$jobs_table} DROP INDEX job_request");
+		$wpdb->query("ALTER TABLE {$jobs_table} DROP COLUMN request_key");
+		$wpdb->query("DROP TABLE {$items_table}");
+		AIPS_Config::get_instance()->set_option('aips_db_version', '3.3.0');
+
+		AIPS_DB_Migrations::check_and_run();
+		AIPS_Config::get_instance()->set_option('aips_db_version', '3.3.0');
+		AIPS_DB_Migrations::check_and_run();
+
+		$this->assertSame($items_table, $wpdb->get_var("SHOW TABLES LIKE '{$items_table}'"));
+		$state_columns = $wpdb->get_col("SHOW COLUMNS FROM {$state_table}", 0);
+		$this->assertContains('last_requested_count', $state_columns);
+		$this->assertContains('last_generated_count', $state_columns);
+		$this->assertContains('claim_recheck_attempts', $state_columns);
+		$request_key_column = $wpdb->get_row("SHOW COLUMNS FROM {$jobs_table} LIKE 'request_key'");
+		$this->assertSame('varchar(100)', strtolower($request_key_column->Type));
+		$job_request = array_values(array_filter($wpdb->get_results("SHOW INDEX FROM {$jobs_table}"), function($index) { return 'job_request' === $index->Key_name; }));
+		usort($job_request, function($a, $b) { return (int) $a->Seq_in_index <=> (int) $b->Seq_in_index; });
+		$this->assertNotEmpty($job_request);
+		$this->assertSame(0, (int) $job_request[0]->Non_unique);
+		$this->assertSame(array('job_type', 'request_key'), array_map(function($index) { return $index->Column_name; }, $job_request));
+		$this->assertSame(array(64, 100), array_map(function($index) { return (int) $index->Sub_part; }, $job_request));
+		$item_indexes = $wpdb->get_results("SHOW INDEX FROM {$items_table}");
+		$batch_author = array_values(array_filter($item_indexes, function($index) { return 'batch_author' === $index->Key_name; }));
+		usort($batch_author, function($a, $b) { return (int) $a->Seq_in_index <=> (int) $b->Seq_in_index; });
+		$this->assertSame(array('batch_id', 'author_id'), array_map(function($index) { return $index->Column_name; }, $batch_author));
+		$this->assertSame(0, (int) $batch_author[0]->Non_unique);
+		$this->assertSame(AIPS_VERSION, get_option('aips_db_version'));
+	}
+
 	/**
 	 * Legacy partial-generation keys should be renamed and the generated-post
 	 * marker should be backfilled without duplicating rows on re-run.

@@ -218,21 +218,29 @@ class AIPS_Generation_Retry_Scheduler {
 			return $decision;
 		}
 
-		// Bounded retry with backoff.
+		// Claim rechecks have their own budget and never consume generation
+		// retries, because no provider/database generation attempt occurred.
+		$is_claim_recheck = AIPS_Generation_Outcome::ALREADY_RUNNING === $outcome->get_outcome();
 		$existing     = $this->state_repository->get($flow, $author_id);
-		$prev_attempt = $existing ? (int) $existing->retry_attempts : 0;
+		$prev_attempt = $existing
+			? (int) ($is_claim_recheck ? ($existing->claim_recheck_attempts ?? 0) : $existing->retry_attempts)
+			: 0;
 		$next_attempt = $prev_attempt + 1;
-		$max_attempts = $this->get_max_attempts($flow);
+		$max_attempts = $is_claim_recheck
+			? max(1, (int) apply_filters('aips_generation_already_running_max_rechecks', 5, $flow, $author_id))
+			: $this->get_max_attempts($flow);
 
 		if ($next_attempt > $max_attempts) {
 			// Budget exhausted — stop retrying and alert the admin.
 			$this->state_repository->clear_retry($flow, $author_id);
 			$decision['exhausted'] = true;
-			$this->notify_retry_exhausted($flow, $author, $outcome, $prev_attempt);
+			if (!$is_claim_recheck) {
+				$this->notify_retry_exhausted($flow, $author, $outcome, $prev_attempt);
+			}
 			return $decision;
 		}
 
-		if (AIPS_Generation_Outcome::ALREADY_RUNNING === $outcome->get_outcome()) {
+		if ($is_claim_recheck) {
 			/**
 			 * Filters the short delay before rechecking a generation claim.
 			 *
@@ -274,7 +282,11 @@ class AIPS_Generation_Retry_Scheduler {
 			return $decision;
 		}
 
-		$this->state_repository->set_next_retry($flow, $author_id, $retry_at, $next_attempt);
+		if ($is_claim_recheck) {
+			$this->state_repository->set_next_claim_recheck($flow, $author_id, $retry_at, $next_attempt);
+		} else {
+			$this->state_repository->set_next_retry($flow, $author_id, $retry_at, $next_attempt);
+		}
 		$decision['retry_scheduled'] = true;
 		$decision['next_retry_at']   = $retry_at;
 
@@ -291,7 +303,11 @@ class AIPS_Generation_Retry_Scheduler {
 			'info'
 		);
 
-		$this->notify_retry_scheduled($flow, $author, $outcome, $next_attempt, $max_attempts, $retry_at);
+		if ($is_claim_recheck) {
+			$this->notify_already_running($flow, $author, $retry_at);
+		} else {
+			$this->notify_retry_scheduled($flow, $author, $outcome, $next_attempt, $max_attempts, $retry_at);
+		}
 
 		return $decision;
 	}
@@ -305,6 +321,13 @@ class AIPS_Generation_Retry_Scheduler {
 			return;
 		}
 		$this->notifications->generation_retry_scheduled($flow, $author, $outcome->get_outcome(), $attempt, $max, $retry_at);
+	}
+
+	private function notify_already_running($flow, $author, int $retry_at): void {
+		if (!method_exists($this->notifications, 'generation_already_running')) {
+			return;
+		}
+		$this->notifications->generation_already_running($flow, $author, $retry_at);
 	}
 
 	private function notify_retry_exhausted($flow, $author, AIPS_Generation_Outcome $outcome, int $attempts): void {

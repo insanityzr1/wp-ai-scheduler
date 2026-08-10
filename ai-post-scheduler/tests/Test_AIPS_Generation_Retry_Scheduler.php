@@ -38,6 +38,11 @@ class AIPS_Fake_Generation_State {
 		$this->rows[$k]['next_retry_at']  = $when;
 		$this->rows[$k]['retry_attempts'] = $attempt;
 	}
+	public function set_next_claim_recheck($flow, $author_id, $when, $attempt) {
+		$k = $this->key($flow, $author_id);
+		$this->rows[$k]['next_retry_at'] = $when;
+		$this->rows[$k]['claim_recheck_attempts'] = $attempt;
+	}
 	public function clear_retry($flow, $author_id) {
 		$k = $this->key($flow, $author_id);
 		if (isset($this->rows[$k])) { $this->rows[$k]['next_retry_at'] = 0; }

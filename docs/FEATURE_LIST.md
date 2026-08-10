@@ -10,10 +10,12 @@
 ## Author review workflow (3.4.0)
 
 - Independent master, topic-generation, and post-generation activation controls.
-- Atomic claims, outcome-driven retries, and short claim-contention rechecks.
+- Atomic claims, outcome-driven retries, and separately bounded claim-contention rechecks.
 - Manual runs preserve schedules by default and offer an explicit reset.
-- Queued, idempotent bulk topic generation with progress, cancellation, and per-author results.
+- Queued, idempotent bulk topic generation with progress, cancellation, stale-worker recovery, and per-author results.
 - Topic validation, duplicate accounting, bounded refill, and structured partial outcomes.
+- Live author status cards expose last requested/generated totals, recent errors, retry state, and fresh review counters.
+- Partial manual results include every generated link and failed-topic reason, with focused retries for failed topics.
 - Direct generation respects `max_posts_per_topic`; regeneration uses explicit replacement semantics.
 **Cron Jobs:** 6  
 **AJAX Endpoints:** 50+  

@@ -225,6 +225,11 @@ class AIPS_Notifications {
 		$this->senders->author_topics_generated($author_name, $topic_count, $author_id);
 	}
 
+	/** Create a warning notification when topic refill completes partially. */
+	public function author_topics_partially_generated($author_name, $generated_count, $requested_count, $author_id, $refill_attempts = 0) {
+		$this->senders->author_topics_partially_generated($author_name, $generated_count, $requested_count, $author_id, $refill_attempts);
+	}
+
 	/**
 	 * Send a high-priority generation failure notification.
 	 *
@@ -272,6 +277,28 @@ class AIPS_Notifications {
 				'dedupe_window' => 300,
 			)
 		);
+	}
+
+	/** Notify admins that a short recheck was scheduled because another worker owns the claim. */
+	public function generation_already_running($flow, $author, $retry_at) {
+		$when = AIPS_DateTime::fromTimestamp((int) $retry_at)->format('Y-m-d H:i');
+		$message = sprintf(
+			/* translators: 1: flow label, 2: author name, 3: datetime */
+			__('%1$s for "%2$s" is already running. A status recheck is scheduled for %3$s.', 'ai-post-scheduler'),
+			$this->flow_label($flow),
+			isset($author->name) ? $author->name : '',
+			$when
+		);
+		$author_id = isset($author->id) ? (int) $author->id : 0;
+		$url = AIPS_Generation_State_Repository::FLOW_AUTHOR_TOPIC === $flow && class_exists('AIPS_Admin_Menu_Helper')
+			? AIPS_Admin_Menu_Helper::get_page_url('author_topics', array('author_id' => $author_id))
+			: $this->author_history_url($author);
+
+		$this->send('generation_retry_scheduled', array(), array(self::CHANNEL_DB), '', $url, $message, array(
+			'level'         => 'info',
+			'dedupe_key'    => 'generation_already_running_' . sanitize_key($flow) . '_' . $author_id,
+			'dedupe_window' => 300,
+		));
 	}
 
 	/**

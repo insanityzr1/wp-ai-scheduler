@@ -54,6 +54,7 @@ class AIPS_Bulk_Batch_Job_Store {
 	 * @var int
 	 */
 	const CLEANUP_DAYS = 7;
+	const CLEANUP_BATCH_SIZE = 500;
 
 	/**
 	 * Return the full table name (with WP prefix).
@@ -246,7 +247,7 @@ class AIPS_Bulk_Batch_Job_Store {
 			$wpdb->prepare(
 				"UPDATE {$this->table()} SET status = %s, updated_at = %d WHERE job_id = %s AND status = %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 				self::STATUS_COMPLETED,
-				time(),
+				AIPS_DateTime::now()->timestamp(),
 				$job_id,
 				self::STATUS_PROCESSING
 			)
@@ -324,13 +325,14 @@ class AIPS_Bulk_Batch_Job_Store {
 		global $wpdb;
 
 		$result = $wpdb->query($wpdb->prepare(
-			"UPDATE {$this->table()} SET status = %s, updated_at = %d WHERE job_id = %s AND job_type = %s AND status IN (%s,%s)",
+			"UPDATE {$this->table()} SET status = %s, updated_at = %d WHERE job_id = %s AND job_type = %s AND status IN (%s,%s,%s)",
 			self::STATUS_CANCELED,
-			time(),
+			AIPS_DateTime::now()->timestamp(),
 			$job_id,
 			$job_type,
 			self::STATUS_PENDING,
-			self::STATUS_PROCESSING
+			self::STATUS_PROCESSING,
+			self::STATUS_FAILED
 		));
 
 		return 1 === (int) $result;
@@ -344,21 +346,53 @@ class AIPS_Bulk_Batch_Job_Store {
 	 *
 	 * @param string $job_id UUID of the job.
 	 * @param int    $count  Number of items completed in this slice.
-	 * @return bool True on success, false on failure.
+	 * @return bool True only when the parent counter changed.
 	 */
 	public function increment_processed( string $job_id, int $count ): bool {
 		global $wpdb;
 
 		$result = $wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 			$wpdb->prepare(
-				"UPDATE {$this->table()} SET processed = processed + %d, updated_at = %d WHERE job_id = %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				"UPDATE {$this->table()} SET processed = LEAST(total, processed + %d), updated_at = %d WHERE job_id = %s AND processed < total", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 				$count,
-				time(),
+				AIPS_DateTime::now()->timestamp(),
 				$job_id
 			)
 		);
 
-		return $result !== false;
+		return 1 === (int) $result;
+	}
+
+	/**
+	 * Reconcile a parent counter from idempotent terminal child rows.
+	 *
+	 * @return bool True only when the parent row changed.
+	 */
+	public function reconcile_processed(string $job_id, int $processed, string $final_status = ''): bool {
+		global $wpdb;
+		$processed = max(0, $processed);
+		$now = AIPS_DateTime::now()->timestamp();
+		if ('' !== $final_status) {
+			$result = $wpdb->query($wpdb->prepare(
+				"UPDATE {$this->table()} SET processed = GREATEST(processed, %d), status = %s, updated_at = %d WHERE job_id = %s AND status <> %s AND (processed < %d OR status <> %s)",
+				$processed,
+				$final_status,
+				$now,
+				$job_id,
+				self::STATUS_CANCELED,
+				$processed,
+				$final_status
+			));
+		} else {
+			$result = $wpdb->query($wpdb->prepare(
+				"UPDATE {$this->table()} SET processed = GREATEST(processed, %d), updated_at = %d WHERE job_id = %s AND processed < %d",
+				$processed,
+				$now,
+				$job_id,
+				$processed
+			));
+		}
+		return 1 === (int) $result;
 	}
 
 	// -----------------------------------------------------------------------
@@ -372,23 +406,29 @@ class AIPS_Bulk_Batch_Job_Store {
 	 *
 	 * @return int Number of rows deleted.
 	 */
-	public function cleanup_old_jobs(): int {
+	public function cleanup_old_jobs($item_repository = null): int {
 		global $wpdb;
 
-		$cutoff = time() - ( self::CLEANUP_DAYS * DAY_IN_SECONDS );
-
-		$item_table = $wpdb->prefix . 'aips_author_topic_batch_items';
-		$wpdb->query($wpdb->prepare(
-			"DELETE i FROM {$item_table} i INNER JOIN {$this->table()} j ON j.job_id = i.batch_id WHERE j.status IN ('completed','failed','canceled') AND j.updated_at < %d",
-			$cutoff
+		$cutoff = AIPS_DateTime::now()->timestamp() - ( self::CLEANUP_DAYS * DAY_IN_SECONDS );
+		$job_ids = $wpdb->get_col($wpdb->prepare(
+			"SELECT job_id FROM {$this->table()} WHERE status IN ('completed','failed','canceled') AND updated_at < %d ORDER BY updated_at ASC LIMIT %d",
+			$cutoff,
+			self::CLEANUP_BATCH_SIZE
 		));
+		if (empty($job_ids)) {
+			return 0;
+		}
 
-		$deleted = $wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-			$wpdb->prepare(
-				"DELETE FROM {$this->table()} WHERE status IN ('completed','failed','canceled') AND updated_at < %d", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-				$cutoff
-			)
-		);
+		$item_repository = $item_repository ?: new AIPS_Author_Topic_Batch_Items_Repository();
+		if (!$item_repository->delete_for_batches($job_ids)) {
+			return 0;
+		}
+
+		$placeholders = implode(',', array_fill(0, count($job_ids), '%s'));
+		$deleted = $wpdb->query($wpdb->prepare(
+			"DELETE FROM {$this->table()} WHERE job_id IN ({$placeholders})",
+			$job_ids
+		));
 
 		return (int) $deleted;
 	}

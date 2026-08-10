@@ -149,15 +149,22 @@ class AIPS_Author_Post_Generator extends AIPS_Author_Slice_Scheduler_Base implem
 	 */
 	public function run_scheduled_generation($author): AIPS_Author_Post_Generation_Result {
 		$correlation_id = (string) AIPS_Correlation_ID::get();
-		$this->state_repository->record_attempt(
-			AIPS_Generation_State_Repository::FLOW_AUTHOR_POST,
-			(int) $author->id,
-			$correlation_id
-		);
-
 		// advance_schedule=false: the policy below decides advancement.
 		$result  = $this->generate_posts_for_author($author, null, 'scheduled', false);
 		$outcome = AIPS_Generation_Outcome::from_post_result($result);
+		if (AIPS_Author_Post_Generation_Result::STATUS_ALREADY_RUNNING !== $result->get_status()) {
+			$this->state_repository->record_attempt(
+				AIPS_Generation_State_Repository::FLOW_AUTHOR_POST,
+				(int) $author->id,
+				$correlation_id
+			);
+			$this->state_repository->record_result_counts(
+				AIPS_Generation_State_Repository::FLOW_AUTHOR_POST,
+				(int) $author->id,
+				$result->get_requested_count(),
+				count($result->get_post_ids())
+			);
+		}
 
 		$decision = $this->retry_scheduler->handle_outcome(
 			AIPS_Generation_State_Repository::FLOW_AUTHOR_POST,

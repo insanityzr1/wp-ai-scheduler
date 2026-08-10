@@ -13,9 +13,9 @@ if (!defined('ABSPATH')) {
 class AIPS_Author_Generation_Status_Repository {
 	private $wpdb;
 
-	public function __construct() {
+	public function __construct($wpdb_instance = null) {
 		global $wpdb;
-		$this->wpdb = $wpdb;
+		$this->wpdb = $wpdb_instance ?: $wpdb;
 	}
 
 	/**
@@ -33,8 +33,8 @@ class AIPS_Author_Generation_Status_Repository {
 		$status = array();
 		foreach ($author_ids as $author_id) {
 			$status[$author_id] = array(
-				'topic' => array('last_attempt_at' => 0, 'last_success_at' => 0, 'last_outcome' => '', 'next_retry_at' => 0, 'running' => false),
-				'post'  => array('last_attempt_at' => 0, 'last_success_at' => 0, 'last_outcome' => '', 'next_retry_at' => 0, 'running' => false),
+				'topic' => $this->empty_flow_status(),
+				'post'  => $this->empty_flow_status(),
 				'counts' => array('pending' => 0, 'approved' => 0, 'rejected' => 0, 'posts_generated' => 0, 'generated_posts' => 0),
 			);
 		}
@@ -57,6 +57,10 @@ class AIPS_Author_Generation_Status_Repository {
 				'last_attempt_at' => (int) $row->last_attempt_at,
 				'last_success_at' => (int) $row->last_success_at,
 				'last_outcome'    => (string) $row->last_outcome,
+				'last_requested_count' => isset($row->last_requested_count) ? (int) $row->last_requested_count : 0,
+				'last_generated_count' => isset($row->last_generated_count) ? (int) $row->last_generated_count : 0,
+				'last_error_code'       => isset($row->last_error_code) ? (string) $row->last_error_code : '',
+				'last_error_message'    => isset($row->last_error_message) ? (string) $row->last_error_message : '',
 				'next_retry_at'   => (int) $row->next_retry_at,
 				'running'         => false,
 			);
@@ -104,5 +108,19 @@ class AIPS_Author_Generation_Status_Repository {
 		}
 
 		return $status;
+	}
+
+	private function empty_flow_status(): array {
+		return array(
+			'last_attempt_at'      => 0,
+			'last_success_at'      => 0,
+			'last_outcome'         => '',
+			'last_requested_count' => 0,
+			'last_generated_count' => 0,
+			'last_error_code'      => '',
+			'last_error_message'   => '',
+			'next_retry_at'        => 0,
+			'running'              => false,
+		);
 	}
 }

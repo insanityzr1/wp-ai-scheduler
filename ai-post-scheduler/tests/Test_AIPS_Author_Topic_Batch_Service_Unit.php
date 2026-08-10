@@ -17,6 +17,8 @@ class Test_AIPS_Author_Topic_Batch_Service_Unit extends WP_UnitTestCase {
 			public $existing;
 			public $created = array();
 			public $statuses = array();
+			public $status_value = 'processing';
+			public $processed_value = 1;
 			public function __construct($existing) { $this->existing = $existing; }
 			public function find_active_by_request_key($type, $key) { return $this->existing; }
 			public function create($type, $items, $options = array()) {
@@ -24,7 +26,7 @@ class Test_AIPS_Author_Topic_Batch_Service_Unit extends WP_UnitTestCase {
 				return 'batch-123';
 			}
 			public function get($id) {
-				return (object) array('job_id' => $id, 'job_type' => 'author_topic_generation', 'status' => 'processing', 'total' => 2, 'processed' => 1);
+				return (object) array('job_id' => $id, 'job_type' => 'author_topic_generation', 'status' => $this->status_value, 'total' => 2, 'processed' => $this->processed_value);
 			}
 			public function update_status($id, $status, $processed = null) { $this->statuses[] = array($id, $status); return true; }
 		};
@@ -89,5 +91,25 @@ class Test_AIPS_Author_Topic_Batch_Service_Unit extends WP_UnitTestCase {
 		$this->assertTrue($service->cancel('batch-123'));
 		$this->assertSame(array('batch-123', 'canceled'), $jobs->statuses[0]);
 		$this->assertSame(array('batch-123'), $items->canceled);
+	}
+
+	public function test_terminal_status_includes_fresh_counts_for_each_author(): void {
+		list($authors, $jobs, $items, $queue) = $this->dependencies();
+		$jobs->status_value = 'completed';
+		$jobs->processed_value = 2;
+		$status_repository = new class {
+			public function get_for_authors($ids) {
+				return array(
+					2 => array('counts' => array('pending' => 3)),
+					3 => array('counts' => array('pending' => 1)),
+				);
+			}
+		};
+		$service = new AIPS_Author_Topic_Batch_Service($authors, $jobs, $items, $queue, $status_repository);
+
+		$status = $service->get_status('batch-123');
+
+		$this->assertSame(3, $status['author_counts'][2]['pending']);
+		$this->assertSame(1, $status['author_counts'][3]['pending']);
 	}
 }

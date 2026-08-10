@@ -6,9 +6,10 @@ The AI Post Scheduler uses WordPress's built-in `dbDelta()` function to manage d
 
 ## 3.4.0 — Queued author-topic batches
 
-- Adds `request_key varchar(100)` and an index to `aips_bulk_batch_jobs` for active-request idempotency.
-- Adds `aips_author_topic_batch_items` for queued/running/completed/failed/canceled per-author state and structured results.
-- Both changes are applied idempotently by `dbDelta()` when `AIPS_VERSION` changes.
+- Adds `request_key varchar(100)` and a bounded unique index to `aips_bulk_batch_jobs` for request idempotency across all statuses during the retained job lifetime.
+- Adds `aips_author_topic_batch_items` for queued/running/partial/completed/failed/canceled per-author state, ownership tokens, and structured results.
+- Adds `last_requested_count`, `last_generated_count`, and `claim_recheck_attempts` to `aips_generation_state` for aggregate author status cards and a claim-contention budget separate from generation retries.
+- These changes are applied idempotently by `dbDelta()` when `AIPS_VERSION` changes.
 
 ### Key Points
 

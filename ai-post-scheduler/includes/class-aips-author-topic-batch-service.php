@@ -17,12 +17,14 @@ class AIPS_Author_Topic_Batch_Service {
 	private $job_store;
 	private $item_repository;
 	private $queue_service;
+	private $status_repository;
 
-	public function __construct($authors_repository = null, $job_store = null, $item_repository = null, $queue_service = null) {
+	public function __construct($authors_repository = null, $job_store = null, $item_repository = null, $queue_service = null, $status_repository = null) {
 		$this->authors_repository = $authors_repository ?: new AIPS_Authors_Repository();
 		$this->job_store          = $job_store ?: new AIPS_Bulk_Batch_Job_Store();
 		$this->item_repository    = $item_repository ?: new AIPS_Author_Topic_Batch_Items_Repository();
 		$this->queue_service      = $queue_service ?: new AIPS_Batch_Queue_Service();
+		$this->status_repository = $status_repository ?: new AIPS_Author_Generation_Status_Repository();
 	}
 
 	/**
@@ -127,13 +129,59 @@ class AIPS_Author_Topic_Batch_Service {
 
 		$total     = max(0, (int) $job->total);
 		$processed = min($total, max(0, (int) $job->processed));
+		$recovered = 0;
+
+		if ($processed < $total && in_array((string) $job->status, array(AIPS_Bulk_Batch_Job_Store::STATUS_PENDING, AIPS_Bulk_Batch_Job_Store::STATUS_PROCESSING, AIPS_Bulk_Batch_Job_Store::STATUS_FAILED), true)) {
+			$lease = max(60, (int) apply_filters('aips_author_topic_batch_item_lease', 15 * MINUTE_IN_SECONDS, $batch_id));
+			$recovered = $this->item_repository->recover_stale_items($batch_id, $lease);
+			if ($recovered > 0) {
+				$correlation_id = isset($job->options['correlation_id']) ? (string) $job->options['correlation_id'] : (string) AIPS_Correlation_ID::get();
+				$dispatch = $this->queue_service->dispatch_generic(
+					AIPS_Bulk_Batch_Processor::HOOK,
+					$total,
+					AIPS_DateTime::now()->timestamp(),
+					array($batch_id),
+					$correlation_id
+				);
+				if (is_wp_error($dispatch)) {
+					$this->item_repository->expire_queued_leases($batch_id);
+					return $dispatch;
+				}
+			}
+		}
 
 		$authors = array_map(function($row) { return (array) $row; }, $this->item_repository->get_by_batch($batch_id));
-		$completed_count = count(array_filter($authors, function($author) { return 'completed' === ($author['status'] ?? ''); }));
+		$completed_count = count(array_filter($authors, function($author) { return in_array(($author['status'] ?? ''), array('completed', 'partial'), true); }));
+		$partial_count = count(array_filter($authors, function($author) { return 'partial' === ($author['status'] ?? ''); }));
 		$failed_count = count(array_filter($authors, function($author) { return 'failed' === ($author['status'] ?? ''); }));
-		$status = (string) $job->status;
-		if ($processed >= $total && $completed_count > 0 && $failed_count > 0) {
+		$active_count = count(array_filter($authors, function($author) { return in_array(($author['status'] ?? ''), array('queued', 'running'), true); }));
+		$terminal_count = $completed_count + $failed_count;
+		if (AIPS_Bulk_Batch_Job_Store::STATUS_CANCELED !== (string) $job->status && $terminal_count > $processed) {
+			$final_status = $terminal_count >= $total
+				? ($failed_count > 0 ? AIPS_Bulk_Batch_Job_Store::STATUS_FAILED : AIPS_Bulk_Batch_Job_Store::STATUS_COMPLETED)
+				: '';
+			$reconciled = $this->job_store->reconcile_processed($batch_id, $terminal_count, $final_status);
+			$processed = min($total, $terminal_count);
+			if ($reconciled && $processed >= $total && $total > 0) {
+				do_action('aips_bulk_batch_completed', $batch_id, self::JOB_TYPE, $processed, $total);
+			}
+		}
+		$status = ($processed < $total || $active_count > 0) ? AIPS_Bulk_Batch_Job_Store::STATUS_PROCESSING : AIPS_Bulk_Batch_Job_Store::STATUS_COMPLETED;
+		if ($processed >= $total && 0 === $active_count && ($partial_count > 0 || ($completed_count > 0 && $failed_count > 0))) {
 			$status = 'partial';
+		} elseif ($processed >= $total && 0 === $active_count && $failed_count > 0) {
+			$status = AIPS_Bulk_Batch_Job_Store::STATUS_FAILED;
+		} elseif (AIPS_Bulk_Batch_Job_Store::STATUS_CANCELED === (string) $job->status) {
+			$status = AIPS_Bulk_Batch_Job_Store::STATUS_CANCELED;
+		}
+		$author_counts = array();
+		if (in_array($status, array('completed', 'failed', 'canceled', 'partial'), true)) {
+			$author_ids = array_values(array_filter(array_map(function($author) {
+				return isset($author['author_id']) ? absint($author['author_id']) : 0;
+			}, $authors)));
+			foreach ($this->status_repository->get_for_authors($author_ids) as $author_id => $author_status) {
+				$author_counts[(int) $author_id] = isset($author_status['counts']) ? $author_status['counts'] : array();
+			}
 		}
 
 		return array(
@@ -142,7 +190,9 @@ class AIPS_Author_Topic_Batch_Service {
 			'total'     => $total,
 			'processed' => $processed,
 			'percent'   => $total > 0 ? (int) floor(($processed / $total) * 100) : 0,
+			'recovered' => $recovered,
 			'authors'   => $authors,
+			'author_counts' => $author_counts,
 		);
 	}
 
@@ -157,7 +207,8 @@ class AIPS_Author_Topic_Batch_Service {
 		if (!$job || self::JOB_TYPE !== (string) ($job->job_type ?? '')) {
 			return new WP_Error('batch_not_found', __('Author topic batch not found.', 'ai-post-scheduler'));
 		}
-		if (!in_array((string) $job->status, array(AIPS_Bulk_Batch_Job_Store::STATUS_PENDING, AIPS_Bulk_Batch_Job_Store::STATUS_PROCESSING), true)) {
+		$active_failed = AIPS_Bulk_Batch_Job_Store::STATUS_FAILED === (string) $job->status && (int) $job->processed < (int) $job->total;
+		if (!$active_failed && !in_array((string) $job->status, array(AIPS_Bulk_Batch_Job_Store::STATUS_PENDING, AIPS_Bulk_Batch_Job_Store::STATUS_PROCESSING), true)) {
 			return new WP_Error('batch_not_cancelable', __('Only active author topic batches can be canceled.', 'ai-post-scheduler'));
 		}
 		$canceled = method_exists($this->job_store, 'cancel_active')

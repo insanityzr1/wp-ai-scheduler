@@ -5,7 +5,10 @@ This document lists all the actions and filters available in the AI Post Schedul
 ## Author generation filters (3.4.0)
 
 - `aips_generation_already_running_recheck_delay` controls the short claim-contention recheck delay (default 60 seconds) without advancing recurring schedules.
+- `aips_generation_already_running_max_rechecks` controls the separate claim-contention recheck budget (default 5) without consuming generation-failure retries.
 - `aips_author_topic_refill_max_attempts` controls bounded replacement requests for invalid or duplicate candidates (default 2).
+- `aips_author_topic_batch_item_lease` controls how long a running bulk author-topic item may remain untouched before status polling safely requeues it (default 15 minutes; minimum 60 seconds).
+- `aips_author_topic_generation_claim_ttl` controls the long-lived author-topic ownership claim used to protect slow batch workers (default 2 hours; values below 10 minutes are raised before the generic `aips_generation_claim_ttl` filter runs).
 
 ## AI Provider Filters
 

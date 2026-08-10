@@ -274,7 +274,7 @@ class AIPS_Bulk_Batch_Processor {
 		foreach ( $items_slice as $item ) {
 			try {
 				$result = call_user_func( $strategy, $item, $job_id, $job );
-				if (is_wp_error($result) && 'batch_item_not_queued' === $result->get_error_code()) {
+				if (is_wp_error($result) && in_array($result->get_error_code(), array('batch_item_not_queued', 'batch_item_lease_lost'), true)) {
 					continue;
 				}
 				$processed_in_slice++;
@@ -320,9 +320,11 @@ class AIPS_Bulk_Batch_Processor {
 			}
 		}
 
-		// Increment the processed counter atomically.
+		// Increment the processed counter atomically. A reconciliation poll may
+		// already have advanced it from terminal child rows.
+		$incremented = false;
 		if ($processed_in_slice > 0) {
-			$this->job_store->increment_processed($job_id, $processed_in_slice);
+			$incremented = $this->job_store->increment_processed($job_id, $processed_in_slice);
 		}
 		$job_after_slice = $this->job_store->get( $job_id );
 		$processed_total = $job_after_slice ? (int) $job_after_slice->processed : 0;
@@ -354,7 +356,7 @@ class AIPS_Bulk_Batch_Processor {
 			);
 		}
 
-		if ($processed_total >= $total_items && $total_items > 0) {
+		if ($incremented && $processed_total >= $total_items && $total_items > 0) {
 			do_action('aips_bulk_batch_completed', $job_id, $job_type, $processed_total, $total_items);
 		}
 

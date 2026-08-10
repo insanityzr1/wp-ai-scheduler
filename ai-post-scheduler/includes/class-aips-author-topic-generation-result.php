@@ -222,6 +222,11 @@ class AIPS_Author_Topic_Generation_Result implements AIPS_Generation_Result_Inte
 		return count($this->persisted_topics);
 	}
 
+	/** Number of topics requested for this run. */
+	public function get_requested_count(): int {
+		return $this->requested_count;
+	}
+
 	/**
 	 * Unique generation run identifier.
 	 *

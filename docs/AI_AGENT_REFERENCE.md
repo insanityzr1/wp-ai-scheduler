@@ -7,8 +7,9 @@ Detailed context for AI agents working on AI Post Scheduler. [AGENTS.md](../AGEN
 - Manual topic and author-post runs return structured result objects; controllers serialize `to_array()` while retaining compatibility fields.
 - Manual runs preserve the next-run timestamp by default. `reset_schedule=1` explicitly recalculates it.
 - `is_active` is the master switch; `topic_generation_is_active` and `post_generation_is_active` independently pause scheduled flows without disabling manual actions.
-- `author_topic_generation` jobs use `aips_bulk_batch_jobs` plus `aips_author_topic_batch_items`; enqueue/status/cancel actions are registered through `AIPS_Ajax_Registry`.
+- `author_topic_generation` jobs use `aips_bulk_batch_jobs` plus `aips_author_topic_batch_items`; enqueue/status/cancel actions are registered through `AIPS_Ajax_Registry`, and expired queued/running item leases are atomically taken over during status polling.
 - Topic candidates are schema-constrained, checked against stored topics for exact/fuzzy duplicates, and refilled up to `aips_author_topic_refill_max_attempts`.
+- Aggregate status queries include last requested/generated totals and recent failure details without per-author queries. Claim-contention rechecks have a separate bounded budget, and partial topic/claim-contention notifications use distinct actionable messages and dedupe keys.
 
 ## Runtime boot shape
 

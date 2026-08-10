@@ -163,6 +163,9 @@ class AIPS_Generation_Claims_Repository {
 	 * @return string|false Claim token or false.
 	 */
 	public function claim_author_topic_generation(int $author_id, int $ttl = 0, string $correlation_id = '') {
+		if ($ttl <= 0) {
+			$ttl = max(self::DEFAULT_TTL, (int) apply_filters('aips_author_topic_generation_claim_ttl', 2 * HOUR_IN_SECONDS, $author_id));
+		}
 		return $this->claim(self::TYPE_AUTHOR_TOPIC_GENERATION, $author_id, $ttl, $correlation_id);
 	}
 

@@ -47,30 +47,77 @@ class AIPS_Author_Topic_Batch_Items_Repository {
 		return is_array($rows) ? $rows : array();
 	}
 
-	public function claim(string $batch_id, int $author_id): bool {
+	public function claim(string $batch_id, int $author_id) {
+		$claim_token = wp_generate_uuid4();
 		$result = $this->wpdb->query($this->wpdb->prepare(
-			"UPDATE {$this->table_name} SET status = 'running', updated_at = %d WHERE batch_id = %s AND author_id = %d AND status = 'queued'",
+			"UPDATE {$this->table_name} SET status = 'running', claim_token = %s, updated_at = %d WHERE batch_id = %s AND author_id = %d AND status = 'queued'",
+			$claim_token,
 			AIPS_DateTime::now()->timestamp(),
 			$batch_id,
 			$author_id
 		));
-		return 1 === (int) $result;
+		return 1 === (int) $result ? $claim_token : false;
 	}
 
-	public function record_result(string $batch_id, int $author_id, $result): bool {
+	/**
+	 * Atomically take over expired queued/running items for redispatch.
+	 *
+	 * Updating the lease timestamp makes concurrent status polls mutually
+	 * exclusive: only the poll that changes rows dispatches replacement work.
+	 * Including queued rows recovers cron events lost before item claim.
+	 *
+	 * @param string $batch_id      Batch UUID.
+	 * @param int    $lease_seconds Worker lease in seconds.
+	 * @return int Number of recovered rows.
+	 */
+	public function recover_stale_items(string $batch_id, int $lease_seconds): int {
+		$now = AIPS_DateTime::now()->timestamp();
+		$cutoff = $now - max(1, $lease_seconds);
+		$claims_table = $this->wpdb->prefix . 'aips_generation_claims';
+		$result = $this->wpdb->query($this->wpdb->prepare(
+			"UPDATE {$this->table_name} i
+			LEFT JOIN {$claims_table} c ON c.claim_type = %s AND c.resource_id = i.author_id AND c.expires_at > %d
+			SET i.status = 'queued', i.claim_token = NULL, i.updated_at = %d
+			WHERE i.batch_id = %s AND i.status IN ('queued','running') AND i.updated_at < %d AND c.id IS NULL",
+			AIPS_Generation_Claims_Repository::TYPE_AUTHOR_TOPIC_GENERATION,
+			$now,
+			$now,
+			$batch_id,
+			$cutoff
+		));
+		return false === $result ? 0 : (int) $result;
+	}
+
+	/** Expire queued leases immediately when replacement dispatch fails. */
+	public function expire_queued_leases(string $batch_id): bool {
+		$result = $this->wpdb->query($this->wpdb->prepare(
+			"UPDATE {$this->table_name} SET updated_at = 0 WHERE batch_id = %s AND status = 'queued'",
+			$batch_id
+		));
+		return false !== $result;
+	}
+
+	public function record_result(string $batch_id, int $author_id, $result, string $claim_token = ''): bool {
 		$is_error = is_wp_error($result);
 		$result_data = $result instanceof AIPS_Generation_Result_Interface ? $result->to_array() : $result;
 		if ($result instanceof AIPS_Generation_Result_Interface) {
 			$is_error = !$result->is_success();
 		}
+		$is_partial = $result instanceof AIPS_Generation_Result_Interface && method_exists($result, 'is_partial') && $result->is_partial();
 		$data = array(
-			'status'        => $is_error ? 'failed' : 'completed',
+			'status'        => $is_error ? 'failed' : ($is_partial ? 'partial' : 'completed'),
 			'error_code'    => is_wp_error($result) ? (string) $result->get_error_code() : '',
 			'error_message' => is_wp_error($result) ? (string) $result->get_error_message() : ($is_error && is_array($result_data) ? (string) ($result_data['error'] ?? '') : ''),
 			'result_json'   => wp_json_encode(is_wp_error($result) ? array() : $result_data),
 			'updated_at'    => AIPS_DateTime::now()->timestamp(),
 		);
-		return false !== $this->wpdb->update($this->table_name, $data, array('batch_id' => $batch_id, 'author_id' => $author_id));
+		$where = array('batch_id' => $batch_id, 'author_id' => $author_id);
+		if ('' !== $claim_token) {
+			$where['status'] = 'running';
+			$where['claim_token'] = $claim_token;
+		}
+		$updated = $this->wpdb->update($this->table_name, $data, $where);
+		return '' === $claim_token ? false !== $updated : 1 === (int) $updated;
 	}
 
 	public function cancel_pending(string $batch_id): bool {
@@ -78,6 +125,20 @@ class AIPS_Author_Topic_Batch_Items_Repository {
 			"UPDATE {$this->table_name} SET status = 'canceled', updated_at = %d WHERE batch_id = %s AND status = 'queued'",
 			AIPS_DateTime::now()->timestamp(),
 			$batch_id
+		));
+		return false !== $result;
+	}
+
+	/** Delete child rows for a bounded set of expired terminal jobs. */
+	public function delete_for_batches(array $batch_ids): bool {
+		$batch_ids = array_values(array_unique(array_filter(array_map('sanitize_text_field', $batch_ids))));
+		if (empty($batch_ids)) {
+			return true;
+		}
+		$placeholders = implode(',', array_fill(0, count($batch_ids), '%s'));
+		$result = $this->wpdb->query($this->wpdb->prepare(
+			"DELETE FROM {$this->table_name} WHERE batch_id IN ({$placeholders})",
+			$batch_ids
 		));
 		return false !== $result;
 	}

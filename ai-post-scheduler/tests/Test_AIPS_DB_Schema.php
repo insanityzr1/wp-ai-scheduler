@@ -17,6 +17,46 @@ class Test_AIPS_DB_Schema extends WP_UnitTestCase {
 		// Install tables to ensure they exist
 		AIPS_DB_Manager::install_tables();
 	}
+
+	public function test_author_review_schema_contains_batch_and_generation_status_fields() {
+		global $wpdb;
+		$items_table = $wpdb->prefix . 'aips_author_topic_batch_items';
+		$state_table = $wpdb->prefix . 'aips_generation_state';
+		$jobs_table = $wpdb->prefix . 'aips_bulk_batch_jobs';
+
+		$this->assertSame($items_table, $wpdb->get_var("SHOW TABLES LIKE '{$items_table}'"));
+		$item_column_rows = $wpdb->get_results("SHOW COLUMNS FROM {$items_table}");
+		$item_columns = array_map(function($column) { return $column->Field; }, $item_column_rows);
+		$item_column_map = array();
+		foreach ($item_column_rows as $column) { $item_column_map[$column->Field] = $column; }
+		foreach (array('batch_id', 'author_id', 'status', 'claim_token', 'result_json', 'updated_at') as $column) {
+			$this->assertContains($column, $item_columns);
+		}
+		$this->assertSame('varchar(36)', strtolower($item_column_map['batch_id']->Type));
+		$this->assertSame('queued', $item_column_map['status']->Default);
+		$this->assertSame('0', (string) $item_column_map['created_at']->Default);
+		$this->assertSame('0', (string) $item_column_map['updated_at']->Default);
+		$item_indexes = $wpdb->get_results("SHOW INDEX FROM {$items_table}");
+		$batch_status = array_values(array_filter($item_indexes, function($index) { return 'batch_status' === $index->Key_name; }));
+		usort($batch_status, function($a, $b) { return (int) $a->Seq_in_index <=> (int) $b->Seq_in_index; });
+		$this->assertSame(array('batch_id', 'status', 'updated_at'), array_map(function($index) { return $index->Column_name; }, $batch_status));
+		$batch_author = array_values(array_filter($item_indexes, function($index) { return 'batch_author' === $index->Key_name; }));
+		usort($batch_author, function($a, $b) { return (int) $a->Seq_in_index <=> (int) $b->Seq_in_index; });
+		$this->assertSame(array('batch_id', 'author_id'), array_map(function($index) { return $index->Column_name; }, $batch_author));
+		$this->assertSame(0, (int) $batch_author[0]->Non_unique);
+		$request_key_column = $wpdb->get_row("SHOW COLUMNS FROM {$jobs_table} LIKE 'request_key'");
+		$this->assertSame('varchar(100)', strtolower($request_key_column->Type));
+		$job_request = array_values(array_filter($wpdb->get_results("SHOW INDEX FROM {$jobs_table}"), function($index) { return 'job_request' === $index->Key_name; }));
+		usort($job_request, function($a, $b) { return (int) $a->Seq_in_index <=> (int) $b->Seq_in_index; });
+		$this->assertNotEmpty($job_request);
+		$this->assertSame(0, (int) $job_request[0]->Non_unique);
+		$this->assertSame(array('job_type', 'request_key'), array_map(function($index) { return $index->Column_name; }, $job_request));
+		$this->assertSame(array(64, 100), array_map(function($index) { return (int) $index->Sub_part; }, $job_request));
+		$state_columns = $wpdb->get_col("SHOW COLUMNS FROM {$state_table}", 0);
+		$this->assertContains('last_requested_count', $state_columns);
+		$this->assertContains('last_generated_count', $state_columns);
+		$this->assertContains('claim_recheck_attempts', $state_columns);
+	}
 	
 	/**
 	 * Test that aips_schedule table has the composite index is_active_next_run.

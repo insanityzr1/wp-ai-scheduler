@@ -10,3 +10,9 @@
 **PR:** 🎨 Palette: Add aria-hidden to decorative Dashicons in dashboard
 **Learning:** Decorative icons in empty states must be explicitly hidden from screen readers.
 **Action:** When adding empty state Dashicons, include aria-hidden="true".
+## 2024-05-30 - Add aria-hidden to Generated Posts Dashicons
+**Area:** Generated Posts tab (templates/admin/tab-generated-posts.php)
+**Status:** opened PR
+**PR:** 🎨 Palette: Add aria-hidden to decorative Dashicons in Generated Posts
+**Learning:** Decorative icons in history interfaces must be explicitly hidden from screen readers.
+**Action:** When adding or auditing generated posts Dashicons, include aria-hidden="true".

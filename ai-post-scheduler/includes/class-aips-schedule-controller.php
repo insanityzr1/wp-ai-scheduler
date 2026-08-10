@@ -156,26 +156,6 @@ class AIPS_Schedule_Controller {
         $bulk_job_store = new AIPS_Bulk_Batch_Job_Store();
         $bulk_counts = $bulk_job_store->get_status_counts(array('pending', 'processing', 'failed'));
 
-        // Derive the last successful run per family from the same unified schedule
-        // rows the table uses. `last_run` is persisted only after a run completes,
-        // so the max `last_run` per type is an accurate "last run" indicator.
-        //
-        // This intentionally does NOT query history by creation_method: the
-        // history table's creation_method values overlap across families
-        // (e.g. both template and author-post runs are logged as 'scheduled'),
-        // so a per-family creation_method filter cannot distinguish them.
-        $last_success = array_fill_keys(array_keys($families), null);
-        foreach ($all_schedules as $schedule) {
-            $type = isset($schedule['type']) ? (string) $schedule['type'] : '';
-            if (!array_key_exists($type, $last_success)) {
-                continue;
-            }
-            $last_run = isset($schedule['last_run']) ? (int) $schedule['last_run'] : 0;
-            if ($last_run > 0 && ($last_success[$type] === null || $last_run > $last_success[$type])) {
-                $last_success[$type] = $last_run;
-            }
-        }
-
         // Get rate limiter status
         $rate_limiter_status = array(
             'enabled' => false,
@@ -200,7 +180,6 @@ class AIPS_Schedule_Controller {
                 'upcoming_24h' => count($timeline),
                 'overdue' => $overdue_schedules,
             ),
-            'last_success' => $last_success,
             'retry_pending' => ($queue_depth['aips_retry_failed_author_slices_topics'] + $queue_depth['aips_retry_failed_author_slices_posts']) > 0,
             'last_error' => $bulk_counts['failed'] > 0,
             'rate_limiter' => $rate_limiter_status,

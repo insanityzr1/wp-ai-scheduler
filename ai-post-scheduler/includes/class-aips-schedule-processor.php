@@ -710,10 +710,14 @@ class AIPS_Schedule_Processor {
             $now       = AIPS_DateTime::now()->timestamp();
 
             if ($opened_at > 0 && ($now - $opened_at) >= $cooldown) {
-                // Cooldown elapsed — allow a single half-open probe.
+                // Cooldown elapsed — allow a single in-memory probe run. The
+                // circuit is deliberately NOT persisted as 'half_open': keeping
+                // it 'open' means a probe that ends partial, dispatches a batch,
+                // or is interrupted can never get stuck in a half-open state.
+                // It simply stays open and is re-probed after the next cooldown,
+                // or is closed by the success path on a clean run.
                 $is_probe = true;
-                $this->repository->update($schedule->schedule_id, array('circuit_state' => 'half_open'));
-                $this->logger->log('Circuit half-open probe for schedule ' . $schedule->schedule_id, 'info');
+                $this->logger->log('Circuit probe (cooldown elapsed) for schedule ' . $schedule->schedule_id, 'info');
             } else {
                 // Still open and within cooldown — skip this run entirely.
                 $this->logger->log('Circuit open — skipping schedule ' . $schedule->schedule_id, 'warning');
@@ -726,7 +730,7 @@ class AIPS_Schedule_Processor {
                             __('Schedule "%s" skipped: circuit breaker is open.', 'ai-post-scheduler'),
                             isset($schedule->name) ? $schedule->name : ''
                         ),
-                        array('event_type' => 'circuit_open_skipped', 'event_status' => 'failed'),
+                        array('event_type' => 'circuit_open_skipped', 'event_status' => 'warning'),
                         null,
                         array('schedule_id' => $schedule->schedule_id)
                     );
@@ -956,6 +960,11 @@ class AIPS_Schedule_Processor {
         // not affected by the manual execution.
         $start_index       = 0;
         $prior_completed   = 0;
+        // Number of already-generated posts pre-seeded into $successful_post_ids
+        // by the resume logic below. Used to distinguish posts generated in THIS
+        // run from those carried over, so cumulative counts are not double-added
+        // and the circuit breaker only counts genuinely-failed runs.
+        $seeded_count      = 0;
 
         if ($is_manual) {
             // Clear any stale progress left by a previous interrupted automated run
@@ -994,8 +1003,17 @@ class AIPS_Schedule_Processor {
                         // Even if $saved_completed disagrees (e.g. a crash wrote the
                         // post but not the cursor), count(post_ids) reflects the true
                         // number of already-created posts.
+                        //
+                        // The prior posts are seeded directly into
+                        // $successful_post_ids, so $prior_completed stays 0 to
+                        // avoid counting them twice in the cumulative totals
+                        // ($prior_completed + count($successful_post_ids)).
+                        // $seeded_count records how many were carried over so the
+                        // circuit breaker can tell "no new posts this run" apart
+                        // from "resumed posts present".
                         $successful_post_ids = $saved_post_ids;
-                        $prior_completed     = count($saved_post_ids);
+                        $seeded_count        = count($saved_post_ids);
+                        $prior_completed     = 0;
                         $start_index         = count($saved_post_ids);
                     } else {
                         // Legacy cursor (no post_ids): resume from the recorded index.
@@ -1022,11 +1040,14 @@ class AIPS_Schedule_Processor {
                 if (!$is_manual) {
                     $completed_so_far = $prior_completed + count($successful_post_ids);
 
-                    // Only a pure failure (nothing generated this run) counts
-                    // toward the consecutive-failure trip. A partial run made
-                    // progress, so it neither trips nor resets the counter.
-                    $is_pure_failure = ($completed_so_far === 0);
-                    $new_failures    = $is_pure_failure ? ($prior_failures + 1) : $prior_failures;
+                    // Only a pure failure — zero NEW posts generated in THIS run —
+                    // counts toward the consecutive-failure trip. Basing this on
+                    // posts generated this run (excluding any resumed from a prior
+                    // batch) ensures a schedule that keeps failing on resume still
+                    // trips the breaker, while a run that made progress does not.
+                    $generated_this_run = count($successful_post_ids) - $seeded_count;
+                    $is_pure_failure    = ($generated_this_run <= 0);
+                    $new_failures       = $is_pure_failure ? ($prior_failures + 1) : $prior_failures;
                     $trip            = $is_pure_failure && ($new_failures >= self::CIRCUIT_FAILURE_THRESHOLD);
 
                     $failure_run_state = array(
@@ -1058,7 +1079,10 @@ class AIPS_Schedule_Processor {
                                     isset($schedule->name) ? $schedule->name : '',
                                     $new_failures
                                 ),
-                                array('event_type' => 'circuit_opened', 'event_status' => 'failed'),
+                                // Recorded as a distinct 'warning' state-transition event, not a
+                                // 'failed' one, so it does not double-count against the run's own
+                                // schedule_failed entry that handle_execution_failure() records.
+                                array('event_type' => 'circuit_opened', 'event_status' => 'warning'),
                                 null,
                                 array('schedule_id' => $schedule->schedule_id, 'consecutive_failures' => $new_failures)
                             );

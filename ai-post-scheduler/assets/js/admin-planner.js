@@ -179,32 +179,30 @@
                 $btn.data('original-text', originalText);
             }
 
-            if ($btn.data('is-confirming')) {
-                // Second click - Execute
-                $('#topics-list').empty();
-                $('#planner-results').removeClass('active');
-                $('#planner-niche').val('');
-                $('#planner-manual-topics').val('');
-                $('#planner-topic-search').val(''); // Clear search input
-                window.AIPS.updateSelectionCount();
+            AIPS.Utilities.confirm('Are you sure you want to clear the list?', 'Confirm', [
+                {
+                    text: 'Cancel',
+                    class: 'aips-btn-secondary',
+                    action: function() {
+                        // Do nothing
+                    }
+                },
+                {
+                    text: 'Clear List',
+                    class: 'aips-btn-primary',
+                    action: function() {
+                        $('#topics-list').empty();
+                        $('#planner-results').removeClass('active');
+                        $('#planner-niche').val('');
+                        $('#planner-manual-topics').val('');
+                        $('#planner-topic-search').val(''); // Clear search input
+                        window.AIPS.updateSelectionCount();
 
-                // Reset button
-                $btn.text(originalText);
-                $btn.removeData('is-confirming');
-                clearTimeout($btn.data('timeout'));
-            } else {
-                // First click - Ask for confirmation
-                $btn.text('Click again to confirm');
-                $btn.data('is-confirming', true);
-
-                // Reset after 3 seconds
-                var timeout = setTimeout(function() {
-                    $btn.text(originalText);
-                    $btn.removeData('is-confirming');
-                }, 3000);
-
-                $btn.data('timeout', timeout);
-            }
+                        // Reset button state
+                        $btn.text(originalText);
+                    }
+                }
+            ]);
         },
 
         /**

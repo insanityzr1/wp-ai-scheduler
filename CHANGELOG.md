@@ -1,5 +1,8 @@
 ## [Unreleased]
 
+### Changed
+- Refined Planner UI: Replaced the two-click soft confirmation with the standard `AIPS.Utilities.confirm` modal when clearing the topic list.
+
 ### Added
 - **WordPress AI Connector Routing**: Added Settings > AI controls for using all available WordPress AI connectors or an ordered allowlist, with connector-specific failover and short-lived health cooldowns. Request validation and content-policy failures are surfaced without provider shopping.
 

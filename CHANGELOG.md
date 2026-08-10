@@ -2,6 +2,11 @@
 
 ### Added
 - **WordPress AI Connector Routing**: Added Settings > AI controls for using all available WordPress AI connectors or an ordered allowlist, with connector-specific failover and short-lived health cooldowns. Request validation and content-policy failures are surfaced without provider shopping.
+- **Prompt Context Digest**: Added bounded beginning/outline/conclusion context for stateless title and excerpt requests, preserving article-wide signal without resending unbounded bodies.
+
+### Changed
+- **Prompt Hardening**: Source and article content are now delimited as reference data with explicit prompt-injection boundaries, metadata generation preserves voice excerpt instructions, and structured metadata schemas reject unexpected properties.
+- **Title Regeneration**: Template and topic regeneration now use the same context-aware path and include saved post content when conversational replay is unavailable.
 
 ### Fixed
 - **Short-form AI Responses**: Reserve at least 1200 output tokens for title and excerpt requests so reasoning-capable connector models do not cut off visible responses after spending the smaller configured budget on internal reasoning. The global Max Tokens Limit remains authoritative.

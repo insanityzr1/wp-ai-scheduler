@@ -307,6 +307,7 @@ class AIPS_Generation_Outcome {
 	 */
 	public function should_retry(): bool {
 		switch ($this->outcome) {
+			case self::ALREADY_RUNNING:
 			case self::TRANSIENT_FAILURE:
 			case self::RATE_LIMIT:
 			case self::PARSING_SHORTFALL:

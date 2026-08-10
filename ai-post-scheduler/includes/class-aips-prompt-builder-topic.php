@@ -192,4 +192,19 @@ class AIPS_Prompt_Builder_Topic {
 
 		return $prompt;
 	}
+
+	public function build_refill(string $base_prompt, int $missing, array $accepted_titles, array $rejections): string {
+		$rejected_lines = array();
+		foreach (array_slice($rejections, -20) as $rejection) {
+			$title = isset($rejection['title']) ? (string) $rejection['title'] : '(untitled)';
+			$reason = isset($rejection['reason']) ? (string) $rejection['reason'] : 'invalid';
+			$rejected_lines[] = "- {$title} ({$reason})";
+		}
+
+		return $base_prompt
+			. "\n\nGenerate exactly {$missing} replacement topic(s)."
+			. "\nDo not repeat any accepted title:\n- " . implode("\n- ", $accepted_titles)
+			. "\nDo not repeat these rejected candidates:\n" . implode("\n", $rejected_lines)
+			. "\nReturn only the requested replacement candidates in the required JSON structure.";
+	}
 }

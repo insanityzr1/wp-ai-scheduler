@@ -91,6 +91,7 @@
 			// Authors list bulk actions
 			$(document).on('change', '#aips-authors-select-all', this.toggleSelectAllAuthors.bind(this));
 			$(document).on('click', '#aips-authors-bulk-apply', this.executeAuthorsBulkAction.bind(this));
+			$(document).on('click', '.aips-cancel-author-topic-batch', this.cancelAuthorTopicBatch.bind(this));
 
 			// Author Suggestions
 			$(document).on('click', '#aips-suggest-authors-btn', this.openSuggestModal.bind(this));
@@ -160,30 +161,80 @@
 					label: 'Yes, generate',
 					className: 'aips-btn aips-btn-danger-solid',
 					action: () => {
-						const requests = authorIds.map((authorId) => {
-							return $.ajax({
-								url: ajaxurl,
-								type: 'POST',
-								data: {
-									action: 'aips_generate_topics_now',
-									nonce: aipsAuthorsL10n.nonce,
-									author_id: authorId
-								}
-							});
-						});
-
-						Promise.allSettled(requests).then((results) => {
-							const successCount = results.filter((r) => r.status === 'fulfilled' && r.value && r.value.success).length;
-							if (successCount > 0) {
-								AIPS.Utilities.showToast((aipsAuthorsL10n.topicsGeneratedBulk || '%d author(s) queued for topic generation.').replace('%d', successCount), 'success');
-								setTimeout(() => location.reload(), 800);
-							} else {
-								AIPS.Utilities.showToast(aipsAuthorsL10n.errorGenerating || 'Error generating topics.', 'error');
+						const requestKey = 'author-topics-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+						$.ajax({
+							url: ajaxurl,
+							type: 'POST',
+							data: {
+								action: 'aips_enqueue_author_topic_generation',
+								nonce: aipsAuthorsL10n.nonce,
+								author_ids: authorIds,
+								request_key: requestKey
 							}
+						}).done((response) => {
+							if (!response || !response.success || !response.data || !response.data.batch_id) {
+								AIPS.Utilities.showToast((response && response.data && response.data.message) || aipsAuthorsL10n.errorGenerating || 'Error queueing topic generation.', 'error');
+								return;
+							}
+							const accepted = response.data.accepted_author_ids ? response.data.accepted_author_ids.length : authorIds.length;
+							AIPS.Utilities.showToast((aipsAuthorsL10n.topicsGeneratedBulk || '%d author(s) queued for topic generation.').replace('%d', accepted), 'success');
+							this.showAuthorTopicBatchProgress(response.data.batch_id, accepted);
+							this.pollAuthorTopicBatch(response.data.batch_id);
+						}).fail(() => {
+							AIPS.Utilities.showToast(aipsAuthorsL10n.errorGenerating || 'Error queueing topic generation.', 'error');
 						});
 					}
 				}
 			]);
+		},
+
+		showAuthorTopicBatchProgress: function (batchId, total) {
+			$('#aips-author-topic-batch-progress').remove();
+			const html = '<div id="aips-author-topic-batch-progress" class="notice notice-info" data-batch-id="' + $('<div>').text(batchId).html() + '">' +
+				'<p><strong>' + (aipsAuthorsL10n.batchQueued || 'Author topic generation queued.') + '</strong> ' +
+				'<span class="aips-author-topic-batch-count">0 / ' + parseInt(total, 10) + '</span> ' +
+				'<span class="aips-author-topic-batch-status">' + (aipsAuthorsL10n.queued || 'Queued') + '</span> ' +
+				'<button type="button" class="button-link aips-cancel-author-topic-batch">' + (aipsAuthorsL10n.cancel || 'Cancel') + '</button></p>' +
+				'<progress max="100" value="0" style="width:100%"></progress><div class="aips-author-topic-batch-errors"></div></div>';
+			$('#aips-authors-bulk-apply').closest('.aips-panel-toolbar').after(html);
+		},
+
+		pollAuthorTopicBatch: function (batchId) {
+			$.post(ajaxurl, {
+				action: 'aips_get_author_topic_batch_status',
+				nonce: aipsAuthorsL10n.nonce,
+				batch_id: batchId
+			}).done((response) => {
+				if (!response || !response.success || !response.data) {
+					return;
+				}
+				const data = response.data;
+				const $panel = $('#aips-author-topic-batch-progress[data-batch-id="' + batchId + '"]');
+				$panel.find('progress').val(data.percent || 0);
+				$panel.find('.aips-author-topic-batch-count').text((data.processed || 0) + ' / ' + (data.total || 0));
+				$panel.find('.aips-author-topic-batch-status').text(data.status || 'running');
+				const errors = (data.authors || []).filter((author) => author.error_message);
+				$panel.find('.aips-author-topic-batch-errors').html(errors.map((author) => '<p>' + $('<div>').text(author.error_message).html() + '</p>').join(''));
+
+				if (['completed', 'partial', 'failed', 'canceled'].indexOf(data.status) !== -1) {
+					$panel.find('.aips-cancel-author-topic-batch').remove();
+					if (data.status === 'completed' || data.status === 'partial') {
+						setTimeout(() => location.reload(), 1200);
+					}
+					return;
+				}
+				setTimeout(() => this.pollAuthorTopicBatch(batchId), 2000);
+			});
+		},
+
+		cancelAuthorTopicBatch: function (e) {
+			e.preventDefault();
+			const batchId = $(e.currentTarget).closest('#aips-author-topic-batch-progress').data('batch-id');
+			$.post(ajaxurl, {
+				action: 'aips_cancel_author_topic_batch',
+				nonce: aipsAuthorsL10n.nonce,
+				batch_id: batchId
+			}).done(() => this.pollAuthorTopicBatch(batchId));
 		},
 
 		/**
@@ -325,6 +376,8 @@
 						$('#topic_generation_frequency').val(author.topic_generation_frequency);
 						$('#post_generation_frequency').val(author.post_generation_frequency);
 						$('#is_active').prop('checked', author.is_active == 1);
+						$('#topic_generation_is_active').prop('checked', author.topic_generation_is_active == null || author.topic_generation_is_active == 1);
+						$('#post_generation_is_active').prop('checked', author.post_generation_is_active == null || author.post_generation_is_active == 1);
 
 						// Restore affiliate links setting.
 						$('#author_affiliate_links_enabled').prop('checked', author.affiliate_links_enabled == 1);
@@ -460,12 +513,22 @@
 			const authorId = $(e.currentTarget).data('id');
 			const $btn = $(e.currentTarget);
 
-			AIPS.Utilities.confirm(aipsAuthorsL10n.confirmGenerateTopics, 'Notice', [
-				{ label: 'No, cancel', className: 'aips-btn aips-btn-primary' },
-				{
-					label: 'Yes, generate',
-					className: 'aips-btn aips-btn-danger-solid',
-					action: () => {
+			AIPS.Utilities.showModal({
+				heading: aipsAuthorsL10n.generateTopicsModalTitle || 'Generate Topics',
+				message: aipsAuthorsL10n.confirmGenerateTopics,
+				fields: [{
+					type: 'checkbox',
+					name: 'reset_schedule',
+					label: aipsAuthorsL10n.resetScheduleLabel || 'Reset the next scheduled run from now',
+					value: false
+				}],
+				buttons: [
+					{ label: aipsAuthorsL10n.cancel || 'Cancel', className: 'aips-btn aips-btn-primary' },
+					{
+						label: aipsAuthorsL10n.generateButtonLabel || 'Generate',
+						className: 'aips-btn aips-btn-danger-solid',
+						submit: true,
+						action: (formData) => {
 						AIPS.Utilities.setButtonLoading($btn, aipsAuthorsL10n.generating);
 
 						$.ajax({
@@ -474,12 +537,29 @@
 							data: {
 								action: 'aips_generate_topics_now',
 								nonce: aipsAuthorsL10n.nonce,
-								author_id: authorId
+								author_id: authorId,
+								reset_schedule: formData.reset_schedule ? 1 : 0
 							},
 							success: (response) => {
 								if (response.success) {
-									AIPS.Utilities.showToast(response.data.message || aipsAuthorsL10n.topicsGenerated, 'success');
-									setTimeout(() => location.reload(), 1000);
+									const result = response.data.result || {};
+									const quality = result.quality || {};
+									const scheduleMessage = response.data.schedule_reset
+										? (aipsAuthorsL10n.scheduleReset || ' The recurring schedule was reset.')
+										: (aipsAuthorsL10n.schedulePreserved || ' The recurring schedule was preserved.');
+									let qualityMessage = '';
+									if (result.status === 'partial' || result.missing_count > 0) {
+										qualityMessage = ' ' + (aipsAuthorsL10n.topicQualitySummary || 'Accepted: %1$d; invalid: %2$d; duplicates: %3$d; still missing: %4$d.')
+											.replace('%1$d', result.persisted_count || 0)
+											.replace('%2$d', quality.invalid || 0)
+											.replace('%3$d', (quality.exact_duplicates || 0) + (quality.fuzzy_duplicates || 0))
+											.replace('%4$d', result.missing_count || 0);
+									}
+									AIPS.Utilities.showToast(
+										AIPS.Utilities.escapeHtml((response.data.message || aipsAuthorsL10n.topicsGenerated) + scheduleMessage + qualityMessage),
+										result.status === 'partial' ? 'warning' : 'success',
+										{ isHtml: true, duration: 10000 }
+									);
 								} else {
 									AIPS.Utilities.showToast(
 										response.data && response.data.message ? response.data.message : aipsAuthorsL10n.errorGenerating,
@@ -494,9 +574,10 @@
 								AIPS.Utilities.resetButton($btn);
 							}
 						});
+						}
 					}
-				}
-			]);
+				]
+			});
 		},
 
 		/**
@@ -539,6 +620,12 @@
 							}
 							return null;
 						}
+					},
+					{
+						type: 'checkbox',
+						name: 'reset_schedule',
+						label: aipsAuthorsL10n.resetScheduleLabel || 'Reset the next scheduled run from now',
+						value: false
 					}
 				],
 				buttons: [
@@ -562,7 +649,8 @@
 									nonce: aipsAjax.nonce,
 									id: authorId,
 									type: type,
-									quantity: formData.quantity
+									quantity: formData.quantity,
+									reset_schedule: formData.reset_schedule ? 1 : 0
 								},
 								success: (response) => {
 									if (response.success) {
@@ -571,18 +659,32 @@
 												? response.data.message
 												: aipsAuthorsL10n.postsGenerated
 										);
+										message += response.data.schedule_reset
+											? ' ' + AIPS.Utilities.escapeHtml(aipsAuthorsL10n.scheduleReset || 'The recurring schedule was reset.')
+											: ' ' + AIPS.Utilities.escapeHtml(aipsAuthorsL10n.schedulePreserved || 'The recurring schedule was preserved.');
 
-										if (response.data && response.data.edit_url) {
-											const safeEditUrl = AIPS.Utilities.sanitizeUrl(response.data.edit_url);
-
+										const postLinks = response.data && Array.isArray(response.data.post_links) ? response.data.post_links : [];
+										postLinks.forEach((postLink, index) => {
+											const safeEditUrl = AIPS.Utilities.sanitizeUrl(postLink.edit_url);
 											if (safeEditUrl) {
 												message += ' <a href="' + AIPS.Utilities.escapeAttribute(safeEditUrl) + '" target="_blank">' +
-													AIPS.Utilities.escapeHtml(aipsAuthorsL10n.editPost) +
+													AIPS.Utilities.escapeHtml((aipsAuthorsL10n.editPost || 'Edit post') + ' ' + (index + 1)) +
 												'</a>';
 											}
+										});
+
+										const failures = response.data && Array.isArray(response.data.failures) ? response.data.failures : [];
+										const skipped = response.data && Array.isArray(response.data.skipped) ? response.data.skipped : [];
+										if (failures.length || skipped.length) {
+											message += ' ' + AIPS.Utilities.escapeHtml(
+												(aipsAuthorsL10n.generationIssues || '%1$d failed and %2$d skipped.')
+													.replace('%1$d', failures.length)
+													.replace('%2$d', skipped.length)
+											);
 										}
 
-										AIPS.Utilities.showToast(message, 'success', { isHtml: true, duration: 8000 });
+										const resultStatus = response.data.result && response.data.result.status;
+										AIPS.Utilities.showToast(message, resultStatus === 'partial' ? 'warning' : 'success', { isHtml: true, duration: 10000 });
 									} else {
 										AIPS.Utilities.showToast(
 											response.data && response.data.message
@@ -2484,7 +2586,9 @@
 					topic_generation_quantity: 5,
 					post_generation_frequency: 'daily',
 					post_status: 'draft',
-					is_active: 1
+					is_active: 1,
+					topic_generation_is_active: 1,
+					post_generation_is_active: 1
 				},
 				success: (response) => {
 					if (response.success) {

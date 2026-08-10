@@ -140,6 +140,44 @@ class AIPS_Author_Topic_Logs_Repository {
 			'metadata' => $metadata
 		));
 	}
+
+	/**
+	 * Mark an earlier generated post as replaced by a regeneration.
+	 *
+	 * Replaced logs no longer consume max_posts_per_topic because eligibility
+	 * counts only the `post_generated` action. The old WordPress post can remain
+	 * available as a draft without blocking its replacement.
+	 *
+	 * @param int $author_topic_id Author topic ID.
+	 * @param int $old_post_id     Replaced WordPress post ID.
+	 * @param int $new_post_id     Replacement WordPress post ID.
+	 * @return bool
+	 */
+	public function mark_post_replaced($author_topic_id, $old_post_id, $new_post_id) {
+		$result = $this->wpdb->update(
+			$this->table_name,
+			array(
+				'action'   => 'post_replaced',
+				'metadata' => wp_json_encode(array('replacement_post_id' => absint($new_post_id))),
+			),
+			array(
+				'author_topic_id' => absint($author_topic_id),
+				'post_id'         => absint($old_post_id),
+				'action'          => 'post_generated',
+			)
+		);
+
+		return 1 === (int) $result;
+	}
+
+	public function has_generated_post($author_topic_id, $post_id): bool {
+		$count = $this->wpdb->get_var($this->wpdb->prepare(
+			"SELECT COUNT(*) FROM {$this->table_name} WHERE author_topic_id = %d AND post_id = %d AND action = 'post_generated'",
+			absint($author_topic_id),
+			absint($post_id)
+		));
+		return (int) $count > 0;
+	}
 	
 	/**
 	 * Log an edit action.
@@ -239,4 +277,3 @@ class AIPS_Author_Topic_Logs_Repository {
 		return $counts;
 	}
 }
-

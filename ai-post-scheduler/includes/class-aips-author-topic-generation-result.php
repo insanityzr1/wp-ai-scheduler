@@ -50,6 +50,9 @@ class AIPS_Author_Topic_Generation_Result implements AIPS_Generation_Result_Inte
 	 * @var int Number of duplicate candidates flagged.
 	 */
 	private $duplicate_count = 0;
+	private $quality_metrics = array();
+	private $rejections = array();
+	private $refill_attempts = 0;
 
 	/**
 	 * @var array<int, array> Persisted topic records (associative arrays).
@@ -103,6 +106,12 @@ class AIPS_Author_Topic_Generation_Result implements AIPS_Generation_Result_Inte
 		$this->accepted_count  = max(0, $accepted);
 		$this->rejected_count  = max(0, $rejected);
 		$this->duplicate_count = max(0, $duplicate);
+	}
+
+	public function set_quality_metrics(array $metrics, array $rejections = array(), int $refill_attempts = 0): void {
+		$this->quality_metrics = $metrics;
+		$this->rejections      = array_values($rejections);
+		$this->refill_attempts = max(0, $refill_attempts);
 	}
 
 	/**
@@ -267,6 +276,10 @@ class AIPS_Author_Topic_Generation_Result implements AIPS_Generation_Result_Inte
 			'accepted_count'    => $this->accepted_count,
 			'rejected_count'    => $this->rejected_count,
 			'duplicate_count'   => $this->duplicate_count,
+			'quality'           => $this->quality_metrics,
+			'rejections'        => $this->rejections,
+			'refill_attempts'   => $this->refill_attempts,
+			'missing_count'     => max(0, $this->requested_count - count($this->persisted_topics)),
 			'persisted_count'   => count($this->persisted_topics),
 			'persisted_ids'     => $this->get_persisted_topic_ids(),
 			'generation_run_id' => $this->generation_run_id,

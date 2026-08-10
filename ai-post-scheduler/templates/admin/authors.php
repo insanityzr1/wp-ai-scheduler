@@ -25,6 +25,7 @@ if ($current_page === 'aips-authors' || $is_embedded_authors_view) {
         $feedback_repository = new AIPS_Feedback_Repository();
         $author_ids = array_map(function($a) { return $a->id; }, $authors);
         $all_feedback_stats = $feedback_repository->get_statistics_bulk($author_ids);
+		$generation_statuses = (new AIPS_Author_Generation_Status_Repository())->get_for_authors($author_ids);
     }
 
     // Load article structures for the dropdown
@@ -110,9 +111,10 @@ $site_ctx = AIPS_Site_Context::get();
                         </thead>
                         <tbody>
                             <?php foreach ($authors as $author):
-                                $status_counts = $topics_repository->get_status_counts($author->id);
-                                $total_topics = $status_counts['pending'] + $status_counts['approved'] + $status_counts['rejected'];
-                                $posts_count = $logs_repository->count_generated_posts_by_author($author->id);
+								$generation_status = $generation_statuses[$author->id];
+								$status_counts = $generation_status['counts'];
+								$total_topics = $status_counts['pending'] + $status_counts['approved'] + $status_counts['rejected'];
+								$posts_count = $status_counts['generated_posts'];
                                 // Read policy flags directly from already-loaded author details (no extra DB query).
                                 $author_details = !empty($author->details) ? json_decode($author->details, true) : array();
                                 $policy_flags = (is_array($author_details) && isset($author_details['policy_flags']) && is_array($author_details['policy_flags'])) ? $author_details['policy_flags'] : array();
@@ -204,6 +206,32 @@ $site_ctx = AIPS_Site_Context::get();
                                             <?php esc_html_e('Inactive', 'ai-post-scheduler'); ?>
                                         </span>
                                         <?php endif; ?>
+										<?php
+										$topic_flow_enabled = $author->is_active && (!isset($author->topic_generation_is_active) || (int) $author->topic_generation_is_active === 1);
+										$post_flow_enabled = $author->is_active && (!isset($author->post_generation_is_active) || (int) $author->post_generation_is_active === 1);
+										$topic_flow = $generation_status['topic'];
+										$post_flow = $generation_status['post'];
+										?>
+										<div class="aips-author-flow-cards" style="margin-top:8px;display:grid;gap:6px;">
+											<div class="aips-author-flow-card" data-flow="topic">
+												<strong><?php esc_html_e('Topics', 'ai-post-scheduler'); ?></strong>
+												<span class="aips-badge <?php echo $topic_flow_enabled ? 'aips-badge-success' : 'aips-badge-neutral'; ?>"><?php echo esc_html($topic_flow_enabled ? __('Enabled', 'ai-post-scheduler') : __('Paused', 'ai-post-scheduler')); ?></span>
+												<span class="cell-meta"><?php echo esc_html($topic_flow['running'] ? __('Running', 'ai-post-scheduler') : ($topic_flow['next_retry_at'] ? __('Retrying', 'ai-post-scheduler') : ($topic_flow['last_outcome'] ?: __('Not run yet', 'ai-post-scheduler')))); ?></span>
+												<span class="cell-meta"><?php printf(esc_html__('Pending: %d', 'ai-post-scheduler'), (int) $status_counts['pending']); ?></span>
+												<span class="cell-meta"><?php printf(esc_html__('Last attempt: %s', 'ai-post-scheduler'), esc_html($topic_flow['last_attempt_at'] ? date_i18n(get_option('date_format') . ' ' . get_option('time_format'), $topic_flow['last_attempt_at']) : __('Never', 'ai-post-scheduler'))); ?></span>
+												<span class="cell-meta"><?php printf(esc_html__('Last success: %s', 'ai-post-scheduler'), esc_html($topic_flow['last_success_at'] ? date_i18n(get_option('date_format') . ' ' . get_option('time_format'), $topic_flow['last_success_at']) : __('Never', 'ai-post-scheduler'))); ?></span>
+												<span class="cell-meta"><?php printf(esc_html__('Next run: %s', 'ai-post-scheduler'), esc_html($author->topic_generation_next_run ? date_i18n(get_option('date_format') . ' ' . get_option('time_format'), (int) $author->topic_generation_next_run) : __('Not scheduled', 'ai-post-scheduler'))); ?></span>
+											</div>
+											<div class="aips-author-flow-card" data-flow="post">
+												<strong><?php esc_html_e('Posts', 'ai-post-scheduler'); ?></strong>
+												<span class="aips-badge <?php echo $post_flow_enabled ? 'aips-badge-success' : 'aips-badge-neutral'; ?>"><?php echo esc_html($post_flow_enabled ? __('Enabled', 'ai-post-scheduler') : __('Paused', 'ai-post-scheduler')); ?></span>
+												<span class="cell-meta"><?php echo esc_html($post_flow['running'] ? __('Running', 'ai-post-scheduler') : ($post_flow['next_retry_at'] ? __('Retrying', 'ai-post-scheduler') : ($post_flow['last_outcome'] ?: __('Not run yet', 'ai-post-scheduler')))); ?></span>
+												<span class="cell-meta"><?php printf(esc_html__('Eligible: %d', 'ai-post-scheduler'), (int) $status_counts['approved']); ?></span>
+												<span class="cell-meta"><?php printf(esc_html__('Last attempt: %s', 'ai-post-scheduler'), esc_html($post_flow['last_attempt_at'] ? date_i18n(get_option('date_format') . ' ' . get_option('time_format'), $post_flow['last_attempt_at']) : __('Never', 'ai-post-scheduler'))); ?></span>
+												<span class="cell-meta"><?php printf(esc_html__('Last success: %s', 'ai-post-scheduler'), esc_html($post_flow['last_success_at'] ? date_i18n(get_option('date_format') . ' ' . get_option('time_format'), $post_flow['last_success_at']) : __('Never', 'ai-post-scheduler'))); ?></span>
+												<span class="cell-meta"><?php printf(esc_html__('Next run: %s', 'ai-post-scheduler'), esc_html($author->post_generation_next_run ? date_i18n(get_option('date_format') . ' ' . get_option('time_format'), (int) $author->post_generation_next_run) : __('Not scheduled', 'ai-post-scheduler'))); ?></span>
+											</div>
+										</div>
                                         <?php if ($policy_flags_count >= 3): ?>
                                         <div style="margin-top: 6px;">
                                             <span class="aips-badge aips-badge-warning">
@@ -573,9 +601,26 @@ $site_ctx = AIPS_Site_Context::get();
             <div class="form-group">
                 <label>
                     <input type="checkbox" id="is_active" name="is_active" checked>
-                    <?php esc_html_e('Active', 'ai-post-scheduler'); ?>
+					<?php esc_html_e('Author active (master switch)', 'ai-post-scheduler'); ?>
                 </label>
+				<p class="description"><?php esc_html_e('When disabled, neither automatic topic nor automatic post generation runs.', 'ai-post-scheduler'); ?></p>
             </div>
+
+			<div class="form-group">
+				<label>
+					<input type="checkbox" id="topic_generation_is_active" name="topic_generation_is_active" checked>
+					<?php esc_html_e('Automatic topic generation enabled', 'ai-post-scheduler'); ?>
+				</label>
+				<p class="description"><?php esc_html_e('Disable to pause recurring topic generation while allowing scheduled posts from already approved topics.', 'ai-post-scheduler'); ?></p>
+			</div>
+
+			<div class="form-group">
+				<label>
+					<input type="checkbox" id="post_generation_is_active" name="post_generation_is_active" checked>
+					<?php esc_html_e('Automatic post generation enabled', 'ai-post-scheduler'); ?>
+				</label>
+				<p class="description"><?php esc_html_e('Disable to pause recurring post generation while allowing the topic review backlog to continue growing.', 'ai-post-scheduler'); ?></p>
+			</div>
 
             <?php
             $author_source_groups = get_terms(array(

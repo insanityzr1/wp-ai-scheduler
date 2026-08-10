@@ -168,4 +168,21 @@ class Test_AIPS_Generation_Retry_Scheduler extends WP_UnitTestCase {
 		$this->assertFalse($decision['retry_scheduled']);
 		$this->assertEmpty($jobs->calls);
 	}
+
+	public function test_already_running_schedules_short_recheck_without_recording_failure() {
+		add_filter('aips_generation_already_running_recheck_delay', function () { return 45; });
+
+		list($scheduler, $state, $jobs) = $this->make();
+		$outcome = new AIPS_Generation_Outcome(AIPS_Generation_Outcome::ALREADY_RUNNING, 'already_running', 'busy');
+
+		$decision = $scheduler->handle_outcome($this->flow(), $this->author(), $outcome, 'corr-1');
+
+		$this->assertFalse($decision['advance']);
+		$this->assertTrue($decision['retry_scheduled']);
+		$this->assertCount(1, $jobs->calls);
+		$this->assertEqualsWithDelta(45, $jobs->calls[0]['fire_at'] - time(), 2.0);
+		$this->assertSame(0, $state->rows[$this->flow() . ':77']['consecutive_failures'] ?? 0);
+
+		remove_all_filters('aips_generation_already_running_recheck_delay');
+	}
 }

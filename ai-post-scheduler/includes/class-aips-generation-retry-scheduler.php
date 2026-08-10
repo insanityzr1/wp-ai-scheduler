@@ -183,23 +183,29 @@ class AIPS_Generation_Retry_Scheduler {
 			return $decision;
 		}
 
-		// Record the failure and its classification.
-		$this->state_repository->record_failure(
-			$flow,
-			$author_id,
-			$outcome->get_outcome(),
-			$outcome->get_error_code(),
-			$outcome->get_error_message()
-		);
-
-		// No-work / already-running: no retry; advance per policy.
+		// No-work advances per policy without a retry.
 		if (AIPS_Generation_Outcome::NO_APPROVED_TOPICS === $outcome->get_outcome()) {
+			$this->state_repository->record_failure(
+				$flow,
+				$author_id,
+				$outcome->get_outcome(),
+				$outcome->get_error_code(),
+				$outcome->get_error_message()
+			);
 			$this->notify_no_approved_topics($flow, $author);
 			return $decision;
 		}
 
-		if (AIPS_Generation_Outcome::ALREADY_RUNNING === $outcome->get_outcome()) {
-			return $decision;
+		// A held claim is not a generation failure. It gets a short bounded
+		// recheck, but must not inflate the author's consecutive failure count.
+		if (AIPS_Generation_Outcome::ALREADY_RUNNING !== $outcome->get_outcome()) {
+			$this->state_repository->record_failure(
+				$flow,
+				$author_id,
+				$outcome->get_outcome(),
+				$outcome->get_error_code(),
+				$outcome->get_error_message()
+			);
 		}
 
 		// Permanent error: notify the admin, never retry, never advance.
@@ -226,7 +232,20 @@ class AIPS_Generation_Retry_Scheduler {
 			return $decision;
 		}
 
-		$delay        = $this->compute_delay($flow, $next_attempt, $outcome->get_retry_after());
+		if (AIPS_Generation_Outcome::ALREADY_RUNNING === $outcome->get_outcome()) {
+			/**
+			 * Filters the short delay before rechecking a generation claim.
+			 *
+			 * @since 3.3.0
+			 *
+			 * @param int    $delay     Recheck delay in seconds.
+			 * @param string $flow      Generation flow.
+			 * @param int    $author_id Author ID.
+			 */
+			$delay = max(1, (int) apply_filters('aips_generation_already_running_recheck_delay', 60, $flow, $author_id));
+		} else {
+			$delay = $this->compute_delay($flow, $next_attempt, $outcome->get_retry_after());
+		}
 		$retry_at     = AIPS_DateTime::now()->timestamp() + $delay;
 		$hook         = self::hook_for_flow($flow);
 		$correlation  = '' !== $correlation_id ? $correlation_id : (string) AIPS_Correlation_ID::get();

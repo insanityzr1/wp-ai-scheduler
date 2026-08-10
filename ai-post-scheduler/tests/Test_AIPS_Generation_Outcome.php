@@ -47,14 +47,14 @@ class Test_AIPS_Generation_Outcome extends WP_UnitTestCase {
 		$this->assertFalse($outcome->should_retry());
 	}
 
-	public function test_already_running_no_advance_no_retry() {
+	public function test_already_running_no_advance_with_recheck() {
 		$result = new AIPS_Author_Post_Generation_Result(1, 1);
 		$result->mark_already_running();
 		$outcome = AIPS_Generation_Outcome::from_post_result($result);
 
 		$this->assertSame(AIPS_Generation_Outcome::ALREADY_RUNNING, $outcome->get_outcome());
 		$this->assertFalse($outcome->advances_schedule());
-		$this->assertFalse($outcome->should_retry());
+		$this->assertTrue($outcome->should_retry());
 	}
 
 	public function test_transient_failure_retries_no_advance() {
@@ -136,7 +136,7 @@ class Test_AIPS_Generation_Outcome extends WP_UnitTestCase {
 	public function test_wp_error_already_running() {
 		$outcome = AIPS_Generation_Outcome::from_wp_error(new WP_Error('already_running', 'busy'));
 		$this->assertSame(AIPS_Generation_Outcome::ALREADY_RUNNING, $outcome->get_outcome());
-		$this->assertFalse($outcome->should_retry());
+		$this->assertTrue($outcome->should_retry());
 		$this->assertFalse($outcome->advances_schedule());
 	}
 

@@ -803,6 +803,13 @@ class AIPS_Schedule_Controller {
         if (is_wp_error($result)) {
             AIPS_Ajax_Response::error(array('message' => $result->get_error_message()));
         }
+		if ($result instanceof AIPS_Generation_Result_Interface && !$result->is_success()) {
+			$result_data = $result->to_array();
+			$message = !empty($result_data['error'])
+				? (string) $result_data['error']
+				: sprintf(__('Generation did not complete (%s).', 'ai-post-scheduler'), (string) $result->get_status());
+			AIPS_Ajax_Response::error(array('message' => $message, 'result' => $result_data));
+		}
 
         $current_next_run = $this->get_schedule_next_run($id, $type);
         $schedule_info    = array(
@@ -830,17 +837,35 @@ class AIPS_Schedule_Controller {
                 'edit_url' => $edit_url,
             ), $schedule_info));
         } elseif ($type === AIPS_Unified_Schedule_Service::TYPE_AUTHOR_TOPIC) {
-            $count = is_array($result) ? count($result) : 0;
+            if (!($result instanceof AIPS_Author_Topic_Generation_Result)) {
+                AIPS_Ajax_Response::error(__('Topic generation returned an invalid result.', 'ai-post-scheduler'));
+            }
+            $result_data = $result->to_array();
+            $topics      = $result->get_persisted_topics();
+            $count       = count($topics);
             AIPS_Ajax_Response::success(array_merge(array(
                 'message' => sprintf(
                     _n('%d topic generated successfully!', '%d topics generated successfully!', $count, 'ai-post-scheduler'),
                     $count
                 ),
+                'topics' => $topics,
+                'result' => $result_data,
             ), $schedule_info));
         } elseif ($type === AIPS_Unified_Schedule_Service::TYPE_AUTHOR_POST) {
-            $post_ids = is_array($result) ? array_values(array_filter(array_map('absint', $result))) : array();
+            if (!($result instanceof AIPS_Author_Post_Generation_Result)) {
+                AIPS_Ajax_Response::error(__('Post generation returned an invalid result.', 'ai-post-scheduler'));
+            }
+            $result_data = $result->to_array();
+            $post_ids = array_values(array_filter(array_map('absint', $result->get_post_ids())));
             $post_id  = !empty($post_ids) ? $post_ids[0] : 0;
             $edit_url = 1 === count($post_ids) && $post_id ? esc_url_raw(get_edit_post_link($post_id, 'raw')) : '';
+			$post_links = array();
+			foreach ($post_ids as $generated_post_id) {
+				$post_links[] = array(
+					'id'       => $generated_post_id,
+					'edit_url' => esc_url_raw(get_edit_post_link($generated_post_id, 'raw')),
+				);
+			}
             AIPS_Ajax_Response::success(array_merge(array(
                 'message'  => sprintf(
                     _n('%d post generated successfully from author topics!', '%d posts generated successfully from author topics!', count($post_ids), 'ai-post-scheduler'),
@@ -849,6 +874,10 @@ class AIPS_Schedule_Controller {
                 'post_ids' => $post_ids,
                 'post_id'  => $post_id,
                 'edit_url' => $edit_url,
+				'post_links' => $post_links,
+				'failures'   => $result_data['failures'],
+				'skipped'    => $result_data['skipped'],
+				'result'     => $result_data,
             ), $schedule_info));
         } else {
             AIPS_Ajax_Response::success($schedule_info, __('Schedule executed successfully.', 'ai-post-scheduler'));
@@ -1034,13 +1063,17 @@ class AIPS_Schedule_Controller {
                 }
 
                 $result = $service->run_now($id, $type);
-                if (is_wp_error($result)) {
+				$result_error = is_wp_error($result) || ($result instanceof AIPS_Generation_Result_Interface && !$result->is_success());
+                if ($result_error) {
+					$error_message = is_wp_error($result)
+						? $result->get_error_message()
+						: sprintf(__('Generation did not complete (%s).', 'ai-post-scheduler'), $result->get_status());
                     $errors[] = sprintf(
                         /* translators: 1: ID, 2: error */
                         __('ID %1$d (%2$s): %3$s', 'ai-post-scheduler'),
                         $id,
                         $type,
-                        $result->get_error_message()
+						$error_message
                     );
                 } else {
                     $success++;

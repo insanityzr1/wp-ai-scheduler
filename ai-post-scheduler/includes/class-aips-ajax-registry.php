@@ -102,6 +102,9 @@ class AIPS_Ajax_Registry {
 		'aips_get_author_posts'           => 'AIPS_Authors_Controller',
 		'aips_get_author_feedback'        => 'AIPS_Authors_Controller',
 		'aips_generate_topics_now'        => 'AIPS_Authors_Controller',
+		'aips_enqueue_author_topic_generation' => 'AIPS_Author_Topic_Batch_Controller',
+		'aips_get_author_topic_batch_status'    => 'AIPS_Author_Topic_Batch_Controller',
+		'aips_cancel_author_topic_batch'        => 'AIPS_Author_Topic_Batch_Controller',
 		'aips_get_topic_posts'            => 'AIPS_Authors_Controller',
 		'aips_suggest_authors'            => 'AIPS_Authors_Controller',
 

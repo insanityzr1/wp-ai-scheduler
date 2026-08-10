@@ -2,6 +2,11 @@
 
 ### Added
 - **WordPress AI Connector Routing**: Added Settings > AI controls for using all available WordPress AI connectors or an ordered allowlist, with connector-specific failover and short-lived health cooldowns. Request validation and content-policy failures are surfaced without provider shopping.
+- **Author Review Completion**: Added independent topic/post generation controls, aggregate flow status cards, queued and cancelable bulk topic generation, structured partial-result feedback, and bounded topic candidate validation/refill.
+
+### Changed
+- **Manual Author Generation**: Run-now actions preserve recurring schedules unless an administrator explicitly selects reset; direct generation now enforces each author's per-topic post limit while regeneration uses explicit replacement semantics.
+- **Generation Resilience**: Concurrent `already_running` outcomes receive a short bounded recheck without advancing the recurring schedule.
 
 ### Fixed
 - **Short-form AI Responses**: Reserve at least 1200 output tokens for title and excerpt requests so reasoning-capable connector models do not cut off visible responses after spending the smaller configured budget on internal reasoning. The global Max Tokens Limit remains authoritative.

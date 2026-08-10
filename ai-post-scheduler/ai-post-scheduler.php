@@ -3,7 +3,7 @@
  * Plugin Name: AI Post Scheduler
  * Plugin URI: https://nunezserver.com/nunezscheduler
  * Description: Schedule AI-generated posts using advanced features & scheduling options.
- * Version: 3.3.0
+ * Version: 3.4.0
  * Author: Raymond Nunez
  * Author URI: https://nunezserver.com
  * License: GPL v2 or later
@@ -44,7 +44,7 @@ if (!defined('AIPS_TELEMETRY_QUERY_SAMPLE_LIMIT')) {
 
 // Define plugin constants
 if (!defined('AIPS_VERSION')) {
-    define('AIPS_VERSION', '3.3.0');
+    define('AIPS_VERSION', '3.4.0');
 }
 
 if (!defined('AIPS_PLUGIN_DIR')) {
@@ -674,6 +674,51 @@ final class AI_Post_Scheduler {
                 (string) $correlation_id
             );
         }, 10, 5);
+
+		AIPS_Bulk_Batch_Processor::instance()->register(
+			AIPS_Author_Topic_Batch_Service::JOB_TYPE,
+			function($author_id, $batch_id, $job) {
+				$item_repository = new AIPS_Author_Topic_Batch_Items_Repository();
+				if (!$item_repository->claim((string) $batch_id, (int) $author_id)) {
+					return new WP_Error('batch_item_not_queued', __('This author batch item was already claimed or completed.', 'ai-post-scheduler'));
+				}
+				try {
+					$result = AIPS_Author_Topics_Scheduler::instance()->generate_now((int) $author_id, false);
+				} catch (Throwable $exception) {
+					$result = new WP_Error('author_topic_batch_exception', $exception->getMessage());
+				}
+				$item_repository->record_result((string) $batch_id, (int) $author_id, $result);
+				return $result;
+			}
+		);
+
+		add_action('aips_bulk_batch_completed', function($job_id, $job_type) {
+			if (AIPS_Author_Topic_Batch_Service::JOB_TYPE !== $job_type) {
+				return;
+			}
+			$status = (new AIPS_Author_Topic_Batch_Service())->get_status((string) $job_id);
+			if (is_wp_error($status)) {
+				return;
+			}
+			$failed = count(array_filter($status['authors'], function($author) {
+				return 'failed' === ($author['status'] ?? '');
+			}));
+			$message = sprintf(
+				/* translators: 1: processed authors, 2: failed authors */
+				__('Author topic batch completed: %1$d processed, %2$d failed.', 'ai-post-scheduler'),
+				(int) $status['processed'],
+				$failed
+			);
+			(new AIPS_Notifications())->send(
+				'author_topic_batch_completed',
+				array(),
+				array(AIPS_Notifications::CHANNEL_DB),
+				'',
+				admin_url('admin.php?page=aips-authors'),
+				$message,
+				array('dedupe_key' => 'author_topic_batch_' . (string) $job_id, 'dedupe_window' => DAY_IN_SECONDS)
+			);
+		}, 10, 2);
 
         // Register bulk-batch strategies for each supported job type.
         // Strategies are registered directly (not via add_action) so they are

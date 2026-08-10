@@ -469,6 +469,38 @@ class AIPS_Author_Topics_Repository {
 			)
 		);
 	}
+
+	/**
+	 * Determine whether one approved topic remains below its generated-post limit.
+	 *
+	 * Only successful generation logs whose WordPress post still exists consume
+	 * the limit. This is the direct-topic equivalent of
+	 * get_approved_for_generation() and keeps manual, queue, and scheduled flows
+	 * on the same eligibility rule.
+	 *
+	 * @param int $topic_id            Author topic ID.
+	 * @param int $max_posts_per_topic Maximum live generated posts.
+	 * @return bool
+	 */
+	public function is_eligible_for_generation($topic_id, $max_posts_per_topic = 1) {
+		$logs_table  = $this->wpdb->prefix . 'aips_author_topic_logs';
+		$posts_table = $this->wpdb->posts;
+		$max_posts   = max(1, (int) $max_posts_per_topic);
+
+		$count = $this->wpdb->get_var($this->wpdb->prepare(
+			"SELECT COUNT(*)
+			FROM {$logs_table} l
+			INNER JOIN {$posts_table} p ON p.ID = l.post_id
+			INNER JOIN {$this->table_name} t ON t.id = l.author_topic_id
+			WHERE t.id = %d
+			AND t.status = 'approved'
+			AND l.action = 'post_generated'
+			AND l.post_id IS NOT NULL",
+			absint($topic_id)
+		));
+
+		return (int) $count < $max_posts;
+	}
 	
 	/**
 	 * Get summary of approved topics for context (for feedback loop).

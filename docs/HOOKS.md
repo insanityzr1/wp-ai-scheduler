@@ -2,6 +2,11 @@
 
 This document lists all the actions and filters available in the AI Post Scheduler plugin. Developers can use these hooks to extend the plugin's functionality.
 
+## Author generation filters (3.4.0)
+
+- `aips_generation_already_running_recheck_delay` controls the short claim-contention recheck delay (default 60 seconds) without advancing recurring schedules.
+- `aips_author_topic_refill_max_attempts` controls bounded replacement requests for invalid or duplicate candidates (default 2).
+
 ## AI Provider Filters
 
 ### `aips_wp_ai_client_prompt_builder`

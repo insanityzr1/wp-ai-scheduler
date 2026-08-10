@@ -46,6 +46,7 @@ class AIPS_Bulk_Batch_Job_Store {
 	const STATUS_PROCESSING = 'processing';
 	const STATUS_COMPLETED  = 'completed';
 	const STATUS_FAILED     = 'failed';
+	const STATUS_CANCELED   = 'canceled';
 
 	/**
 	 * Number of days after which completed/failed jobs are eligible for cleanup.
@@ -118,13 +119,14 @@ class AIPS_Bulk_Batch_Job_Store {
 				'job_type'     => $job_type,
 				'items_json'   => wp_json_encode( $items ),
 				'options_json' => wp_json_encode( $safe_options ),
+				'request_key'  => isset($safe_options['request_key']) ? (string) $safe_options['request_key'] : null,
 				'status'       => self::STATUS_PENDING,
 				'total'        => count( $items ),
 				'processed'    => 0,
 				'created_at'   => $now,
 				'updated_at'   => $now,
 			),
-			array( '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%d', '%d' )
+			array( '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%d', '%d' )
 		);
 
 		if ( $result === false ) {
@@ -136,6 +138,19 @@ class AIPS_Bulk_Batch_Job_Store {
 		}
 
 		return $job_id;
+	}
+
+	public function find_by_request_key(string $job_type, string $request_key) {
+		global $wpdb;
+		return $wpdb->get_row($wpdb->prepare(
+			"SELECT * FROM {$this->table()} WHERE job_type = %s AND request_key = %s ORDER BY created_at DESC LIMIT 1",
+			$job_type,
+			$request_key
+		));
+	}
+
+	public function find_active_by_request_key(string $job_type, string $request_key) {
+		return $this->find_by_request_key($job_type, $request_key);
 	}
 
 	/**
@@ -299,6 +314,29 @@ class AIPS_Bulk_Batch_Job_Store {
 	}
 
 	/**
+	 * Atomically cancel an active job of the expected type.
+	 *
+	 * @param string $job_id   UUID of the job.
+	 * @param string $job_type Expected job type.
+	 * @return bool True only when an active matching row was changed.
+	 */
+	public function cancel_active(string $job_id, string $job_type): bool {
+		global $wpdb;
+
+		$result = $wpdb->query($wpdb->prepare(
+			"UPDATE {$this->table()} SET status = %s, updated_at = %d WHERE job_id = %s AND job_type = %s AND status IN (%s,%s)",
+			self::STATUS_CANCELED,
+			time(),
+			$job_id,
+			$job_type,
+			self::STATUS_PENDING,
+			self::STATUS_PROCESSING
+		));
+
+		return 1 === (int) $result;
+	}
+
+	/**
 	 * Increment the processed item counter for a job.
 	 *
 	 * Uses a single UPDATE to avoid race conditions between concurrent batch
@@ -339,9 +377,15 @@ class AIPS_Bulk_Batch_Job_Store {
 
 		$cutoff = time() - ( self::CLEANUP_DAYS * DAY_IN_SECONDS );
 
+		$item_table = $wpdb->prefix . 'aips_author_topic_batch_items';
+		$wpdb->query($wpdb->prepare(
+			"DELETE i FROM {$item_table} i INNER JOIN {$this->table()} j ON j.job_id = i.batch_id WHERE j.status IN ('completed','failed','canceled') AND j.updated_at < %d",
+			$cutoff
+		));
+
 		$deleted = $wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 			$wpdb->prepare(
-				"DELETE FROM {$this->table()} WHERE status IN ('completed','failed') AND updated_at < %d", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				"DELETE FROM {$this->table()} WHERE status IN ('completed','failed','canceled') AND updated_at < %d", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 				$cutoff
 			)
 		);

@@ -742,7 +742,7 @@ class AIPS_Author_Post_Generator extends AIPS_Author_Slice_Scheduler_Base implem
 	 * @param int $topic_id Topic ID.
 	 * @return int|WP_Error Post ID on success, WP_Error on failure.
 	 */
-	public function generate_now($topic_id) {
+	public function generate_now($topic_id, $replace_existing = false) {
 		$topic = $this->topics_repository->get_by_id($topic_id);
 		
 		if (!$topic) {
@@ -753,6 +753,17 @@ class AIPS_Author_Post_Generator extends AIPS_Author_Slice_Scheduler_Base implem
 		
 		if (!$author) {
 			return new WP_Error('invalid_author', 'Author not found');
+		}
+
+		$max_posts_per_topic = isset($author->max_posts_per_topic) ? max(1, (int) $author->max_posts_per_topic) : 1;
+		if (!$replace_existing && !$this->topics_repository->is_eligible_for_generation((int) $topic->id, $max_posts_per_topic)) {
+			return new WP_Error(
+				'topic_post_limit_reached',
+				sprintf(
+					__('This topic has reached its limit of %d generated posts.', 'ai-post-scheduler'),
+					$max_posts_per_topic
+				)
+			);
 		}
 		
 		// Per-topic claim protects this direct/manual generation from overlapping
@@ -796,19 +807,25 @@ class AIPS_Author_Post_Generator extends AIPS_Author_Slice_Scheduler_Base implem
 	 * @return int|WP_Error New post ID on success, WP_Error on failure.
 	 */
 	public function regenerate_post($post_id, $topic_id) {
-		// Preserve the original post status before setting it to draft
 		$original_post = get_post($post_id);
-		if ($original_post && isset($original_post->post_status)) {
-			update_post_meta($post_id, AIPS_Post_Manager::META_ORIGINAL_POST_STATUS, $original_post->post_status);
+		if (!$original_post || !$this->logs_repository->has_generated_post((int) $topic_id, (int) $post_id)) {
+			return new WP_Error('invalid_regeneration_target', __('The selected post was not generated from this topic.', 'ai-post-scheduler'));
 		}
 
-		// Set the old post to draft
-		wp_update_post(array(
-			'ID' => $post_id,
-			'post_status' => 'draft',
-		));
-		
-		// Generate a new post
-		return $this->generate_now($topic_id);
+		// Do not mutate the existing post until a replacement exists.
+		$new_post_id = $this->generate_now($topic_id, true);
+		if (is_wp_error($new_post_id)) {
+			return $new_post_id;
+		}
+
+		if (!$this->logs_repository->mark_post_replaced((int) $topic_id, (int) $post_id, (int) $new_post_id)) {
+			wp_delete_post((int) $new_post_id, true);
+			return new WP_Error('regeneration_log_update_failed', __('The replacement could not be finalized.', 'ai-post-scheduler'));
+		}
+
+		update_post_meta($post_id, AIPS_Post_Manager::META_ORIGINAL_POST_STATUS, $original_post->post_status);
+		wp_update_post(array('ID' => $post_id, 'post_status' => 'draft'));
+
+		return $new_post_id;
 	}
 }

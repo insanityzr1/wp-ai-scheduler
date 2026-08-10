@@ -4,6 +4,12 @@
 
 The AI Post Scheduler uses WordPress's built-in `dbDelta()` function to manage database schema updates. This is the standard WordPress approach for database migrations.
 
+## 3.4.0 — Queued author-topic batches
+
+- Adds `request_key varchar(100)` and an index to `aips_bulk_batch_jobs` for active-request idempotency.
+- Adds `aips_author_topic_batch_items` for queued/running/completed/failed/canceled per-author state and structured results.
+- Both changes are applied idempotently by `dbDelta()` when `AIPS_VERSION` changes.
+
 ### Key Points
 
 - **Single Source of Truth**: All database schema is defined in `AIPS_DB_Manager::get_schema()`

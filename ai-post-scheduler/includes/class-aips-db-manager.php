@@ -36,6 +36,7 @@ class AIPS_DB_Manager {
         'aips_cache_events',
         'aips_generation_claims',
         'aips_generation_state',
+		'aips_author_topic_batch_items',
     );
 
     public function __construct() {
@@ -100,6 +101,7 @@ class AIPS_DB_Manager {
         $table_cache_events         = $tables['aips_cache_events'];
         $table_generation_claims    = $tables['aips_generation_claims'];
         $table_generation_state     = $tables['aips_generation_state'];
+		$table_author_topic_batch_items = $tables['aips_author_topic_batch_items'];
 
         $sql = array();
 
@@ -610,6 +612,7 @@ class AIPS_DB_Manager {
             job_type varchar(100) NOT NULL,
             items_json longtext NOT NULL,
             options_json longtext NOT NULL,
+			request_key varchar(100) DEFAULT NULL,
             status varchar(20) NOT NULL DEFAULT 'pending',
             total int(11) NOT NULL DEFAULT 0,
             processed int(11) NOT NULL DEFAULT 0,
@@ -619,8 +622,25 @@ class AIPS_DB_Manager {
             KEY job_type (job_type),
             KEY status (status),
             KEY created_at (created_at),
-            KEY status_updated (status, updated_at)
+            KEY status_updated (status, updated_at),
+			UNIQUE KEY job_request (job_type(64), request_key(100))
         ) $charset_collate;";
+
+		$sql[] = "CREATE TABLE $table_author_topic_batch_items (
+			id bigint(20) NOT NULL AUTO_INCREMENT,
+			batch_id varchar(36) NOT NULL,
+			author_id bigint(20) NOT NULL,
+			status varchar(20) NOT NULL DEFAULT 'queued',
+			error_code varchar(100) DEFAULT NULL,
+			error_message text DEFAULT NULL,
+			result_json longtext DEFAULT NULL,
+			created_at bigint(20) unsigned NOT NULL DEFAULT 0,
+			updated_at bigint(20) unsigned NOT NULL DEFAULT 0,
+			PRIMARY KEY  (id),
+			UNIQUE KEY batch_author (batch_id, author_id),
+			KEY batch_status (batch_id, status),
+			KEY author_id (author_id)
+		) $charset_collate;";
 
         $sql[] = "CREATE TABLE $table_cache_index (
             id bigint(20) NOT NULL AUTO_INCREMENT,

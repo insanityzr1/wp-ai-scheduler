@@ -194,7 +194,7 @@ class AIPS_Bulk_Batch_Processor {
 			return;
 		}
 
-		if ( $job->status === AIPS_Bulk_Batch_Job_Store::STATUS_COMPLETED ) {
+		if (in_array($job->status, array(AIPS_Bulk_Batch_Job_Store::STATUS_COMPLETED, AIPS_Bulk_Batch_Job_Store::STATUS_CANCELED), true)) {
 			$this->logger->log(
 				sprintf( 'Bulk batch processor: job %s already completed; skipping duplicate slice.', $job_id ),
 				'warning'
@@ -269,33 +269,42 @@ class AIPS_Bulk_Batch_Processor {
 		// Execute the strategy for each item in the slice.
 		$success_count = 0;
 		$failed_count  = 0;
+		$processed_in_slice = 0;
 
 		foreach ( $items_slice as $item ) {
 			try {
 				$result = call_user_func( $strategy, $item, $job_id, $job );
+				if (is_wp_error($result) && 'batch_item_not_queued' === $result->get_error_code()) {
+					continue;
+				}
+				$processed_in_slice++;
 
-				if ( is_wp_error( $result ) ) {
+				$result_failed = is_wp_error($result) || ($result instanceof AIPS_Generation_Result_Interface && !$result->is_success());
+				if ( $result_failed ) {
 					$failed_count++;
+					$error_message = is_wp_error($result)
+						? $result->get_error_message()
+						: (string) ($result->to_array()['error'] ?? __('Generation failed.', 'ai-post-scheduler'));
 					$history->record(
 						'warning',
-						$result->get_error_message(),
+						$error_message,
 						null,
 						null,
-						array( 'item' => $item, 'error_code' => $result->get_error_code() )
+						array( 'item' => $item, 'error_code' => is_wp_error($result) ? $result->get_error_code() : 'generation_failed' )
 					);
 				} else {
 					$success_count++;
-					$post_result = is_array( $result ) ? $result : (int) $result;
+					$post_result = $result instanceof AIPS_Generation_Result_Interface ? $result->to_array() : (is_array( $result ) ? $result : (int) $result);
 					$history->record(
 						'activity',
-						/* translators: %s: post ID */
-						sprintf( __( 'Post %s generated successfully', 'ai-post-scheduler' ), is_array( $post_result ) ? implode( ',', $post_result ) : $post_result ),
+						__( 'Bulk item generation completed.', 'ai-post-scheduler' ),
 						null,
 						null,
 						array( 'item' => $item, 'post_id' => $post_result )
 					);
 				}
 			} catch ( Throwable $e ) {
+				$processed_in_slice++;
 				$failed_count++;
 				$this->logger->log(
 					sprintf( 'Bulk batch processor: exception for item in job %s: %s', $job_id, $e->getMessage() ),
@@ -312,7 +321,9 @@ class AIPS_Bulk_Batch_Processor {
 		}
 
 		// Increment the processed counter atomically.
-		$this->job_store->increment_processed( $job_id, count( $items_slice ) );
+		if ($processed_in_slice > 0) {
+			$this->job_store->increment_processed($job_id, $processed_in_slice);
+		}
 		$job_after_slice = $this->job_store->get( $job_id );
 		$processed_total = $job_after_slice ? (int) $job_after_slice->processed : 0;
 		$total_items     = $job_after_slice ? (int) $job_after_slice->total : $total_quantity;
@@ -341,6 +352,10 @@ class AIPS_Bulk_Batch_Processor {
 				),
 				'info'
 			);
+		}
+
+		if ($processed_total >= $total_items && $total_items > 0) {
+			do_action('aips_bulk_batch_completed', $job_id, $job_type, $processed_total, $total_items);
 		}
 
 		// Complete the history container for this slice.

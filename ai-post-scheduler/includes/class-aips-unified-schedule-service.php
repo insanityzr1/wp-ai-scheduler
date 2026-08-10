@@ -187,9 +187,7 @@ class AIPS_Unified_Schedule_Service {
 				if (!$author) {
 					return new WP_Error('not_found', __('Author not found.', 'ai-post-scheduler'));
 				}
-				// generate_posts_for_author() returns a structured result object;
-				// convert to the legacy int[]|WP_Error shape existing callers expect.
-				return $generator->generate_posts_for_author($author, $quantity, 'manual', $advance_schedule)->to_legacy_return();
+				return $generator->generate_posts_for_author($author, $quantity, 'manual', $advance_schedule);
 
 			default:
 				return new WP_Error('invalid_type', __('Invalid schedule type.', 'ai-post-scheduler'));

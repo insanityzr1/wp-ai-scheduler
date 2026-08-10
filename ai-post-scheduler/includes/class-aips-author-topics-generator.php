@@ -54,6 +54,7 @@ class AIPS_Author_Topics_Generator {
 	 * @var AIPS_Prompt_Builder_Topic Topic prompt builder.
 	 */
 	private $prompt_builder;
+	private $candidate_validator;
 
 	/**
 	 * Initialize the generator.
@@ -66,7 +67,7 @@ class AIPS_Author_Topics_Generator {
 	 * @param object|null $feedback_repository Feedback repository (optional for testing).
 	 * @param object|null $prompt_builder Topic prompt builder (optional for testing).
 	 */
-	public function __construct(?AIPS_AI_Service_Interface $ai_service = null, ?AIPS_Logger_Interface $logger = null, $topics_repository = null, $logs_repository = null, $embeddings_service = null, $feedback_repository = null, $prompt_builder = null) {
+	public function __construct(?AIPS_AI_Service_Interface $ai_service = null, ?AIPS_Logger_Interface $logger = null, $topics_repository = null, $logs_repository = null, $embeddings_service = null, $feedback_repository = null, $prompt_builder = null, $candidate_validator = null) {
 		$container = AIPS_Container::get_instance();
 		$this->ai_service = $ai_service ?: ($container->has(AIPS_AI_Service_Interface::class) ? $container->make(AIPS_AI_Service_Interface::class) : new AIPS_AI_Service());
 		$this->logger = $logger ?: ($container->has(AIPS_Logger_Interface::class) ? $container->make(AIPS_Logger_Interface::class) : new AIPS_Logger());
@@ -78,6 +79,7 @@ class AIPS_Author_Topics_Generator {
 			null,
 			new AIPS_Prompt_Builder_Diversity_Injector(null, $this->topics_repository)
 		);
+		$this->candidate_validator = $candidate_validator ?: new AIPS_Author_Topic_Candidate_Validator();
 	}
 	
 	/**
@@ -134,35 +136,73 @@ class AIPS_Author_Topics_Generator {
 
 		$prompt = $this->prompt_builder->build($author, $approved_topics, $rejected_topics, $feedback_guidance);
 
-		// Use generate_json for structured topic data
-		$response = $this->ai_service->generate_json($prompt, array(
-			'temperature' => 0.7,
-			'json_schema' => $this->get_topic_json_schema(),
-		));
+		$existing_topics = $this->topics_repository->get_by_author($author->id);
+		$existing_titles = array_map(function($topic) { return (string) $topic->topic_title; }, (array) $existing_topics);
+		$accepted_titles = array();
+		$topics = array();
+		$rejections = array();
+		$metrics = array('returned' => 0, 'accepted' => 0, 'invalid' => 0, 'exact_duplicates' => 0, 'fuzzy_duplicates' => 0);
+		$max_refills = max(0, (int) apply_filters('aips_author_topic_refill_max_attempts', 2, $author));
+		$refill_attempts = 0;
+		$current_prompt = $prompt;
 
-		if (is_wp_error($response)) {
-			$this->logger->log("Failed to generate topics for author {$author->id}: " . $response->get_error_message(), 'error');
-			$result->mark_failed($response);
-			return $result;
+		for ($attempt = 0; $attempt <= $max_refills && count($topics) < $requested; $attempt++) {
+			$missing = max(1, $requested - count($topics));
+			$response = $this->ai_service->generate_json($current_prompt, array(
+				'temperature' => 0.7,
+				'json_schema' => $this->get_topic_json_schema($missing),
+			));
+			if (is_wp_error($response)) {
+				if (empty($topics)) {
+					$this->logger->log("Failed to generate topics for author {$author->id}: " . $response->get_error_message(), 'error');
+					$result->mark_failed($response);
+					return $result;
+				}
+				break;
+			}
+
+			$validation = $this->candidate_validator->validate((array) $response, $existing_titles, $accepted_titles);
+			$metrics['returned'] += (int) $validation['counts']['returned'];
+			$metrics['invalid'] += (int) $validation['counts']['invalid'];
+			$metrics['exact_duplicates'] += (int) $validation['counts']['exact_duplicates'];
+			$rejections = array_merge($rejections, $validation['rejections']);
+
+			$validated_topics = $this->format_validated_topics($validation['accepted'], $author);
+			$validated_topics = $this->apply_fuzzy_duplicate_flags($author, $validated_topics);
+			foreach ($validated_topics as $validated_topic) {
+				if (count($topics) >= $requested) {
+					break;
+				}
+				$metadata = !empty($validated_topic['metadata']) ? json_decode($validated_topic['metadata'], true) : array();
+				if (!empty($metadata['potential_duplicate'])) {
+					$metrics['fuzzy_duplicates']++;
+					$rejections[] = array(
+						'title'      => $validated_topic['topic_title'],
+						'reason'     => 'fuzzy_duplicate',
+						'match'      => isset($metadata['duplicate_match']) ? $metadata['duplicate_match'] : '',
+						'similarity' => isset($metadata['duplicate_similarity']) ? $metadata['duplicate_similarity'] : 0,
+					);
+					continue;
+				}
+				$topics[] = $validated_topic;
+				$accepted_titles[] = $validated_topic['topic_title'];
+			}
+
+			if (count($topics) < $requested && $attempt < $max_refills) {
+				$refill_attempts++;
+				$current_prompt = $this->prompt_builder->build_refill($prompt, $requested - count($topics), $accepted_titles, $rejections);
+			}
 		}
 
-		$candidate_count = is_array($response) ? count($response) : 0;
-
-		// Parse the JSON response into database-ready topics
-		$topics = $this->parse_json_topics($response, $author);
+		$metrics['accepted'] = count($topics);
+		$result->set_quality_metrics($metrics, $rejections, $refill_attempts);
+		$result->set_candidate_counts(count($topics), $metrics['invalid'], $metrics['exact_duplicates'] + $metrics['fuzzy_duplicates']);
 
 		if (empty($topics)) {
 			$this->logger->log("No topics parsed from AI response for author {$author->id}", 'warning');
-			$result->set_candidate_counts(0, $candidate_count, 0);
 			$result->mark_failed(new WP_Error('no_topics_parsed', 'Failed to parse topics from AI response'));
 			return $result;
 		}
-
-		// Flag semantically similar candidates before they reach editorial review.
-		$topics = $this->apply_fuzzy_duplicate_flags($author, $topics);
-
-		$duplicate_count = $this->count_potential_duplicates($topics);
-		$result->set_candidate_counts(count($topics), max(0, $candidate_count - count($topics)), $duplicate_count);
 
 		// Bulk insert stamped with the run ID, then fetch the EXACT inserted rows.
 		$inserted_ids = $this->topics_repository->create_bulk($topics, $run_id);
@@ -318,19 +358,71 @@ class AIPS_Author_Topics_Generator {
 	 *
 	 * @return array<string, mixed>
 	 */
-	private function get_topic_json_schema(): array {
+	private function get_topic_json_schema(int $requested_count = 1): array {
+		$requested_count = max(1, $requested_count);
+
 		return array(
-			'type'  => 'array',
+			'type'     => 'array',
+			'minItems' => 1,
+			'maxItems' => $requested_count,
 			'items' => array(
-				'type'       => 'object',
+				'type'                 => 'object',
+				'additionalProperties' => false,
 				'properties' => array(
-					'title'    => array('type' => 'string'),
-					'score'    => array('type' => 'integer'),
-					'keywords' => array('type' => 'array', 'items' => array('type' => 'string')),
+					'title'    => array(
+						'type'      => 'string',
+						'minLength' => 10,
+						'maxLength' => 160,
+					),
+					'score'    => array(
+						'type'    => 'integer',
+						'minimum' => 0,
+						'maximum' => 100,
+					),
+					'keywords' => array(
+						'type'     => 'array',
+						'minItems' => 1,
+						'maxItems' => 8,
+						'items'    => array(
+							'type'      => 'string',
+							'minLength' => 2,
+							'maxLength' => 60,
+						),
+					),
 				),
 				'required' => array('title', 'score', 'keywords'),
 			),
 		);
+	}
+
+	/**
+	 * Convert validated candidates into database-ready topic arrays.
+	 *
+	 * @param array<int, array<string, mixed>> $validated_topics Validated candidates.
+	 * @param object                           $author           Author record.
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function format_validated_topics(array $validated_topics, $author): array {
+		$topics = array();
+
+		foreach ($validated_topics as $topic) {
+			$topics[] = array(
+				'author_id' => (int) $author->id,
+				'topic_title'  => $topic['title'],
+				'topic_prompt' => '',
+				'status'    => 'pending',
+				'score'     => (int) $topic['score'],
+				'metadata'  => wp_json_encode(
+					array(
+						'generated_via'   => 'ai_structured_output',
+						'generation_date' => AIPS_DateTime::now()->timestamp(),
+						'keywords'        => $topic['keywords'],
+					)
+				),
+			);
+		}
+
+		return $topics;
 	}
 
 	/**
@@ -461,9 +553,6 @@ class AIPS_Author_Topics_Generator {
 		}
 
 		$existing_topics = $this->topics_repository->get_by_author($author->id);
-		if (empty($existing_topics)) {
-			return $topics;
-		}
 
 		$candidate_existing = array();
 		foreach ($existing_topics as $existing_topic) {
@@ -476,10 +565,6 @@ class AIPS_Author_Topics_Generator {
 				'topic_title' => $existing_topic->topic_title,
 				'embedding' => $metadata['embedding'],
 			);
-		}
-
-		if (empty($candidate_existing)) {
-			return $topics;
 		}
 
 		$threshold = (float) AIPS_Config::get_instance()->get_option('aips_topic_similarity_threshold');
@@ -517,6 +602,10 @@ class AIPS_Author_Topics_Generator {
 				$topic['score'] = max(0, ((int) (isset($topic['score']) ? $topic['score'] : 50)) - 15);
 			} else {
 				$metadata['potential_duplicate'] = false;
+				$candidate_existing[] = array(
+					'topic_title' => $text,
+					'embedding'   => $embedding,
+				);
 			}
 
 			$topic['metadata'] = wp_json_encode($metadata);

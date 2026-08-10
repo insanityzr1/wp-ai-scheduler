@@ -276,6 +276,19 @@ class AIPS_Author_Topics_Scheduler extends AIPS_Author_Slice_Scheduler_Base {
 		$claim_token = $this->claims_repository->claim_author_topic_generation((int) $author->id);
 		if (false === $claim_token) {
 			$this->logger->log("Topic generation for author {$author->id} skipped — already running.", 'warning');
+			$result = new AIPS_Author_Topic_Generation_Result(
+				(int) $author->id,
+				isset($author->topic_generation_quantity) ? (int) $author->topic_generation_quantity : 0,
+				'',
+				(string) AIPS_Correlation_ID::get()
+			);
+			$result->mark_already_running();
+			$this->retry_scheduler->handle_outcome(
+				AIPS_Generation_State_Repository::FLOW_AUTHOR_TOPIC,
+				$author,
+				AIPS_Generation_Outcome::from_topic_result($result),
+				(string) AIPS_Correlation_ID::get()
+			);
 			return false;
 		}
 
@@ -460,7 +473,7 @@ class AIPS_Author_Topics_Scheduler extends AIPS_Author_Slice_Scheduler_Base {
 	 *
 	 * @param int  $author_id        Author ID.
 	 * @param bool $advance_schedule Whether to reset the author's next run from now.
-	 * @return array|WP_Error Array of generated topics or WP_Error on failure.
+	 * @return AIPS_Author_Topic_Generation_Result|WP_Error Structured result or validation/claim error.
 	 */
 	public function generate_now($author_id, $advance_schedule = false) {
 		$author = $this->authors_repository->get_by_id($author_id);
@@ -477,7 +490,7 @@ class AIPS_Author_Topics_Scheduler extends AIPS_Author_Slice_Scheduler_Base {
 		}
 
 		try {
-			$result = $this->topics_generator->generate_topics($author);
+			$result = $this->topics_generator->generate_topics_with_result($author);
 
 			// Keep manual "Run Now" behavior aligned with cron runs by advancing
 			// schedule timestamps regardless of success/failure to avoid re-running

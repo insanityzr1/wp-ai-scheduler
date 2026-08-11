@@ -135,32 +135,67 @@ class AIPS_Integrations_Controller {
 			return;
 		}
 
-		// All rows in a single save belong to one integration; resolve its
-		// adapter once to validate every submitted field_key before saving
-		// anything, so a bad key (e.g. a hand-typed protected meta key) fails
-		// the whole request instead of silently persisting.
-		$adapter = !empty($mappings[0]['integration_id']) ? AIPS_Integration_Registry::get($mappings[0]['integration_id']) : null;
+		// Validate every submitted field_key against its OWN integration's
+		// adapter before saving anything, so a bad key (e.g. a reserved meta
+		// key) fails the whole request instead of silently persisting. A save
+		// from the UI normally carries one integration, but a crafted payload
+		// could mix them — so an adapter is resolved (and memoized) per row's
+		// integration_id rather than assuming they all match row 0.
+		$adapters = array();
 
-		if ($adapter instanceof AIPS_Integration_Interface) {
-			foreach ($mappings as $mapping) {
-				if (empty($mapping['field_key'])) {
-					continue;
-				}
+		foreach ($mappings as $mapping) {
+			if (empty($mapping['integration_id']) || empty($mapping['field_key'])) {
+				continue;
+			}
 
-				$valid = $adapter->validate_field_key($mapping['field_key']);
+			$integration_id = $mapping['integration_id'];
 
-				if (is_wp_error($valid)) {
-					AIPS_Ajax_Response::error($valid->get_error_message(), $valid->get_error_code());
-					return;
-				}
+			if (!array_key_exists($integration_id, $adapters)) {
+				$resolved = AIPS_Integration_Registry::get($integration_id);
+				$adapters[$integration_id] = $resolved instanceof AIPS_Integration_Interface ? $resolved : null;
+			}
+
+			$adapter = $adapters[$integration_id];
+
+			if (!$adapter instanceof AIPS_Integration_Interface) {
+				AIPS_Ajax_Response::error(
+					sprintf(
+						/* translators: %s: integration identifier. */
+						__('Unknown or unavailable integration: %s', 'ai-post-scheduler'),
+						sanitize_key($integration_id)
+					),
+					'integration_unavailable'
+				);
+				return;
+			}
+
+			$valid = $adapter->validate_field_key($mapping['field_key']);
+
+			if (is_wp_error($valid)) {
+				AIPS_Ajax_Response::error($valid->get_error_message(), $valid->get_error_code());
+				return;
 			}
 		}
 
-		// All rows in a single save belong to one selected group. Retire any
-		// mappings left over from a previously-selected group for this
-		// integration so switching groups doesn't leave both active.
-		if (!empty($mappings[0]['integration_id']) && isset($mappings[0]['source_key'])) {
-			$this->repo->delete_stale_group_mappings($template_id, $mappings[0]['integration_id'], $mappings[0]['source_key']);
+		// A template's mappings for one integration should reflect exactly one
+		// selected group at a time. Retire mappings left over from a
+		// previously-selected group, once per distinct (integration, group)
+		// present in this save, so switching groups doesn't leave both active.
+		$pruned = array();
+
+		foreach ($mappings as $mapping) {
+			if (empty($mapping['integration_id']) || !isset($mapping['source_key'])) {
+				continue;
+			}
+
+			$prune_key = $mapping['integration_id'] . '|' . $mapping['source_key'];
+
+			if (isset($pruned[$prune_key])) {
+				continue;
+			}
+
+			$pruned[$prune_key] = true;
+			$this->repo->delete_stale_group_mappings($template_id, $mapping['integration_id'], $mapping['source_key']);
 		}
 
 		foreach ($mappings as $mapping) {

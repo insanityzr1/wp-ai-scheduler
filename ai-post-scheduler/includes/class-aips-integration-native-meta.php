@@ -51,11 +51,18 @@ class AIPS_Integration_Native_Meta implements AIPS_Integration_Interface {
 		$post_type = (string) $group_id;
 		$include_protected = !empty($args['include_protected']);
 		$type_map = $this->get_supported_field_types();
-		$registered = get_registered_meta_keys('post', $post_type);
+
+		// Merge meta registered site-wide (empty subtype, e.g. register_meta('post', ...))
+		// with meta registered for this specific post type; the post-type-specific
+		// registration wins on key collisions.
+		$registered = array_merge(
+			get_registered_meta_keys('post', ''),
+			get_registered_meta_keys('post', $post_type)
+		);
 		$fields = array();
 
 		foreach ($registered as $meta_key => $meta_args) {
-			if (!$this->is_valid_field_key($meta_key)) {
+			if (!$this->is_valid_field_key($meta_key) || $this->is_denied_field_key($meta_key)) {
 				continue;
 			}
 
@@ -138,6 +145,22 @@ class AIPS_Integration_Native_Meta implements AIPS_Integration_Interface {
 			);
 		}
 
+		// A narrow denylist of keys that must never be overwritten with
+		// generated text, even under the advanced opt-in — WordPress-core
+		// internal meta (thumbnail, edit locks, page template, oEmbed cache,
+		// menu-item wiring) and AIPS's own state. Writing generated content
+		// onto these can corrupt post state or the plugin's own bookkeeping.
+		if ($this->is_denied_field_key($field_key)) {
+			return new WP_Error(
+				'protected_meta_key',
+				sprintf(
+					/* translators: %s: meta key. */
+					__('Meta key "%s" is reserved by WordPress or this plugin and cannot be used for generation.', 'ai-post-scheduler'),
+					$field_key
+				)
+			);
+		}
+
 		return true;
 	}
 
@@ -149,6 +172,30 @@ class AIPS_Integration_Native_Meta implements AIPS_Integration_Interface {
 	 */
 	private function is_valid_field_key($field_key) {
 		return is_string($field_key) && $field_key !== '' && preg_match('/^[a-zA-Z0-9_]+$/', $field_key) === 1;
+	}
+
+	/**
+	 * Whether a meta key is reserved by WordPress core or by AIPS and must
+	 * never be a generation target, regardless of the advanced opt-in.
+	 *
+	 * Deliberately narrow: generic custom protected keys (e.g. another
+	 * plugin's `_my_plugin_setting`) remain writable under the opt-in. Only
+	 * core-internal namespaces and AIPS's own state are blocked.
+	 *
+	 * @param string $field_key Field/meta key.
+	 * @return bool
+	 */
+	private function is_denied_field_key($field_key) {
+		$denied_prefixes = array('_aips', '_wp_', '_edit_', '_oembed_', '_menu_item_');
+		foreach ($denied_prefixes as $prefix) {
+			if (strpos($field_key, $prefix) === 0) {
+				return true;
+			}
+		}
+
+		$denied_exact = array('_thumbnail_id', '_pingme', '_encloseme', '_edit_lock', '_edit_last');
+
+		return in_array($field_key, $denied_exact, true);
 	}
 
 	/**

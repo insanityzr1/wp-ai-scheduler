@@ -129,6 +129,47 @@ class Test_AIPS_Integration_Native_Meta extends WP_UnitTestCase {
 		$this->assertTrue($this->adapter->validate_field_key('contact_phone_number'));
 	}
 
+	/**
+	 * @dataProvider reserved_key_provider
+	 */
+	public function test_validate_field_key_rejects_reserved_key($reserved_key) {
+		$result = $this->adapter->validate_field_key($reserved_key);
+		$this->assertInstanceOf('WP_Error', $result);
+		$this->assertSame('protected_meta_key', $result->get_error_code());
+	}
+
+	public function reserved_key_provider() {
+		return array(
+			'AIPS own meta'       => array('_aips_generated_post'),
+			'WP core internal'    => array('_wp_page_template'),
+			'edit lock'           => array('_edit_lock'),
+			'oEmbed cache'        => array('_oembed_abc123'),
+			'menu item wiring'    => array('_menu_item_object_id'),
+			'thumbnail id'        => array('_thumbnail_id'),
+		);
+	}
+
+	public function test_get_fields_excludes_reserved_key_even_when_include_protected() {
+		$this->register_test_meta('_wp_reserved_demo', array(
+			'type'   => 'string',
+			'single' => true,
+		));
+
+		$fields = $this->fields_by_key($this->adapter->get_fields('post', array('include_protected' => true)));
+
+		$this->assertArrayNotHasKey('_wp_reserved_demo', $fields);
+	}
+
+	public function test_write_field_value_rejects_reserved_key() {
+		$post_id = self::factory()->post->create();
+
+		$result = $this->adapter->write_field_value($post_id, '_aips_generated_post', 'x');
+
+		$this->assertInstanceOf('WP_Error', $result);
+		$this->assertSame('protected_meta_key', $result->get_error_code());
+		$this->assertSame('', get_post_meta($post_id, '_aips_generated_post', true));
+	}
+
 	public function test_write_field_value_writes_post_meta() {
 		$post_id = self::factory()->post->create();
 

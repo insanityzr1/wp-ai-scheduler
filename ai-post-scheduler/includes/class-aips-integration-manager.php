@@ -331,9 +331,34 @@ class AIPS_Integration_Manager {
 	 * @return true|WP_Error
 	 */
 	private function write_field($adapter, $mapping, $shape, $raw_value, $post_id) {
-		$value = $shape === AIPS_Integration_Interface::SHAPE_HTML
-			? wp_kses_post(trim((string) $raw_value))
-			: sanitize_textarea_field(trim((string) $raw_value));
+		// Generatable shapes are all text; a nested array/object here means the
+		// AI returned an unexpected structure (e.g. a JSON object for a field
+		// requested as plain text). Casting that to (string) would write the
+		// literal "Array" and emit a PHP warning, so reject it explicitly.
+		if (!is_scalar($raw_value) && $raw_value !== null) {
+			$error = new WP_Error(
+				'unexpected_value_shape',
+				sprintf(
+					/* translators: %s: field key. */
+					__('The AI returned a non-text value for field "%s".', 'ai-post-scheduler'),
+					$mapping->field_key
+				)
+			);
+			$this->logger->log($error->get_error_message(), 'warning', array('post_id' => $post_id, 'field_key' => $mapping->field_key));
+			return $error;
+		}
+
+		switch ($shape) {
+			case AIPS_Integration_Interface::SHAPE_HTML:
+				$value = wp_kses_post(trim((string) $raw_value));
+				break;
+			case AIPS_Integration_Interface::SHAPE_SHORT_TEXT:
+				// Single-line field: strip newlines that a textarea sanitizer would keep.
+				$value = sanitize_text_field(trim((string) $raw_value));
+				break;
+			default:
+				$value = sanitize_textarea_field(trim((string) $raw_value));
+		}
 
 		$write_result = $adapter->write_field_value($post_id, $mapping->field_key, $value);
 

@@ -2,6 +2,22 @@
 
 This document lists all the actions and filters available in the AI Post Scheduler plugin. Developers can use these hooks to extend the plugin's functionality.
 
+## AI Provider Filters
+
+### `aips_wp_ai_client_prompt_builder`
+Filters an optional prebuilt WordPress AI Client prompt builder before AIPS calls `wp_ai_client_prompt()`.
+
+* **Arguments:**
+  * `object|WP_Error|null $builder`: Replacement builder, or `null` to use WordPress core.
+  * `string $prompt`: Prompt text for the request.
+  * `AIPS_WP_AI_Client_Provider $provider`: Current provider adapter.
+
+### `aips_wp_ai_client_connectors`
+Filters active WordPress AI connectors before AIPS applies its connector allowlist and failover policy.
+
+* **Arguments:**
+  * `array $connectors`: Active AI connector definitions keyed by connector ID.
+
 ## Action Hooks
 
 ### Post Generation
@@ -370,4 +386,3 @@ Filters the maximum number of similar approved topics used as expanded context w
 *   **Default:** `5`
 *   **Arguments:**
     *   `int $limit` Maximum context topics.
-

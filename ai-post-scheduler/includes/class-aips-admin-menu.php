@@ -201,6 +201,15 @@ class AIPS_Admin_Menu {
 
         add_submenu_page(
             null,
+            __('View Source Data', 'ai-post-scheduler'),
+            __('View Source Data', 'ai-post-scheduler'),
+            'manage_options',
+            'aips-source-data',
+            array($this, 'render_source_data_page')
+        );
+
+        add_submenu_page(
+            null,
             __('Taxonomy', 'ai-post-scheduler'),
             __('Taxonomy', 'ai-post-scheduler'),
             'manage_options',
@@ -215,6 +224,15 @@ class AIPS_Admin_Menu {
             'manage_options',
             'aips-internal-links',
             array($this, 'render_internal_links_page')
+        );
+
+        add_submenu_page(
+            null,
+            __('Affiliate Links', 'ai-post-scheduler'),
+            __('Affiliate Links', 'ai-post-scheduler'),
+            'manage_options',
+            'aips-affiliate-links',
+            array($this, 'render_affiliate_links_page')
         );
 
         add_submenu_page(
@@ -244,14 +262,16 @@ class AIPS_Admin_Menu {
             array($this, 'render_status_page')
         );
 
-        add_submenu_page(
-            null,
-            __('Seeder', 'ai-post-scheduler'),
-            __('Seeder', 'ai-post-scheduler'),
-            'manage_options',
-            'aips-seeder',
-            array($this, 'render_seeder_page')
-        );
+        if (AIPS_Config::get_instance()->get_option('aips_developer_mode')) {
+            add_submenu_page(
+                null,
+                __('Seeder', 'ai-post-scheduler'),
+                __('Seeder', 'ai-post-scheduler'),
+                'manage_options',
+                'aips-seeder',
+                array($this, 'render_seeder_page')
+            );
+        }
 
         add_submenu_page(
             null,
@@ -275,12 +295,24 @@ class AIPS_Admin_Menu {
 
         add_submenu_page(
             null,
-            __('Cache Monitor', 'ai-post-scheduler'),
-            __('Cache Monitor', 'ai-post-scheduler'),
+            __('Stress Test', 'ai-post-scheduler'),
+            __('Stress Test', 'ai-post-scheduler'),
             'manage_options',
-            'aips-cache-monitor',
-            array($this, 'render_cache_monitor_page')
+            AIPS_Stress_Test_Controller::PAGE_SLUG,
+            array($this, 'render_stress_test_page')
         );
+
+        if (AIPS_Config::get_instance()->get_option('aips_cache_monitor_enabled')) {
+            add_submenu_page(
+                null,
+                __('Cache Monitor', 'ai-post-scheduler'),
+                __('Cache Monitor', 'ai-post-scheduler'),
+                'manage_options',
+                'aips-cache-monitor',
+                array($this, 'render_cache_monitor_page')
+            );
+        }
+      
         if (AIPS_Config::get_instance()->get_option('aips_developer_mode')) {
             add_submenu_page(
                 null,
@@ -347,6 +379,7 @@ class AIPS_Admin_Menu {
                 'aips-seeder',
                 'aips-dev-tools',
                 'aips-cache-monitor',
+                AIPS_Stress_Test_Controller::PAGE_SLUG,
             ),
             true
         );
@@ -367,8 +400,10 @@ class AIPS_Admin_Menu {
                 'aips-templates',
                 'aips-authors',
                 'aips-sources',
+                'aips-source-data',
                 'aips-taxonomy',
                 'aips-internal-links',
+                'aips-affiliate-links',
                 'aips-author-topics',
                 AIPS_Campaigns_Controller::PAGE_SLUG,
                 AIPS_Campaigns_Controller::DETAIL_PAGE_SLUG,
@@ -639,6 +674,51 @@ class AIPS_Admin_Menu {
     }
 
     /**
+     * Render the Source Data page.
+     *
+     * @return void
+     */
+    public function render_source_data_page() {
+        $source_id      = isset($_GET['source_id']) ? absint(wp_unslash($_GET['source_id'])) : 0;
+        $paged          = isset($_GET['source_data_paged']) ? absint(wp_unslash($_GET['source_data_paged'])) : 1;
+        $search         = isset($_GET['s']) ? sanitize_text_field(wp_unslash($_GET['s'])) : '';
+        $is_global_view = $source_id <= 0;
+        $per_page       = 20;
+
+        $repo      = new AIPS_Sources_Repository();
+        $data_repo = new AIPS_Sources_Data_Repository();
+        $source    = $source_id ? $repo->get_by_id($source_id) : null;
+        $sources   = $is_global_view ? $repo->get_all(false) : array();
+
+        $filters = array(
+            'fetch_status'      => isset($_GET['fetch_status']) ? sanitize_key(wp_unslash($_GET['fetch_status'])) : '',
+            'http_status_class' => isset($_GET['http_status_class']) ? absint(wp_unslash($_GET['http_status_class'])) : 0,
+            'fetched_after'     => isset($_GET['fetched_after']) ? sanitize_text_field(wp_unslash($_GET['fetched_after'])) : '',
+            'fetched_before'    => isset($_GET['fetched_before']) ? sanitize_text_field(wp_unslash($_GET['fetched_before'])) : '',
+            'min_char_count'    => isset($_GET['min_char_count']) ? absint(wp_unslash($_GET['min_char_count'])) : 0,
+            'max_char_count'    => isset($_GET['max_char_count']) ? absint(wp_unslash($_GET['max_char_count'])) : 0,
+            'search_body_text'  => !empty($_GET['search_body_text']),
+            'source_id'         => isset($_GET['filter_source_id']) ? absint(wp_unslash($_GET['filter_source_id'])) : 0,
+        );
+
+        if ($is_global_view) {
+            $source_data = $data_repo->get_paginated($search, $per_page, $paged, $filters);
+        } elseif (!$source) {
+            $source_data = array(
+                'items'        => array(),
+                'total'        => 0,
+                'pages'        => 0,
+                'current_page' => 1,
+                'per_page'     => $per_page,
+            );
+        } else {
+            $source_data = $data_repo->get_paginated_by_source_id($source_id, $search, $per_page, $paged, $filters);
+        }
+
+        include AIPS_PLUGIN_DIR . 'templates/admin/source-data.php';
+    }
+
+    /**
      * Render the Settings page.
      *
      * Includes the settings template file.
@@ -684,6 +764,18 @@ class AIPS_Admin_Menu {
     }
 
     /**
+     * Render the Stress Test page.
+     *
+     * Delegates rendering to AIPS_Stress_Test_Controller.
+     *
+     * @return void
+     */
+    public function render_stress_test_page() {
+        $controller = new AIPS_Stress_Test_Controller();
+        $controller->render_page();
+    }
+
+    /**
      * Render the Dev Tools page.
      *
      * Delegates rendering to the AIPS_Dev_Tools class.
@@ -717,6 +809,11 @@ class AIPS_Admin_Menu {
      *
      * @return void
      */
+    public function render_affiliate_links_page() {
+        $controller = new AIPS_Affiliate_Links_Controller();
+        $controller->render_page();
+    }
+
     public function render_internal_links_page() {
         global $aips_internal_links_controller;
 

@@ -1,3 +1,17 @@
+## [Unreleased]
+
+### Added
+- **WordPress AI Connector Routing**: Added Settings > AI controls for using all available WordPress AI connectors or an ordered allowlist, with connector-specific failover and short-lived health cooldowns. Request validation and content-policy failures are surfaced without provider shopping.
+
+### Fixed
+- **Short-form AI Responses**: Reserve at least 1200 output tokens for title and excerpt requests so reasoning-capable connector models do not cut off visible responses after spending the smaller configured budget on internal reasoning. The global Max Tokens Limit remains authoritative.
+- **WordPress AI Client Detection**: Treat locally registered connectors with configured credentials as available without requiring a successful remote model-catalog request during admin page loads. Live generation now surfaces the AI Client's connector/model error instead of showing a false missing-provider notice.
+- **Stress Test Reliability**: Give AIPS-scoped WordPress AI Client requests a 90-second timeout, retry one transient provider failure during interactive stress tests, and provide sufficient structured-output budget for reasoning-capable models.
+
+### Security
+- **Dev Tools Gating**: Cache Monitor and the Seeder are now disabled by default and properly enforce their feature flags (`aips_cache_monitor_enabled`, `aips_developer_mode`) at every layer — menu, Diagnostics tab, page render, and AJAX handlers — closing gaps where the flag was only checked for UI visibility. The AI scaffold generator ("Dev Tools") AJAX handler now also re-checks `aips_developer_mode`.
+- **MCP Bridge**: `mcp-bridge.php` is now disabled by default and can only be enabled by defining `AIPS_MCP_BRIDGE_ENABLED` and a shared-secret `AIPS_MCP_BRIDGE_TOKEN` in `wp-config.php` — it can no longer be turned on from the WordPress admin UI. All HTTP requests must now present a matching `token` field, closing a CSRF gap on this previously cookie-auth-only endpoint. See `docs/MCP_BRIDGE.md`.
+
 ## [3.5.1] - 2026-07-25
 
 ### Changed
@@ -46,6 +60,7 @@
 - **DST Production Seed Script**: Added DevStackTips production seeder script. ([#1756](../../pull/1756))
 
 ### Changed
+- **Planner Queue Management**: Staggered bulk-scheduled 'once' topics to improve background queue efficiency.
 - **Admin History**: Replaced full page reload with AJAX table reload when retrying failed generations to improve user flow.
 - Refactored multiple admin UI actions to update DOM tables dynamically without a full page reload for a smoother user experience.
 - **Cache Drivers**: Reduced available cache drivers to Array, WP Object Cache, and Database for simplicity and reliability. ([#1708](../../pull/1708))
@@ -152,6 +167,7 @@ All notable changes to this project will be documented in this file.
   - Eliminates 1970 UI date bugs from mixed timestamp formats
 
 ### Changed
+- **Planner Queue Management**: Staggered bulk-scheduled 'once' topics to improve background queue efficiency.
 - **Template Post Duplication Fix**: Resolved issue causing duplicate posts from single template runs
 - **System Status Operations**: Separated nonces per operation, direct logic execution, configurable batch sizes
 - **Performance Tab**: Renamed "Cache" to "Performance" with "Enable Cache System" toggle
@@ -170,6 +186,7 @@ All notable changes to this project will be documented in this file.
 - **Query diagnostics**: telemetry payloads now summarize slow queries and duplicate queries when `SAVEQUERIES` is available, using `AIPS_TELEMETRY_SLOW_QUERY_MS` and bounded query samples.
 
 ### Changed
+- **Planner Queue Management**: Staggered bulk-scheduled 'once' topics to improve background queue efficiency.
 - **Telemetry schema**: `aips_telemetry` now stores top-level request type, event categories, cache counters, total event count, and query anomaly counters for server-side filtering and faster list rendering.
 
 ## [2.3.1] - 2026-04-09
@@ -200,6 +217,7 @@ All notable changes to this project will be documented in this file.
 
 ## [refactor-post-generation-flow] - 2026-02-07
 ### Changed
+- **Planner Queue Management**: Staggered bulk-scheduled 'once' topics to improve background queue efficiency.
 - **MAJOR**: Refactored post generation to use AI Engine's Chatbot feature for conversational context
   - Content, title, and excerpt now generated in a single conversation with shared context
   - AI "remembers" previously generated components, resulting in better coherence

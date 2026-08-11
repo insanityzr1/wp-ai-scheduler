@@ -347,10 +347,11 @@ class AIPS_Author_Topics_Scheduler extends AIPS_Author_Slice_Scheduler_Base {
 	/**
 	 * Manually trigger topic generation for an author (e.g., from admin UI).
 	 *
-	 * @param int $author_id Author ID.
+	 * @param int  $author_id        Author ID.
+	 * @param bool $advance_schedule Whether to update the author's next run.
 	 * @return array|WP_Error Array of generated topics or WP_Error on failure.
 	 */
-	public function generate_now($author_id) {
+	public function generate_now($author_id, $advance_schedule = true) {
 		$author = $this->authors_repository->get_by_id($author_id);
 		
 		if (!$author) {
@@ -362,7 +363,9 @@ class AIPS_Author_Topics_Scheduler extends AIPS_Author_Slice_Scheduler_Base {
 		// Keep manual "Run Now" behavior aligned with cron runs by advancing
 		// schedule timestamps regardless of success/failure to avoid re-running
 		// immediately on the next cron tick.
-		$this->update_author_schedule($author);
+		if ($advance_schedule) {
+			$this->update_author_schedule($author);
+		}
 
 		return $result;
 	}

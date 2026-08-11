@@ -291,7 +291,9 @@ class AIPS_History_Repository implements AIPS_History_Repository_Interface {
                 {$event_domain_case_sql} AS event_domain,
                 {$event_label_case_sql} AS event_label,
                 {$actor_type_case_sql} AS actor_type,
-                t.name as template_name";
+                t.name as template_name,
+                CASE WHEN h.completed_at > 0 AND h.completed_at >= h.created_at THEN h.completed_at - h.created_at ELSE NULL END AS duration_seconds,
+                ls.warning_count, ls.error_count, ls.ai_call_count, ls.latest_message";
         } elseif ($args['fields'] === 'all') {
             // Include longtext fields only when 'all' is explicitly requested or defaulted to, to prevent breaking changes
             $fields_sql = "h.id, h.uuid, h.correlation_id, h.post_id, h.post_type, h.template_id, h.campaign_id, h.status, h.generated_title, h.error_message, h.created_at, h.completed_at, h.author_id, h.topic_id, h.creation_method, h.prompt, h.generated_content, h.generation_log,
@@ -416,7 +418,16 @@ class AIPS_History_Repository implements AIPS_History_Repository_Interface {
         $results = $this->wpdb->get_results($this->wpdb->prepare("
             SELECT $fields_sql
             FROM {$this->table_name} h 
-            LEFT JOIN {$templates_table} t ON h.template_id = t.id 
+            LEFT JOIN {$templates_table} t ON h.template_id = t.id
+            LEFT JOIN (
+                SELECT history_id,
+                    SUM(CASE WHEN history_type_id = 3 THEN 1 ELSE 0 END) AS warning_count,
+                    SUM(CASE WHEN history_type_id = 2 THEN 1 ELSE 0 END) AS error_count,
+                    SUM(CASE WHEN history_type_id = 5 THEN 1 ELSE 0 END) AS ai_call_count,
+                    LEFT(SUBSTRING_INDEX(GROUP_CONCAT(details ORDER BY timestamp DESC SEPARATOR '||'), '||', 1), 180) AS latest_message
+                FROM {$this->table_name_log}
+                GROUP BY history_id
+            ) ls ON h.id = ls.history_id
             WHERE $where_sql
             ORDER BY h.$orderby $order 
             LIMIT %d OFFSET %d
@@ -792,6 +803,27 @@ class AIPS_History_Repository implements AIPS_History_Repository_Interface {
                     ? round(($stats['completed'] / $stats['total']) * 100, 1)
                     : 0;
 
+                $durations = $this->wpdb->get_col(
+                    $this->wpdb->prepare(
+                        "SELECT completed_at - created_at
+                         FROM {$this->table_name}
+                         WHERE completed_at > 0
+                           AND completed_at >= created_at
+                           AND COALESCE(creation_method, '') NOT IN ({$auxiliary_placeholders})
+                           AND NOT (creation_method IS NULL AND template_id IS NULL AND topic_id IS NULL AND post_id IS NULL AND author_id IS NULL)
+                         ORDER BY completed_at - created_at ASC",
+                        ...$auxiliary_methods
+                    )
+                );
+                $duration_count = count($durations);
+                $stats['median_duration'] = null;
+                if ($duration_count > 0) {
+                    $middle = intdiv($duration_count, 2);
+                    $stats['median_duration'] = $duration_count % 2
+                        ? (int) $durations[$middle]
+                        : (int) round(((int) $durations[$middle - 1] + (int) $durations[$middle]) / 2);
+                }
+
                 return $stats;
             }
         );
@@ -870,6 +902,7 @@ class AIPS_History_Repository implements AIPS_History_Repository_Interface {
             'schedule_lifecycle',
             'template_lifecycle',
             'campaign_lifecycle',
+            'notification_sent',
         );
     }
 

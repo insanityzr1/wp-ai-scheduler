@@ -118,6 +118,32 @@ class Test_AIPS_Integrations_Controller extends WP_UnitTestCase {
 		$this->assertSame('field_headline', $get_response['data']['mappings'][0]['field_key']);
 	}
 
+	public function test_save_field_mappings_rejects_unknown_integration() {
+		$controller = new AIPS_Integrations_Controller($this->repo);
+		$mappings = array(
+			array(
+				'integration_id' => 'no_such_integration',
+				'source_key'     => 'g',
+				'field_key'      => 'field_x',
+				'field_type'     => 'text',
+				'is_active'      => true,
+			),
+		);
+
+		$_POST = array(
+			'action'      => 'aips_save_field_mappings',
+			'nonce'       => wp_create_nonce('aips_ajax_nonce'),
+			'template_id' => 21,
+			'mappings'    => wp_json_encode($mappings),
+		);
+		$this->sync_request_from_post();
+
+		$response = $this->run_ajax(array($controller, 'ajax_save_field_mappings'));
+
+		$this->assertFalse($response['success']);
+		$this->assertCount(0, $this->repo->get_by_template(21, false), 'A row for an unknown integration must not be persisted.');
+	}
+
 	public function test_switching_field_group_retires_previous_group_mappings() {
 		$controller = new AIPS_Integrations_Controller($this->repo);
 

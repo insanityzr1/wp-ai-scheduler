@@ -280,3 +280,8 @@ Outcome: Faster, smoother transitions between states without losing scroll posit
 **Improvement:** Stagger scheduled topics with frequency 'once' to improve queue management
 **Files Modified:** ai-post-scheduler/includes/class-aips-planner.php, ai-post-scheduler/tests/Test_Bulk_Schedule.php
 **Outcome:** Reduced concurrent background queue spike by staggering 'once' schedules
+## 2026-08-11 - Research Planner Optimization
+Target Feature: Research Planner
+Improvement: Standardized the 'Clear Topics' confirmation using AIPS.Utilities.confirm to improve user workflow consistency.
+Files Modified: ai-post-scheduler/assets/js/admin-planner.js
+Outcome: Replaced custom inline soft-confirm with standard modal, preventing unintended clearing and aligning with UX patterns.

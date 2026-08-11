@@ -171,40 +171,28 @@
          * Bound to the `click` event on `#btn-clear-topics`.
          */
         clearTopics: function() {
-            var $btn = $(this);
-            var originalText = $btn.data('original-text') || $btn.text();
+            var $topicsList = $('#topics-list');
+            var $resultsPanel = $('#planner-results');
 
-            // Store original text if not already stored
-            if (!$btn.data('original-text')) {
-                $btn.data('original-text', originalText);
-            }
-
-            if ($btn.data('is-confirming')) {
-                // Second click - Execute
-                $('#topics-list').empty();
-                $('#planner-results').removeClass('active');
-                $('#planner-niche').val('');
-                $('#planner-manual-topics').val('');
-                $('#planner-topic-search').val(''); // Clear search input
-                window.AIPS.updateSelectionCount();
-
-                // Reset button
-                $btn.text(originalText);
-                $btn.removeData('is-confirming');
-                clearTimeout($btn.data('timeout'));
-            } else {
-                // First click - Ask for confirmation
-                $btn.text('Click again to confirm');
-                $btn.data('is-confirming', true);
-
-                // Reset after 3 seconds
-                var timeout = setTimeout(function() {
-                    $btn.text(originalText);
-                    $btn.removeData('is-confirming');
-                }, 3000);
-
-                $btn.data('timeout', timeout);
-            }
+            AIPS.Utilities.confirm('Are you sure you want to clear all topics? This cannot be undone.', 'Confirm', [
+                {
+                    label: 'Cancel',
+                    className: 'aips-btn-ghost',
+                    closeAfterAction: true
+                },
+                {
+                    label: 'Clear Topics',
+                    className: 'aips-btn-primary aips-btn-danger',
+                    action: function() {
+                        $topicsList.empty();
+                        $resultsPanel.removeClass('active');
+                        $('#planner-niche').val('');
+                        $('#planner-manual-topics').val('');
+                        $('#planner-topic-search').val(''); // Clear search input
+                        window.AIPS.updateSelectionCount();
+                    }
+                }
+            ]);
         },
 
         /**

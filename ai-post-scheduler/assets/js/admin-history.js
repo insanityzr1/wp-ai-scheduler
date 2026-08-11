@@ -1563,6 +1563,8 @@
 				['status', this.statusFilter, $('#aips-filter-status option:selected').text()],
 				['domain', this.domainFilter, $('#aips-filter-domain option:selected').text()],
 				['actor', this.actorFilter, $('#aips-filter-actor option:selected').text()],
+				['post_type', this.postTypeFilter, $('#aips-filter-post-type option:selected').text()],
+				['correlation_id', this.correlationId, this.correlationId ? 'Correlation: ' + this.correlationId : ''],
 				['date_from', this.dateFrom, this.dateFrom ? 'From ' + this.dateFrom : ''],
 				['date_to', this.dateTo, this.dateTo ? 'To ' + this.dateTo : ''],
 				['search', this.searchQuery, this.searchQuery ? 'Search: ' + this.searchQuery : '']
@@ -1572,7 +1574,7 @@
 			}).join('');
 			if (html) { html += '<button type="button" class="aips-history-clear-filters">Clear all</button>'; }
 			$('#aips-history-filter-chips').html(html);
-			if (this.domainFilter || this.actorFilter || this.dateFrom || this.dateTo) {
+			if (this.domainFilter || this.actorFilter || this.postTypeFilter || this.correlationId || this.dateFrom || this.dateTo) {
 				$('#aips-history-advanced-filters').prop('hidden', false);
 				$('#aips-history-more-filters').attr('aria-expanded', 'true');
 			}
@@ -1581,14 +1583,14 @@
 		removeFilterChip: function (e) {
 			e.preventDefault();
 			var filter = $(e.currentTarget).data('filter');
-			var selectors = { status: '#aips-filter-status', domain: '#aips-filter-domain', actor: '#aips-filter-actor', date_from: '#aips-filter-date-from', date_to: '#aips-filter-date-to', search: '#aips-history-search-input' };
+			var selectors = { status: '#aips-filter-status', domain: '#aips-filter-domain', actor: '#aips-filter-actor', post_type: '#aips-filter-post-type', correlation_id: '#aips-filter-correlation', date_from: '#aips-filter-date-from', date_to: '#aips-filter-date-to', search: '#aips-history-search-input' };
 			$(selectors[filter]).val('');
 			this.applyFilter();
 		},
 
 		clearAllFilters: function (e) {
 			if (e) { e.preventDefault(); }
-			$('#aips-filter-status, #aips-filter-domain, #aips-filter-actor, #aips-filter-date-from, #aips-filter-date-to, #aips-history-search-input').val('');
+			$('#aips-filter-status, #aips-filter-domain, #aips-filter-actor, #aips-filter-post-type, #aips-filter-correlation, #aips-filter-date-from, #aips-filter-date-to, #aips-history-search-input').val('');
 			this.applyFilter();
 		},
 

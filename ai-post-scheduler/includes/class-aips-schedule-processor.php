@@ -697,9 +697,10 @@ class AIPS_Schedule_Processor {
         // ── Per-schedule circuit breaker (automated runs only) ──────────────
         // After CIRCUIT_FAILURE_THRESHOLD consecutive pure failures a schedule's
         // circuit trips 'open' and generation is skipped to stop hammering a
-        // failing schedule. After a cooldown, one 'half_open' probe run is
-        // allowed: success closes the circuit, failure re-opens it. Manual runs
-        // always bypass the breaker so operators can force a run and recover.
+        // failing schedule. After a cooldown, one in-memory probe run is allowed
+        // (the DB state stays 'open'): success closes the circuit, failure
+        // re-opens it. Manual runs always bypass the breaker so operators can
+        // force a run — and a successful manual run closes an open circuit.
         $old_run_state  = $is_manual ? array() : $this->get_decoded_run_state($schedule);
         $prior_failures = isset($old_run_state['consecutive_failures']) ? (int) $old_run_state['consecutive_failures'] : 0;
         $is_probe       = false;
@@ -720,21 +721,12 @@ class AIPS_Schedule_Processor {
                 $this->logger->log('Circuit probe (cooldown elapsed) for schedule ' . $schedule->schedule_id, 'info');
             } else {
                 // Still open and within cooldown — skip this run entirely.
+                // Only a log line is emitted (no lifecycle-history entry): while a
+                // circuit is open, every due tick would otherwise write a skip row,
+                // which is noise for schedules more frequent than the cooldown. The
+                // prior 'circuit_opened' event and the health badge already convey
+                // the open state.
                 $this->logger->log('Circuit open — skipping schedule ' . $schedule->schedule_id, 'warning');
-                $skip_history = $this->result_handler->get_or_create_schedule_history($schedule->schedule_id);
-                if (is_object($skip_history) && method_exists($skip_history, 'record')) {
-                    $skip_history->record(
-                        'warning',
-                        sprintf(
-                            /* translators: %s: schedule name */
-                            __('Schedule "%s" skipped: circuit breaker is open.', 'ai-post-scheduler'),
-                            isset($schedule->name) ? $schedule->name : ''
-                        ),
-                        array('event_type' => 'circuit_open_skipped', 'event_status' => 'warning'),
-                        null,
-                        array('schedule_id' => $schedule->schedule_id)
-                    );
-                }
                 return;
             }
         }
@@ -1214,6 +1206,30 @@ class AIPS_Schedule_Processor {
                         'is_active' => 0,
                         'status'    => 'completed',
                     ));
+                }
+            }
+
+            // A successful manual run proves the schedule can generate again, so
+            // recover an open circuit immediately rather than leaving it gated on
+            // cron until the cooldown probe. Mirrors the automated success path's
+            // circuit close. Runs regardless of $advance_schedule.
+            if (!is_wp_error($overall_result)
+                && isset($schedule->circuit_state)
+                && (string) $schedule->circuit_state !== 'closed'
+            ) {
+                $this->repository->reset_circuit($schedule->schedule_id);
+                if (is_object($history) && method_exists($history, 'record')) {
+                    $history->record(
+                        'activity',
+                        sprintf(
+                            /* translators: %s: schedule name */
+                            __('Circuit breaker closed for schedule "%s" after a successful manual run.', 'ai-post-scheduler'),
+                            isset($schedule->name) ? $schedule->name : ''
+                        ),
+                        array('event_type' => 'circuit_closed', 'event_status' => 'success'),
+                        null,
+                        array('schedule_id' => $schedule->schedule_id)
+                    );
                 }
             }
         }

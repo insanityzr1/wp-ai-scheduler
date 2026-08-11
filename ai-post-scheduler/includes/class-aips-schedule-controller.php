@@ -1156,6 +1156,13 @@ class AIPS_Schedule_Controller {
             AIPS_Ajax_Response::error(__('Circuit reset is only available for template schedules.', 'ai-post-scheduler'));
         }
 
+        // Verify the schedule exists before resetting: a bare UPDATE on a missing
+        // row still "succeeds" (0 rows affected), so without this check the
+        // endpoint would falsely report success for a non-existent schedule.
+        if (!$this->schedule_repository->get_by_id($id)) {
+            AIPS_Ajax_Response::error(__('Schedule not found.', 'ai-post-scheduler'));
+        }
+
         // Reset the circuit state via the repository so cache invalidation is
         // handled consistently (never write the schedule table from the controller).
         $result = $this->schedule_repository->reset_circuit($id);

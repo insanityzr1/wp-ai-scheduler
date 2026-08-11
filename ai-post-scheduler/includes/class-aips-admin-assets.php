@@ -234,6 +234,7 @@ class AIPS_Admin_Assets {
 				'confirmCleanup'        => __('This permanently deletes every post and image created by the Stress Test page. Continue?', 'ai-post-scheduler'),
 				'confirmCleanupHeading' => __('Delete test data', 'ai-post-scheduler'),
 				'confirmCleanupAction'  => __('Yes, delete', 'ai-post-scheduler'),
+				'nothingToExport'       => __('Run at least one test case before exporting.', 'ai-post-scheduler'),
 			),
 		));
 	}

@@ -2,6 +2,9 @@
 
 ### Added
 - **WordPress AI Connector Routing**: Added Settings > AI controls for using all available WordPress AI connectors or an ordered allowlist, with connector-specific failover and short-lived health cooldowns. Request validation and content-policy failures are surfaced without provider shopping.
+- **Stress Test: Integration (meta field) cases**: The Diagnostics > Stress Test page gained four cases that exercise the Integration generation engine end to end — a single native custom field, a batched multi-field run (the N-fields-to-one-call path), native custom fields written onto a generated **custom post type** post, and (only when ACF is installed and active) an ACF field-group case. Each drives the real `AIPS_Integration_Manager` against the page's isolated AI service and reads the written values back to verify them.
+- **Stress Test: Export Results**: An "Export Results" button downloads the full run — provider/model/version snapshot, per-case status, timings, compared values, and the complete AI request/response log — as a single JSON file for sharing and analysis.
+- **Meta-field template setup script**: `scripts/create-meta-field-templates.php` (WP-CLI `wp eval-file`) creates two ready-to-run Templates wired to native WordPress custom fields, for exercising integration generation without ACF.
 
 ### Fixed
 - **Short-form AI Responses**: Reserve at least 1200 output tokens for title and excerpt requests so reasoning-capable connector models do not cut off visible responses after spending the smaller configured budget on internal reasoning. The global Max Tokens Limit remains authoritative.

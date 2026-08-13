@@ -95,6 +95,17 @@ class AIPS_Generated_Posts_Controller {
 		$time_format = get_option('time_format');
 		$datetime_format = $date_format . ' ' . $time_format;
 
+		// Pre-fetch posts for history items to avoid N+1 query overhead
+		$history_post_ids = array();
+		foreach ($history['items'] as $item) {
+			if (!empty($item->post_id)) {
+				$history_post_ids[] = $item->post_id;
+			}
+		}
+		if (!empty($history_post_ids) && function_exists('_prime_post_caches')) {
+			_prime_post_caches(array_unique(array_filter(array_map('intval', $history_post_ids))), false, true);
+		}
+
 		// Get schedule data for each post
 		$posts_data = array();
 		foreach ($history['items'] as $item) {
@@ -154,6 +165,17 @@ class AIPS_Generated_Posts_Controller {
 			'author_id' => $author_id,
 			'template_id' => $template_id,
 		));
+
+		// Pre-fetch posts for partial generations to avoid N+1 query overhead
+		$partial_post_ids = array();
+		foreach ($partial_generations['items'] as $item) {
+			if (!empty($item->post_id)) {
+				$partial_post_ids[] = $item->post_id;
+			}
+		}
+		if (!empty($partial_post_ids) && function_exists('_prime_post_caches')) {
+			_prime_post_caches(array_unique(array_filter(array_map('intval', $partial_post_ids))), false, true);
+		}
 
 		$partial_posts_data = array();
 		foreach ($partial_generations['items'] as $item) {

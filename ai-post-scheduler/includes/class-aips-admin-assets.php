@@ -84,6 +84,19 @@ class AIPS_Admin_Assets {
 
 		$this->enqueue_global_assets();
 
+		$this->dispatch_page_assets($hook, $page);
+	}
+
+	/**
+	 * Dispatch asset enqueuing based on the current page and hook.
+	 *
+	 * Extracted from enqueue_admin_assets to reduce complexity and improve maintainability.
+	 *
+	 * @param string $hook The current admin page hook.
+	 * @param string $page The current page slug.
+	 * @return void
+	 */
+	private function dispatch_page_assets($hook, $page) {
         if ($this->hook_contains($hook, self::HOOK_DASHBOARD) || self::PAGE_DASHBOARD === $page) {
 			$this->enqueue_dashboard_assets();
 		}
@@ -183,7 +196,6 @@ class AIPS_Admin_Assets {
 		}
 
 	}
-
 	/**
 	 * Enqueue assets for the Stress Test page.
 	 *

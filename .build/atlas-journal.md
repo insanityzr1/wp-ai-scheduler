@@ -1438,3 +1438,9 @@ This refactoring resolves the "unexpected title prompts" issue by eliminating du
 **Decision:** Extracted post-execution cleanup, failure logging, success logging, and history container logic into a dedicated `AIPS_Schedule_Result_Handler` class.
 **Consequence:** `AIPS_Schedule_Processor` is now strictly focused on the execution logic. Reduced the class size significantly and decoupled the specific handling of success and error states.
 **Tests:** Created `test-schedule-result-handler.php` to verify result handling. Test execution skipped per user request.
+
+## 2024-10-27 - [Refactor Admin Assets Dispatcher]
+**Context:** The `enqueue_admin_assets` method in `AIPS_Admin_Assets` was a "God Method" of over 100 lines handling the dispatching logic for all admin pages.
+**Decision:** Extracted the dispatching logic into a private `dispatch_page_assets($hook, $page)` method.
+**Consequence:** `enqueue_admin_assets` is now focused and smaller, improving readability.
+**Tests:** Ran the full PHPUnit test suite to ensure admin asset enqueuing behavior remains unchanged.

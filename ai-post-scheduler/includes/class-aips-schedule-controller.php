@@ -118,12 +118,15 @@ class AIPS_Schedule_Controller {
         $all_schedules = $unified_service->get_all('', false);
         $timeline = array();
         $active_schedules = 0;
+        $paused_schedules = 0;
         $overdue_schedules = 0;
 
         foreach ($all_schedules as $schedule) {
             $is_active = !empty($schedule['is_active']);
             if ($is_active) {
                 $active_schedules++;
+            } else {
+                $paused_schedules++;
             }
 
             $next_run = isset($schedule['next_run']) ? (int) $schedule['next_run'] : 0;
@@ -153,6 +156,26 @@ class AIPS_Schedule_Controller {
             return (int) $a['timestamp'] - (int) $b['timestamp'];
         });
 
+        // 24-hour generation output metrics
+        $stats_24h_completed = 0;
+        $stats_24h_failed    = 0;
+        if ($this->history_repository) {
+            $since_24h = gmdate('Y-m-d H:i:s', $now - DAY_IN_SECONDS);
+            $history_24h = $this->history_repository->get_history(array(
+                'date_from' => $since_24h,
+                'per_page'  => 500,
+            ));
+            foreach ($history_24h as $h_item) {
+                if ('completed' === $h_item->status) {
+                    $stats_24h_completed++;
+                } elseif ('failed' === $h_item->status) {
+                    $stats_24h_failed++;
+                }
+            }
+        }
+        $total_24h_runs = $stats_24h_completed + $stats_24h_failed;
+        $success_rate_24h = $total_24h_runs > 0 ? round(($stats_24h_completed / $total_24h_runs) * 100) : 100;
+
         $bulk_job_store = new AIPS_Bulk_Batch_Job_Store();
         $bulk_counts = $bulk_job_store->get_status_counts(array('pending', 'processing', 'failed'));
 
@@ -179,6 +202,15 @@ class AIPS_Schedule_Controller {
             }
         }
 
+        // Compute overall system health tone
+        $health_state = 'healthy';
+        if ($overdue_schedules > 0) {
+            $health_state = 'warning';
+        }
+        if (!empty($bulk_counts['failed']) && $bulk_counts['failed'] > 0) {
+            $health_state = 'critical';
+        }
+
         $payload = array(
             'next_runs' => $next_runs,
             'timeline' => $timeline,
@@ -187,9 +219,16 @@ class AIPS_Schedule_Controller {
             'bulk_jobs' => $bulk_counts,
             'schedule_counts' => array(
                 'active' => $active_schedules,
+                'paused' => $paused_schedules,
                 'upcoming_24h' => count($timeline),
                 'overdue' => $overdue_schedules,
             ),
+            'output_24h' => array(
+                'completed'    => $stats_24h_completed,
+                'failed'       => $stats_24h_failed,
+                'success_rate' => $success_rate_24h,
+            ),
+            'health_state' => $health_state,
             'last_success' => $last_success,
             'retry_pending' => ($queue_depth['aips_retry_failed_author_slices_topics'] + $queue_depth['aips_retry_failed_author_slices_posts']) > 0,
             'last_error' => $bulk_counts['failed'] > 0,

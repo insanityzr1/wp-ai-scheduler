@@ -1073,34 +1073,7 @@ class AIPS_Generator {
         do_action('aips_post_generation_started', $context->get_id(), $context->get_topic() ? $context->get_topic() : '');
 
         // Create new history container using new API
-        // Extract source information from context
-        $history_metadata = array();
-
-        if ($context instanceof AIPS_Template_Context) {
-            $history_metadata['template_id'] = $context->get_id();
-            $template = $context->get_template();
-            if ($template && !empty($template->campaign_id)) {
-                $history_metadata['campaign_id'] = absint($template->campaign_id);
-            }
-        } elseif ($context instanceof AIPS_Topic_Context) {
-            // For topic context, store author_id and topic_id
-            $history_metadata['topic_id'] = $context->get_id();
-            $author = $context->get_author();
-            if ($author && isset($author->id)) {
-                $history_metadata['author_id'] = $author->id;
-            }
-        }
-
-        // Get creation_method from context, default to 'manual' if not specified
-        $creation_method = $context->get_creation_method() ?: 'manual';
-        $history_metadata['creation_method'] = $creation_method;
-
-        $this->current_history = $this->history_service->create('post_generation', $history_metadata)->with_session($context);
-
-        if (!$this->current_history->get_id()) {
-            // Fallback if history creation fails (though unlikely)
-            $this->logger->log('Failed to create history record', 'error');
-        }
+        $this->setup_generation_history($context);
 
         // Open a transcript for this run when conversational generation is enabled
         // and the active provider can replay it.
@@ -1183,6 +1156,64 @@ class AIPS_Generator {
             return $error;
         }
 
+        // Metadata generation sets title and excerpt. It requires content.
+        $metadata = $this->generate_post_metadata($context, $content, $component_statuses);
+
+        // Update the content since metadata step can strip the leading title block
+        if (isset($metadata['content'])) {
+            $content = $metadata['content'];
+        }
+
+        return $this->finalize_post_creation($context, $content, $metadata, $component_statuses, $generation_start);
+    }
+
+    /**
+     * Set up the history container for a generation run.
+     *
+     * @param AIPS_Generation_Context $context Generation context.
+     * @return void
+     */
+    private function setup_generation_history($context) {
+        // Extract source information from context
+        $history_metadata = array();
+
+        if ($context instanceof AIPS_Template_Context) {
+            $history_metadata['template_id'] = $context->get_id();
+            $template = $context->get_template();
+            if ($template && !empty($template->campaign_id)) {
+                $history_metadata['campaign_id'] = absint($template->campaign_id);
+            }
+        } elseif ($context instanceof AIPS_Topic_Context) {
+            // For topic context, store author_id and topic_id
+            $history_metadata['topic_id'] = $context->get_id();
+            $author = $context->get_author();
+            if ($author && isset($author->id)) {
+                $history_metadata['author_id'] = $author->id;
+            }
+        }
+
+        // Get creation_method from context, default to 'manual' if not specified
+        $creation_method = $context->get_creation_method() ?: 'manual';
+        $history_metadata['creation_method'] = $creation_method;
+
+        $this->current_history = $this->history_service->create('post_generation', $history_metadata)->with_session($context);
+
+        if (!$this->current_history->get_id()) {
+            // Fallback if history creation fails (though unlikely)
+            $this->logger->log('Failed to create history record', 'error');
+        }
+    }
+
+    /**
+     * Generate post metadata (title, excerpt, image prompt) based on context and content.
+     * Strips leading title block from the content.
+     *
+     * @param AIPS_Generation_Context $context Generation context.
+     * @param string $content Generated article content.
+     * @param array &$component_statuses Array of component success statuses.
+     * @return array Array containing title, excerpt, content, and resolved image prompt.
+     */
+    private function generate_post_metadata($context, $content, &$component_statuses) {
         // When the combined metadata turn is enabled, ask for the AI variables,
         // title, excerpt, and image prompt in one structured request. It returns
         // null on any failure, in which case the per-component requests below run
@@ -1265,6 +1296,29 @@ class AIPS_Generator {
 
         // Set Post Excerpt component status based on whether excerpt generation was successful
         $component_statuses['post_excerpt'] = (bool) $excerpt_success;
+
+        return array(
+            'title' => $title,
+            'excerpt' => $excerpt,
+            'content' => $content,
+            'resolved_image_prompt' => $resolved_image_prompt,
+        );
+    }
+
+    /**
+     * Finalize post creation, status, featured image, and logging.
+     *
+     * @param AIPS_Generation_Context $context Generation context.
+     * @param string $content Generated post content.
+     * @param array $metadata Metadata from generate_post_metadata.
+     * @param array $component_statuses Array of component success statuses.
+     * @param float $generation_start Microtime when generation started.
+     * @return int|WP_Error Post ID or error.
+     */
+    private function finalize_post_creation($context, $content, $metadata, $component_statuses, $generation_start) {
+        $title = $metadata['title'];
+        $excerpt = $metadata['excerpt'];
+        $resolved_image_prompt = $metadata['resolved_image_prompt'];
 
         // Determine whether this Post has "Partial Generations" based on
         // components known before post creation (title/content/excerpt; the

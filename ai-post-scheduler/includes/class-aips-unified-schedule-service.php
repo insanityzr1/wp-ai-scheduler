@@ -259,9 +259,12 @@ class AIPS_Unified_Schedule_Service {
 				return $this->format_history_logs($logs);
 
 			case self::TYPE_AUTHOR_POST:
+				// 'author_post_generation' is the canonical event_type emitted by
+				// AIPS_Generator; 'topic_post_generation' is retained so historical
+				// rows written before the generator unification still surface.
 				$logs = $this->history_repository->get_author_schedule_logs_by_event_types(
 					$id,
-					array('topic_post_generation'),
+					array('author_post_generation', 'topic_post_generation'),
 					$limit > 0 ? $limit : 100
 				);
 				return $this->format_history_logs($logs);

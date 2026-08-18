@@ -1438,3 +1438,9 @@ This refactoring resolves the "unexpected title prompts" issue by eliminating du
 **Decision:** Extracted post-execution cleanup, failure logging, success logging, and history container logic into a dedicated `AIPS_Schedule_Result_Handler` class.
 **Consequence:** `AIPS_Schedule_Processor` is now strictly focused on the execution logic. Reduced the class size significantly and decoupled the specific handling of success and error states.
 **Tests:** Created `test-schedule-result-handler.php` to verify result handling. Test execution skipped per user request.
+
+## 2026-06-25 - [Extract History AJAX Handlers]
+**Context:** `AIPS_History` was a "God Object" (~1575 lines), handling data logic, modal/view preparation, and complex AJAX routing and handlers.
+**Decision:** Extracted all `ajax_*` methods and `wp_ajax_*` hooks into a new `AIPS_History_Ajax_Controller`. `AIPS_History` retains the view logic and acts as a dependency to the controller.
+**Consequence:** Single Responsibility Principle applied. `AIPS_History` size is significantly reduced. Controller cleanly handles request routing. Methods shared between view and AJAX have been made public.
+**Tests:** Checked syntax with `php -l`. Ran full PHPUnit test suite to ensure backwards compatibility and no regressions.

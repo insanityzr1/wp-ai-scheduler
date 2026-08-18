@@ -191,6 +191,10 @@ class AIPS_Settings {
 				'sanitize_callback' => array($ui, 'sanitize_similarity_threshold'),
 				'default'           => $defaults['aips_topic_similarity_threshold'],
 			),
+			'aips_post_feedback_enabled' => array(
+				'sanitize_callback' => 'absint',
+				'default'           => $defaults['aips_post_feedback_enabled'],
+			),
 			'aips_enable_cache_system' => array(
 				'sanitize_callback' => array($ui, 'sanitize_enable_cache_system'),
 				'default'           => $defaults['aips_enable_cache_system'],
@@ -208,6 +212,34 @@ class AIPS_Settings {
 				'default'           => $defaults['aips_cache_default_ttl'],
 			),
 		);
+
+		foreach (array(
+			'aips_post_feedback_like_weight',
+			'aips_post_feedback_dislike_weight',
+			'aips_post_feedback_similarity_weight',
+			'aips_post_feedback_recency_weight',
+			'aips_post_feedback_author_match_weight',
+			'aips_post_feedback_template_match_weight',
+			'aips_post_feedback_global_pool_weight',
+			'aips_post_feedback_min_similarity',
+			'aips_post_feedback_edited_content_weight',
+		) as $option_name) {
+			$settings[$option_name] = array(
+				'sanitize_callback' => array($ui, 'sanitize_post_feedback_weight'),
+				'default'           => $defaults[$option_name],
+			);
+		}
+
+		foreach (array(
+			'aips_post_feedback_max_examples',
+			'aips_post_feedback_min_samples',
+			'aips_post_feedback_prompt_budget_chars',
+		) as $option_name) {
+			$settings[$option_name] = array(
+				'sanitize_callback' => array($ui, 'sanitize_post_feedback_count'),
+				'default'           => $defaults[$option_name],
+			);
+		}
 
 		foreach (self::get_content_strategy_options() as $option_key => $meta) {
 			$settings[$option_key] = array(
@@ -377,6 +409,22 @@ class AIPS_Settings {
             'aips-settings',
             'aips_feedback_section'
         );
+
+		add_settings_field(
+			'aips_post_feedback_enabled',
+			__('Generated Post Feedback', 'ai-post-scheduler'),
+			array($this->ui, 'post_feedback_enabled_field_callback'),
+			'aips-settings',
+			'aips_feedback_section'
+		);
+
+		add_settings_field(
+			'aips_post_feedback_weights',
+			__('Post Feedback Influence', 'ai-post-scheduler'),
+			array($this->ui, 'post_feedback_weights_field_callback'),
+			'aips-settings',
+			'aips_feedback_section'
+		);
 
         // -----------------------------------------------------------------------
         // Notifications section: Email address + all per-type preferences

@@ -188,11 +188,13 @@ class AIPS_Template_Repository {
             'source_group_ids' => isset($data['source_group_ids']) ? sanitize_text_field($data['source_group_ids']) : wp_json_encode(array()),
             'campaign_id' => !empty($data['campaign_id']) ? absint($data['campaign_id']) : null,
             'is_active' => isset($data['is_active']) ? 1 : 0,
+			'feedback_enabled' => array_key_exists('feedback_enabled', $data) ? $data['feedback_enabled'] : null,
+			'feedback_config' => isset($data['feedback_config']) ? $data['feedback_config'] : null,
             'created_at' => $now,
             'updated_at' => $now,
         );
 
-        $format = array('%s', '%s', '%s', '%d', '%d', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%s', '%d', '%d', '%d', '%d');
+        $format = array('%s', '%s', '%s', '%d', '%d', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%s', '%d', '%d', '%d', '%d', '%d', '%s');
 
         $result = $this->wpdb->insert($this->table_name, $insert_data, $format);
 
@@ -214,6 +216,15 @@ class AIPS_Template_Repository {
         $update_data = array();
         $format = array();
         $allowed_sources = array('ai_prompt', 'unsplash', 'media_library');
+
+		if (array_key_exists('feedback_enabled', $data)) {
+			$update_data['feedback_enabled'] = $data['feedback_enabled'];
+			$format[] = '%d';
+		}
+		if (array_key_exists('feedback_config', $data)) {
+			$update_data['feedback_config'] = $data['feedback_config'];
+			$format[] = '%s';
+		}
 
         if (isset($data['name'])) {
             $update_data['name'] = sanitize_text_field($data['name']);

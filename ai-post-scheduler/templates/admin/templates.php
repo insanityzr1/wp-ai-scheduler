@@ -579,6 +579,7 @@ $is_embedded_templates_view = !empty($embedded);
                                 <?php esc_html_e('Template is active', 'ai-post-scheduler'); ?>
                             </label>
                         </div>
+						<?php $feedback_scope_prefix = 'template'; include AIPS_PLUGIN_DIR . 'templates/partials/post-feedback-scope-settings.php'; ?>
                     </div>
                     
                     <!-- Step 5: Post-Save Next Steps (shown after successful save) -->

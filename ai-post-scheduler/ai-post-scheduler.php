@@ -870,6 +870,7 @@ final class AI_Post_Scheduler {
 
         // Native WordPress post list/editor History links for plugin containers.
         new AIPS_Post_History_UI();
+		new AIPS_Post_Feedback_Editor();
 
         // Internal Links controller must be available globally so the admin-menu
         // render callback can call $controller->render_page() without reconstructing

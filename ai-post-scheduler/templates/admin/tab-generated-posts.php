@@ -96,7 +96,16 @@ if (!defined('ABSPATH')) {
 				<!-- Generated posts table -->
 				<div class="aips-panel-body no-padding">
 					<?php if (!empty($post_feedback_enabled) && !empty($posts_data)): ?>
-					<div class="tablenav top"><select id="aips-post-feedback-bulk-action"><option value=""><?php esc_html_e('Feedback bulk action', 'ai-post-scheduler'); ?></option><option value="liked"><?php esc_html_e('Like', 'ai-post-scheduler'); ?></option><option value="disliked"><?php esc_html_e('Dislike', 'ai-post-scheduler'); ?></option><option value="cleared"><?php esc_html_e('Clear Feedback', 'ai-post-scheduler'); ?></option></select> <button type="button" id="aips-post-feedback-bulk-apply" class="button"><?php esc_html_e('Apply', 'ai-post-scheduler'); ?></button></div>
+					<div class="tablenav top">
+						<select id="aips-post-feedback-bulk-action"><option value=""><?php esc_html_e('Feedback bulk action', 'ai-post-scheduler'); ?></option><option value="liked"><?php esc_html_e('Like', 'ai-post-scheduler'); ?></option><option value="disliked"><?php esc_html_e('Dislike', 'ai-post-scheduler'); ?></option><option value="cleared"><?php esc_html_e('Clear Feedback', 'ai-post-scheduler'); ?></option></select>
+						<span class="aips-post-feedback-bulk-details" hidden>
+							<label class="screen-reader-text" for="aips-post-feedback-bulk-reason"><?php esc_html_e('Feedback reason', 'ai-post-scheduler'); ?></label>
+							<select id="aips-post-feedback-bulk-reason"><option value=""><?php esc_html_e('No reason', 'ai-post-scheduler'); ?></option></select>
+							<label class="screen-reader-text" for="aips-post-feedback-bulk-comment"><?php esc_html_e('Feedback comment', 'ai-post-scheduler'); ?></label>
+							<input type="text" id="aips-post-feedback-bulk-comment" maxlength="2000" placeholder="<?php esc_attr_e('Optional comment', 'ai-post-scheduler'); ?>">
+						</span>
+						<button type="button" id="aips-post-feedback-bulk-apply" class="button"><?php esc_html_e('Apply', 'ai-post-scheduler'); ?></button>
+					</div>
 					<?php endif; ?>
 					<?php if (!empty($posts_data)): ?>
 					<table class="aips-table">

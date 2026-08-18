@@ -56,7 +56,7 @@ class AIPS_Prompt_Builder_Post_Title {
 	 * @param string                         $content Generated article content used as context.
 	 * @return string
 	 */
-	public function build($template_or_context, $topic = null, $voice = null, $content = '') {
+	public function build($template_or_context, $topic = null, $voice = null, $content = '', $feedback_context = null) {
 		$title_instructions = '';
 
 		if ($template_or_context instanceof AIPS_Generation_Context) {
@@ -78,6 +78,7 @@ class AIPS_Prompt_Builder_Post_Title {
 			}
 
 			$prompt = $this->build_base_prompt($title_instructions, $content, $context);
+			$prompt = $this->append_feedback($prompt, $feedback_context);
 
 			return apply_filters('aips_title_prompt', $prompt, $context, $topic_str, null, $content);
 		}
@@ -110,7 +111,7 @@ class AIPS_Prompt_Builder_Post_Title {
 	 * @param AIPS_Generation_Context $context Generation context.
 	 * @return string
 	 */
-	public function build_followup($context) {
+	public function build_followup($context, $feedback_context = null) {
 		$title_instructions = '';
 		$topic_str = $context->get_topic();
 
@@ -135,8 +136,17 @@ class AIPS_Prompt_Builder_Post_Title {
 		}
 
 		$prompt = $this->append_diversity_blocks($prompt, $context);
+		$prompt = $this->append_feedback($prompt, $feedback_context);
 
 		return apply_filters('aips_title_prompt', $prompt, $context, $topic_str, null, '');
+	}
+
+	private function append_feedback($prompt, $feedback_context) {
+		if ($feedback_context instanceof AIPS_Post_Feedback_Prompt_Context) {
+			$guidance = $feedback_context->for_component('title');
+			if ($guidance !== '') { $prompt .= "\n\n" . $guidance; }
+		}
+		return $prompt;
 	}
 
 	/**

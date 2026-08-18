@@ -44,7 +44,7 @@ class AIPS_Prompt_Builder_Post_Excerpt {
 	 * @param mixed       $subject Optional template or generation context.
 	 * @return string
 	 */
-	public function build($title, $content, $voice = null, $topic = null, $subject = null) {
+	public function build($title, $content, $voice = null, $topic = null, $subject = null, $feedback_context = null) {
 		$excerpt_prompt = "Write an excerpt for an article. Must be between 40 and 60 words. Write naturally as a human would. Output only the excerpt, no formatting.\n\n";
 
 		$voice_instructions = $this->build_instructions($voice, $topic);
@@ -56,6 +56,7 @@ class AIPS_Prompt_Builder_Post_Excerpt {
 		$excerpt_prompt .= "ARTICLE BODY:\n" . $content . "\n\n";
 
 		$excerpt_prompt .= 'Create a compelling excerpt that captures the essence of the article while considering the context.';
+		$excerpt_prompt = $this->append_feedback($excerpt_prompt, $feedback_context);
 
 		return apply_filters('aips_excerpt_prompt', $excerpt_prompt, $title, $content, $voice, $topic);
 	}
@@ -75,7 +76,7 @@ class AIPS_Prompt_Builder_Post_Excerpt {
 	 * @param string|null $topic Optional topic to inject into voice instructions.
 	 * @return string
 	 */
-	public function build_followup($voice = null, $topic = null) {
+	public function build_followup($voice = null, $topic = null, $feedback_context = null) {
 		$excerpt_prompt = "Now write an excerpt for that article. Must be between 40 and 60 words. Write naturally as a human would. Output only the excerpt, no formatting.\n\n";
 
 		$voice_instructions = $this->build_instructions($voice, $topic);
@@ -84,8 +85,17 @@ class AIPS_Prompt_Builder_Post_Excerpt {
 		}
 
 		$excerpt_prompt .= 'Create a compelling excerpt that captures the essence of the article while considering the context.';
+		$excerpt_prompt = $this->append_feedback($excerpt_prompt, $feedback_context);
 
 		return apply_filters('aips_excerpt_prompt', $excerpt_prompt, '', '', $voice, $topic);
+	}
+
+	private function append_feedback($prompt, $feedback_context) {
+		if ($feedback_context instanceof AIPS_Post_Feedback_Prompt_Context) {
+			$guidance = $feedback_context->for_component('excerpt');
+			if ($guidance !== '') { $prompt .= "\n\n" . $guidance; }
+		}
+		return $prompt;
 	}
 
 	/**

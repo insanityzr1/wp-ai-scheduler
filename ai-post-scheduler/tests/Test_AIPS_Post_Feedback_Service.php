@@ -40,6 +40,41 @@ class Test_AIPS_Post_Feedback_Service extends WP_UnitTestCase {
 		$this->assertSame('engagement', $result['feedback']->reason_category);
 		$this->assertSame('Strong hook', $result['feedback']->comment);
 		$this->assertMatchesRegularExpression('/^[a-f0-9]{64}$/', $result['feedback']->content_hash);
+		$this->assertSame('queued', $result['index_status']);
+		$this->assertNotEmpty($result['feedback']->embedding_text);
+		$this->assertNotFalse(wp_next_scheduled('aips_index_post_feedback_event', array($result['event_id'], 0)));
+	}
+
+	public function test_feedback_embedding_is_written_to_the_immutable_event_snapshot() {
+		$post_id = self::factory()->post->create(array('post_title' => 'Snapshot', 'post_content' => 'Original body'));
+		update_post_meta($post_id, AIPS_Post_Manager::META_GENERATED_POST, '1');
+		$embeddings = new class {
+			public function generate_embedding($text) { return array(0.25, 0.75); }
+		};
+		$service = new AIPS_Post_Feedback_Service($this->repository, new AIPS_History_Repository(), $embeddings);
+		$result = $service->record($post_id, 'liked', null, null, 1);
+		wp_update_post(array('ID' => $post_id, 'post_content' => 'Edited body'));
+		update_option('aips_post_feedback_enabled', 1);
+		$service->process_index_event($result['event_id']);
+		delete_option('aips_post_feedback_enabled');
+		$event = $this->repository->get_by_id($result['event_id']);
+		$this->assertStringContainsString('Original body', $event->embedding_text);
+		$this->assertSame(array(0.25, 0.75), json_decode($event->embedding, true));
+	}
+
+	public function test_queued_embedding_obeys_global_master_switch() {
+		$post_id = self::factory()->post->create(array('post_content' => 'Body'));
+		update_post_meta($post_id, AIPS_Post_Manager::META_GENERATED_POST, '1');
+		$embeddings = new class {
+			public $calls = 0;
+			public function generate_embedding($text) { $this->calls++; return array(1); }
+		};
+		$service = new AIPS_Post_Feedback_Service($this->repository, new AIPS_History_Repository(), $embeddings);
+		$result = $service->record($post_id, 'liked', null, null, 1);
+		update_option('aips_post_feedback_enabled', 0);
+		$service->process_index_event($result['event_id']);
+		$this->assertSame(0, $embeddings->calls);
+		delete_option('aips_post_feedback_enabled');
 	}
 
 	public function test_clear_appends_audit_event_but_returns_no_current_feedback() {

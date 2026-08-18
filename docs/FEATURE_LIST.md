@@ -275,9 +275,9 @@ Abstraction layer for WordPress post CRUD operations used by the generation pipe
 - Administrators can Like or Dislike generated posts, optionally choosing a reason and adding an editorial comment; feedback can be changed or cleared while the append-only event history remains auditable.
 - The global master switch is authoritative. When enabled, an Author override supersedes global defaults and a Template override supersedes the Author. Partial weight maps inherit values from the next broader scope.
 - Configurable weights cover Like/Dislike influence, semantic similarity, recency, Author/Template matches, and the global pool, with minimum-sample, similarity, example-count, and prompt-budget guardrails.
-- Similar liked posts provide bounded positive examples; disliked posts provide avoidance guidance. Reason-aware routing keeps SEO feedback out of tone guidance and equivalent component-specific concerns separated.
-- Feedback comments are sanitized and treated as untrusted editorial observations, never instructions. Logs retain selected event IDs and counts without copying comments or full source content.
-- Missing embeddings, insufficient samples, and retrieval failures fail open: generation proceeds without feedback guidance. Disabling the global switch avoids feedback retrieval and embedding work entirely.
+- Similar liked and disliked posts select bounded, taxonomy-derived preference and avoidance guidance. Reason-aware routing keeps SEO feedback out of tone guidance and equivalent component-specific concerns separated.
+- Feedback comments are sanitized and retained for administrators but never copied into AI prompts. Logs retain selected event IDs and counts without copying comments or full source content.
+- Rated-version snapshots are embedded asynchronously with bounded retries. Missing embeddings, insufficient samples, and retrieval failures fail open; disabling the global switch prevents queued and generation-time embedding work.
 - Regenerated output starts unrated and stores `_aips_predecessor_post_id`; the predecessor audit trail is retained. Published or edited feedback remains available, with content-hash drift reducing its influence.
 
 ---

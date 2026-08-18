@@ -31,6 +31,7 @@ class AIPS_Post_Feedback_Repository {
 			'content_hash'    => !empty($event['content_hash']) ? sanitize_text_field($event['content_hash']) : null,
 			'author_id'       => !empty($event['author_id']) ? absint($event['author_id']) : null,
 			'template_id'     => !empty($event['template_id']) ? absint($event['template_id']) : null,
+			'embedding_text'  => !empty($event['embedding_text']) ? (string) $event['embedding_text'] : null,
 			'created_at'      => !empty($event['created_at']) ? absint($event['created_at']) : AIPS_DateTime::now()->timestamp(),
 		);
 
@@ -41,12 +42,20 @@ class AIPS_Post_Feedback_Repository {
 		$result = $this->wpdb->insert(
 			$this->table,
 			$data,
-			array('%d', '%d', '%d', '%s', '%s', '%s', '%s', '%d', '%d', '%d')
+			array('%d', '%d', '%d', '%s', '%s', '%s', '%s', '%d', '%d', '%s', '%d')
 		);
 
 		return false === $result
 			? new WP_Error('feedback_insert_failed', __('Could not save post feedback.', 'ai-post-scheduler'))
 			: (int) $this->wpdb->insert_id;
+	}
+
+	public function get_by_id($event_id) {
+		return $this->wpdb->get_row($this->wpdb->prepare("SELECT * FROM {$this->table} WHERE id = %d", absint($event_id)));
+	}
+
+	public function update_embedding($event_id, array $embedding) {
+		return false !== $this->wpdb->update($this->table, array('embedding' => wp_json_encode($embedding)), array('id' => absint($event_id)), array('%s'), array('%d'));
 	}
 
 	public function get_current_for_post($post_id) {
@@ -99,18 +108,13 @@ class AIPS_Post_Feedback_Repository {
 		$limit = max(1, min(500, absint($limit)));
 		$where = array("f.reaction IN ('liked','disliked')", "p.post_status NOT IN ('trash','auto-draft')");
 		$args  = array();
-
-		if ($author_id || $template_id) {
-			$parts = array('f.author_id IS NULL AND f.template_id IS NULL');
-			if ($author_id) {
-				$parts[] = 'f.author_id = %d';
-				$args[]  = $author_id;
-			}
-			if ($template_id) {
-				$parts[] = 'f.template_id = %d';
-				$args[]  = $template_id;
-			}
-			$where[] = '(' . implode(' OR ', $parts) . ')';
+		$order = 'f.id DESC';
+		if ($template_id || $author_id) {
+			$order_parts = array();
+			if ($template_id) { $order_parts[] = 'WHEN f.template_id = %d THEN 0'; $args[] = $template_id; }
+			if ($author_id) { $order_parts[] = 'WHEN f.author_id = %d THEN 1'; $args[] = $author_id; }
+			$order_parts[] = 'WHEN f.template_id IS NULL AND f.author_id IS NULL THEN 2';
+			$order = 'CASE ' . implode(' ', $order_parts) . ' ELSE 3 END ASC, f.id DESC';
 		}
 
 		$args[] = $limit;
@@ -118,7 +122,7 @@ class AIPS_Post_Feedback_Repository {
 			FROM {$this->table} f
 			INNER JOIN (SELECT post_id, MAX(id) latest_id FROM {$this->table} GROUP BY post_id) latest ON latest.latest_id = f.id
 			INNER JOIN {$this->wpdb->posts} p ON p.ID = f.post_id
-			WHERE " . implode(' AND ', $where) . " ORDER BY f.id DESC LIMIT %d";
+			WHERE " . implode(' AND ', $where) . " ORDER BY {$order} LIMIT %d";
 		return $this->wpdb->get_results($this->wpdb->prepare($sql, ...$args));
 	}
 

@@ -19,12 +19,12 @@ class AIPS_Post_Feedback_Service {
 
 	private $repository;
 	private $history_repository;
-	private $indexing_service;
+	private $embeddings_service;
 
-	public function __construct($repository = null, $history_repository = null, $indexing_service = null) {
+	public function __construct($repository = null, $history_repository = null, $embeddings_service = null) {
 		$this->repository         = $repository ?: new AIPS_Post_Feedback_Repository();
 		$this->history_repository = $history_repository ?: new AIPS_History_Repository();
-		$this->indexing_service    = $indexing_service ?: new AIPS_Internal_Links_Service();
+		$this->embeddings_service  = $embeddings_service ?: new AIPS_Embeddings_Service();
 	}
 
 	public function record($post_id, $reaction, $reason_category = null, $comment = null, $user_id = 0) {
@@ -57,18 +57,36 @@ class AIPS_Post_Feedback_Service {
 			'content_hash'    => $this->calculate_content_hash($post),
 			'author_id'       => $history && !empty($history->author_id) ? (int) $history->author_id : null,
 			'template_id'     => $history && !empty($history->template_id) ? (int) $history->template_id : null,
+			'embedding_text'  => $this->build_embedding_snapshot($post),
 		);
 		$event_id = $this->repository->append_event($event);
 		if (is_wp_error($event_id)) {
 			return $event_id;
 		}
 
-		$index_result = $this->indexing_service->index_post($post_id);
+		$scheduled = wp_schedule_single_event(time() + 1, 'aips_index_post_feedback_event', array($event_id, 0), true);
 		return array(
 			'event_id'    => $event_id,
 			'feedback'    => $this->repository->get_current_for_post($post_id),
-			'index_status'=> is_wp_error($index_result) ? 'unavailable' : 'indexed',
+			'index_status'=> (is_wp_error($scheduled) || false === $scheduled) ? 'unavailable' : 'queued',
 		);
+	}
+
+	public function process_index_event($event_id, $attempt = 0) {
+		if (!AIPS_Config::get_instance()->get_option('aips_post_feedback_enabled')) { return; }
+		$event = $this->repository->get_by_id($event_id);
+		if (!$event || empty($event->embedding_text) || 'cleared' === $event->reaction) { return; }
+		$embedding = $this->embeddings_service->generate_embedding($event->embedding_text);
+		if (!is_wp_error($embedding)) { $this->repository->update_embedding($event_id, $embedding); return; }
+		$attempt = absint($attempt);
+		if ($attempt < 2) {
+			wp_schedule_single_event(time() + (MINUTE_IN_SECONDS * pow(5, $attempt + 1)), 'aips_index_post_feedback_event', array(absint($event_id), $attempt + 1));
+		}
+	}
+
+	private function build_embedding_snapshot($post) {
+		$text = trim(implode("\n", array($post->post_title, $post->post_excerpt, wp_strip_all_tags($post->post_content))));
+		return mb_substr(preg_replace('/\s+/u', ' ', $text), 0, 6000);
 	}
 
 	public function clear($post_id, $user_id = 0) {

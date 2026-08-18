@@ -28,16 +28,13 @@ class AIPS_Post_Feedback_Retrieval_Service {
 			$query_embedding = $this->embeddings->generate_embedding($query);
 			if (is_wp_error($query_embedding)) { $empty['diagnostics']['fallback_reason'] = 'query_embedding_unavailable'; return $empty; }
 
-			$post_ids = array();
-			foreach ($candidates as $candidate) { $post_ids[] = absint($this->value($candidate, 'post_id')); }
-			$stored = $this->embedding_repository->get_by_post_ids(array_unique(array_filter($post_ids)));
 			$ranked = array('positive' => array(), 'negative' => array());
 			foreach ($candidates as $candidate) {
 				$post_id = absint($this->value($candidate, 'post_id'));
-				if (!$post_id || !isset($stored[$post_id])) { do_action('aips_post_feedback_embedding_missing', $post_id); continue; }
+				$vector = json_decode((string) $this->value($candidate, 'embedding'), true);
+				if (!$post_id || !is_array($vector)) { do_action('aips_post_feedback_embedding_missing', $post_id); continue; }
 				$post = get_post($post_id);
 				if (!$post || 'trash' === $post->post_status || '' === trim(wp_strip_all_tags($post->post_content))) { continue; }
-				$vector = json_decode($stored[$post_id]->embedding, true);
 				$similarity = $this->embeddings->calculate_similarity($query_embedding, $vector);
 				if (is_wp_error($similarity) || $similarity < $policy->get('min_similarity', .7)) { continue; }
 				$item = $this->rank_candidate($candidate, $post, $similarity, $policy);

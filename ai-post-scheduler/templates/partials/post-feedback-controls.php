@@ -3,8 +3,10 @@ if (!defined('ABSPATH')) { exit; }
 $post_id = absint($post_id ?? 0);
 $feedback = $feedback ?? null;
 $reaction = $feedback ? (string) $feedback->reaction : '';
+$reason = $feedback ? (string) $feedback->reason_category : '';
+$comment = $feedback ? (string) $feedback->comment : '';
 ?>
-<div class="aips-post-feedback-controls" data-post-id="<?php echo esc_attr($post_id); ?>" data-reaction="<?php echo esc_attr($reaction); ?>">
+<div class="aips-post-feedback-controls" data-post-id="<?php echo esc_attr($post_id); ?>" data-reaction="<?php echo esc_attr($reaction); ?>" data-reason="<?php echo esc_attr($reason); ?>" data-comment="<?php echo esc_attr($comment); ?>">
 	<div class="aips-post-feedback-buttons" role="group" aria-label="<?php esc_attr_e('Generated post feedback', 'ai-post-scheduler'); ?>">
 		<button type="button" class="button aips-post-feedback-reaction" data-reaction="liked" aria-pressed="<?php echo 'liked' === $reaction ? 'true' : 'false'; ?>"><span class="dashicons dashicons-thumbs-up"></span> <?php esc_html_e('Like', 'ai-post-scheduler'); ?></button>
 		<button type="button" class="button aips-post-feedback-reaction" data-reaction="disliked" aria-pressed="<?php echo 'disliked' === $reaction ? 'true' : 'false'; ?>"><span class="dashicons dashicons-thumbs-down"></span> <?php esc_html_e('Dislike', 'ai-post-scheduler'); ?></button>

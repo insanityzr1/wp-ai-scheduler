@@ -7,6 +7,8 @@ class Test_AIPS_Post_Feedback_Schema extends WP_UnitTestCase {
 
 		$this->assertContains('aips_post_feedback', AIPS_DB_Manager::get_table_names());
 		$this->assertStringContainsString('CREATE TABLE ' . $GLOBALS['wpdb']->prefix . 'aips_post_feedback', $schema);
+		$this->assertStringContainsString('embedding_text longtext', $schema);
+		$this->assertStringContainsString('embedding longtext', $schema);
 		$this->assertSame(2, substr_count($schema, 'feedback_enabled tinyint(1) DEFAULT NULL'));
 		$this->assertSame(2, substr_count($schema, 'feedback_config longtext DEFAULT NULL'));
 	}

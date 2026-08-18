@@ -8,8 +8,9 @@
 		var labels = (cfg.reasons && cfg.reasons[reaction]) || {};
 		return '<option value="">' + (cfg.noReason || 'No reason') + '</option>' + Object.keys(labels).map(function (key) { return '<option value="' + key + '">' + labels[key] + '</option>'; }).join('');
 	}
-	function setState($root, reaction) {
+	function setState($root, reaction, reason, comment) {
 		$root.attr('data-reaction', reaction || '');
+		$root.attr('data-reason', reason || '').attr('data-comment', comment || '');
 		$root.find('.aips-post-feedback-reaction').each(function () { $(this).attr('aria-pressed', $(this).data('reaction') === reaction ? 'true' : 'false'); });
 		$root.find('.aips-post-feedback-clear').prop('hidden', !reaction);
 		$root.find('.aips-post-feedback-dialog').prop('hidden', true);
@@ -20,6 +21,10 @@
 		var pendingReaction = $(this).data('reaction');
 		$root.attr('data-pending-reaction', pendingReaction);
 		$root.find('.aips-post-feedback-reason').html(reasons(pendingReaction));
+		if ($root.attr('data-reaction') === pendingReaction) {
+			$root.find('.aips-post-feedback-reason').val($root.attr('data-reason') || '');
+			$root.find('.aips-post-feedback-comment').val($root.attr('data-comment') || '');
+		} else { $root.find('.aips-post-feedback-comment').val(''); }
 		$root.find('.aips-post-feedback-dialog').prop('hidden', false).find('select').trigger('focus');
 	});
 	$(document).on('click', '.aips-post-feedback-save', function () {
@@ -27,7 +32,7 @@
 		var pendingReaction = $root.attr('data-pending-reaction') || '';
 		$root.addClass('is-loading').find('button,select,textarea').prop('disabled', true);
 		request({ action: 'aips_post_feedback_set', post_id: $root.data('post-id'), reaction: pendingReaction, reason_category: $root.find('.aips-post-feedback-reason').val(), comment: $root.find('.aips-post-feedback-comment').val() })
-			.done(function (response) { if (response.success) { setState($root, pendingReaction); notice(cfg.saved || 'Feedback saved.'); } else { notice(response.data.message || cfg.error, 'error'); } })
+			.done(function (response) { if (response.success) { setState($root, pendingReaction, $root.find('.aips-post-feedback-reason').val(), $root.find('.aips-post-feedback-comment').val()); notice(cfg.saved || 'Feedback saved.'); } else { notice(response.data.message || cfg.error, 'error'); } })
 			.fail(function () { notice(cfg.error || 'Could not save feedback.', 'error'); })
 			.always(function () { $root.removeClass('is-loading').find('button,select,textarea').prop('disabled', false); });
 	});
@@ -44,7 +49,8 @@
 		if (!ids.length || !reaction) { notice(cfg.selectPosts || 'Select posts and an action.', 'warning'); return; }
 		request({ action: 'aips_post_feedback_bulk', post_ids: ids, reaction: reaction, reason_category: $('#aips-post-feedback-bulk-reason').val(), comment: $('#aips-post-feedback-bulk-comment').val() }).done(function (response) {
 			if (!response.success) { notice(response.data.message || cfg.error, 'error'); return; }
-			(response.data.succeeded || []).forEach(function (id) { setState($('.aips-post-feedback-controls[data-post-id="' + id + '"]'), reaction === 'cleared' ? '' : reaction); });
+			var reason = $('#aips-post-feedback-bulk-reason').val(), comment = $('#aips-post-feedback-bulk-comment').val();
+			(response.data.succeeded || []).forEach(function (id) { setState($('.aips-post-feedback-controls[data-post-id="' + id + '"]'), reaction === 'cleared' ? '' : reaction, reason, comment); });
 			var failed = Object.keys(response.data.failed || {}).length;
 			notice(failed ? (cfg.partial || 'Some posts could not be updated.') : (cfg.saved || 'Feedback saved.'), failed ? 'warning' : 'success');
 		});

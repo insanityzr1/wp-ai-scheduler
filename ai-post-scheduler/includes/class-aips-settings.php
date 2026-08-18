@@ -224,19 +224,26 @@ class AIPS_Settings {
 			'aips_post_feedback_min_similarity',
 			'aips_post_feedback_edited_content_weight',
 		) as $option_name) {
+			$default_value = $defaults[$option_name];
+			$maximum = in_array($option_name, array('aips_post_feedback_min_similarity', 'aips_post_feedback_edited_content_weight'), true) ? 1.0 : 10.0;
 			$settings[$option_name] = array(
-				'sanitize_callback' => array($ui, 'sanitize_post_feedback_weight'),
+				'sanitize_callback' => static function($value) use ($default_value, $maximum) {
+					return is_numeric($value) ? max(0.0, min($maximum, (float) $value)) : $default_value;
+				},
 				'default'           => $defaults[$option_name],
 			);
 		}
 
 		foreach (array(
-			'aips_post_feedback_max_examples',
-			'aips_post_feedback_min_samples',
-			'aips_post_feedback_prompt_budget_chars',
-		) as $option_name) {
+			'aips_post_feedback_max_examples'        => array(1, 20),
+			'aips_post_feedback_min_samples'         => array(1, 1000),
+			'aips_post_feedback_prompt_budget_chars' => array(300, 20000),
+		) as $option_name => $bounds) {
+			$default_value = $defaults[$option_name];
 			$settings[$option_name] = array(
-				'sanitize_callback' => array($ui, 'sanitize_post_feedback_count'),
+				'sanitize_callback' => static function($value) use ($bounds, $default_value) {
+					return is_numeric($value) ? max($bounds[0], min($bounds[1], (int) $value)) : $default_value;
+				},
 				'default'           => $defaults[$option_name],
 			);
 		}

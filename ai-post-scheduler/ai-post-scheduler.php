@@ -565,6 +565,8 @@ final class AI_Post_Scheduler {
      * @return void
      */
     private function boot_cron() {
+		$feedback_service = new AIPS_Post_Feedback_Service();
+		add_action('aips_index_post_feedback_event', array($feedback_service, 'process_index_event'), 10, 2);
         // Lazy-resolve the main template scheduler only when its hook fires.
         add_action('aips_generate_scheduled_posts', function() {
             AIPS_Scheduler::instance()->process();

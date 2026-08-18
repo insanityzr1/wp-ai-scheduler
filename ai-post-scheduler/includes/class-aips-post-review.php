@@ -447,13 +447,6 @@ class AIPS_Post_Review {
 			}
 		}
 		
-		// Update history status to pending for regeneration
-		$this->history_service->update_history_record($history_id, array(
-			'status' => 'pending',
-			'post_id' => null,
-			'error_message' => null,
-		));
-		
 		// Trigger regeneration using the generator (same API as history retry)
 		$generator = new AIPS_Generator();
 		$result = $generator->generate_post($template);
@@ -643,12 +636,6 @@ class AIPS_Post_Review {
 						)
 					);
 				}
-
-				$history_service->update_history_record($history_id, array(
-					'status'        => 'pending',
-					'post_id'       => null,
-					'error_message' => null,
-				));
 
 				$regen_result = $generator->generate_post($template);
 

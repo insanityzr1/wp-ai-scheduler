@@ -418,6 +418,8 @@ class AIPS_DB_Manager {
             content_hash char(64) DEFAULT NULL,
             author_id bigint(20) DEFAULT NULL,
             template_id bigint(20) DEFAULT NULL,
+			embedding_text longtext DEFAULT NULL,
+			embedding longtext DEFAULT NULL,
             created_at bigint(20) unsigned NOT NULL DEFAULT 0,
             PRIMARY KEY  (id),
             KEY post_current (post_id, id),

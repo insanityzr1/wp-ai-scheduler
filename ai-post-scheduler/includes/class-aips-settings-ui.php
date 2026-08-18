@@ -66,10 +66,10 @@ class AIPS_Settings_UI {
 			'aips_post_feedback_author_match_weight'   => array(__('Author match', 'ai-post-scheduler'), 0, 10, 0.05),
 			'aips_post_feedback_template_match_weight' => array(__('Template match', 'ai-post-scheduler'), 0, 10, 0.05),
 			'aips_post_feedback_global_pool_weight'    => array(__('Global pool', 'ai-post-scheduler'), 0, 10, 0.05),
-			'aips_post_feedback_max_examples'          => array(__('Maximum examples', 'ai-post-scheduler'), 1, 50, 1),
+			'aips_post_feedback_max_examples'          => array(__('Maximum examples', 'ai-post-scheduler'), 1, 20, 1),
 			'aips_post_feedback_min_similarity'        => array(__('Minimum similarity', 'ai-post-scheduler'), 0, 1, 0.01),
-			'aips_post_feedback_min_samples'           => array(__('Minimum feedback samples', 'ai-post-scheduler'), 1, 100, 1),
-			'aips_post_feedback_prompt_budget_chars'   => array(__('Prompt budget (characters)', 'ai-post-scheduler'), 250, 20000, 50),
+			'aips_post_feedback_min_samples'           => array(__('Minimum feedback samples', 'ai-post-scheduler'), 1, 1000, 1),
+			'aips_post_feedback_prompt_budget_chars'   => array(__('Prompt budget (characters)', 'ai-post-scheduler'), 300, 20000, 50),
 			'aips_post_feedback_edited_content_weight' => array(__('Edited-content influence', 'ai-post-scheduler'), 0, 1, 0.05),
 		);
 		echo '<div class="aips-post-feedback-settings-grid">';

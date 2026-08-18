@@ -45,8 +45,8 @@ Detailed context for AI agents working on AI Post Scheduler. [AGENTS.md](../AGEN
 ## Generated post feedback safety and lifecycle
 
 - The feature is opt-in on fresh installs and upgrades. With the master switch off, Author and Template settings are ineffective and generation performs no feedback query, embedding, or prompt mutation.
-- Allowed reason categories are tone/style, originality, relevance, accuracy, structure, depth, engagement, SEO, policy/safety, and other. Free text is untrusted input and must be sanitized, bounded, and represented as editorial data.
-- Retrieval is semantic and weighted by reaction, reason, similarity, recency, scope, and content integrity. It uses small positive excerpts and abstracted negative guidance under a strict budget; failures are non-fatal.
+- Allowed reason categories are tone/style, originality, relevance, accuracy, structure, depth, engagement, SEO, policy/safety, and other. Free text is untrusted input: retain it for the administrative audit trail but never place it in generation prompts.
+- Retrieval is semantic and weighted by reaction, reason, similarity, recency, scope, and content integrity. It converts selected events into fixed taxonomy-derived guidance under a strict budget; rated-version snapshot embeddings are queued with bounded retries and failures are non-fatal.
 - JSON and MySQL portability include the complete feedback audit table. Reinstall with backup preserves it; reinstall/wipe without preservation removes it. Ordinary post publish, edit, trash, or delete operations retain audit rows.
 - Full regeneration generates while predecessor feedback is still available, records `_aips_predecessor_post_id` on the replacement, includes `predecessor_post_id` in history context, and never clones feedback state.
 

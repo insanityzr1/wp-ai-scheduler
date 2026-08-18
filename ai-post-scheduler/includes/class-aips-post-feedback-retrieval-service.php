@@ -67,7 +67,8 @@ class AIPS_Post_Feedback_Retrieval_Service {
 		else { $scope_factor = $policy->get('global_pool_weight', .5); }
 		$reaction = (string) $this->value($candidate, 'reaction');
 		$reaction_factor = 'liked' === $reaction ? $policy->get('like_weight', 1) : $policy->get('dislike_weight', 1.25);
-		$created = strtotime((string) $this->value($candidate, 'created_at')) ?: time();
+		$created_raw = $this->value($candidate, 'created_at');
+		$created = is_numeric($created_raw) ? (int) $created_raw : (strtotime((string) $created_raw) ?: time());
 		$age_days = max(0, (time() - $created) / DAY_IN_SECONDS);
 		$recency_factor = 1 / (1 + ($policy->get('recency_weight', .35) * $age_days / 365));
 		$current_hash = hash('sha256', trim(preg_replace('/\s+/u', ' ', wp_strip_all_tags($post->post_title . "\n" . $post->post_excerpt . "\n" . $post->post_content))));

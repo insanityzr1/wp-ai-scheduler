@@ -14,10 +14,19 @@ final class AIPS_Post_Feedback_Prompt_Context {
 
 	public static function from_ranked(array $ranked, AIPS_Post_Feedback_Policy $policy) {
 		if (!$policy->is_enabled()) { return self::empty(array('fallback_reason' => 'disabled')); }
+		$maximum = (int) $policy->get('max_examples', 6);
+		$positive_limit = (int) ceil($maximum / 2);
+		$negative_limit = (int) floor($maximum / 2);
+		if (empty($ranked['positive'])) { $negative_limit = $maximum; }
+		if (empty($ranked['negative'])) { $positive_limit = $maximum; }
+		$selected = array(
+			'positive' => array_slice($ranked['positive'] ?? array(), 0, $positive_limit),
+			'negative' => array_slice($ranked['negative'] ?? array(), 0, $negative_limit),
+		);
 		$components = array('content' => array(), 'title' => array(), 'excerpt' => array(), 'metadata' => array());
 		$ids = array();
 		foreach (array('positive' => 'Prefer', 'negative' => 'Avoid') as $pool => $heading) {
-			foreach (($ranked[$pool] ?? array()) as $item) {
+			foreach ($selected[$pool] as $item) {
 				$id = absint($item['feedback_id'] ?? 0); if ($id) { $ids[] = $id; }
 				$reason = sanitize_key($item['reason_category'] ?? 'other') ?: 'other';
 				$instruction = self::instruction($reason, 'positive' === $pool);

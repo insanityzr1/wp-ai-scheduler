@@ -47,4 +47,16 @@ class Test_Post_Feedback_Prompt_Guidance extends WP_UnitTestCase {
 		$guidance = AIPS_Post_Feedback_Prompt_Context::from_ranked($ranked, $policy);
 		$this->assertLessThanOrEqual(300, strlen($guidance->for_component('content')));
 	}
+
+	public function test_max_examples_is_shared_between_positive_and_negative_pools() {
+		$policy = new AIPS_Post_Feedback_Policy(true, array('prompt_budget_chars' => 4000, 'max_examples' => 2), array());
+		$item = array('reason_category' => 'other', 'comment' => '', 'excerpt' => '', 'score' => 1);
+		$ranked = array(
+			'positive' => array($item + array('feedback_id' => 1), $item + array('feedback_id' => 2)),
+			'negative' => array($item + array('feedback_id' => 3), $item + array('feedback_id' => 4)),
+			'diagnostics' => array(),
+		);
+		$guidance = AIPS_Post_Feedback_Prompt_Context::from_ranked($ranked, $policy);
+		$this->assertSame(array(1, 3), $guidance->get_selected_feedback_ids());
+	}
 }

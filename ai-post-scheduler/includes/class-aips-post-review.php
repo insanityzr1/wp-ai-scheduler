@@ -436,13 +436,15 @@ class AIPS_Post_Review {
 			AIPS_Ajax_Response::error(__('Template not found.', 'ai-post-scheduler'));
 		}
 		
-		// Delete the existing post if it exists
-		if ($history_item->post_id) {
+		$predecessor_post_id = !empty($history_item->post_id) ? absint($history_item->post_id) : 0;
+
+		// Validate deletion access before generation, but retain the predecessor
+		// until feedback retrieval and generation have completed.
+		if ($predecessor_post_id) {
 			// Verify per-post capability before deleting
-			if (!current_user_can('delete_post', $history_item->post_id)) {
+			if (!current_user_can('delete_post', $predecessor_post_id)) {
 				AIPS_Ajax_Response::error(__('You do not have permission to regenerate this post.', 'ai-post-scheduler'));
 			}
-			wp_delete_post($history_item->post_id, true);
 		}
 		
 		// Update history status to pending for regeneration
@@ -470,6 +472,13 @@ class AIPS_Post_Review {
 			AIPS_Ajax_Response::error(array('message' => $result->get_error_message()));
 			return;
 		}
+
+		if ($predecessor_post_id) {
+			AIPS_Bulk_Generator_Service::record_regeneration_lineage($result, $predecessor_post_id);
+			if (!wp_delete_post($predecessor_post_id, true)) {
+				AIPS_Ajax_Response::error(__('The replacement was generated, but the predecessor could not be removed.', 'ai-post-scheduler'));
+			}
+		}
 		
 		// Log the regeneration success
 		$history = $this->history_service->create('post_review_action', array('post_id' => $result));
@@ -478,7 +487,10 @@ class AIPS_Post_Review {
 			__('Post regenerated from review queue', 'ai-post-scheduler'),
 			array('event_type' => 'post_regenerated', 'event_status' => 'success'),
 			null,
-			array('post_id' => $result)
+			array(
+				'post_id' => $result,
+				'predecessor_post_id' => $predecessor_post_id,
+			)
 		);
 		
 		/**
@@ -632,17 +644,6 @@ class AIPS_Post_Review {
 					);
 				}
 
-				if (!wp_delete_post($post_id, true)) {
-					return new WP_Error(
-						'delete_failed',
-						sprintf(
-							/* translators: %d: post ID */
-							__('Failed to delete old post ID %d for regeneration', 'ai-post-scheduler'),
-							$post_id
-						)
-					);
-				}
-
 				$history_service->update_history_record($history_id, array(
 					'status'        => 'pending',
 					'post_id'       => null,
@@ -653,6 +654,19 @@ class AIPS_Post_Review {
 
 				if (is_wp_error($regen_result)) {
 					return $regen_result;
+				}
+
+				AIPS_Bulk_Generator_Service::record_regeneration_lineage($regen_result, $post_id);
+				if (!wp_delete_post($post_id, true)) {
+					return new WP_Error(
+						'delete_failed',
+						sprintf(
+							/* translators: %d: post ID */
+							__('Replacement post %1$d was generated, but predecessor post %2$d could not be removed', 'ai-post-scheduler'),
+							$regen_result,
+							$post_id
+						)
+					);
 				}
 
 				/**

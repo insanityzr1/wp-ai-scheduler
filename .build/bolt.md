@@ -32,3 +32,9 @@
 **PR:** To be created
 **Learning:** The internal links service looped over suggestion results and called `get_post()` individually to fetch titles for anchor text, resulting in N+1 queries.
 **Action:** When looping over post IDs to call `get_post()`, use `_prime_post_caches(array_unique($post_ids), false, true)` before the loop (with a `function_exists` check) to bulk load the posts.
+## 2026-08-19 - [N+1 Generated Posts UI]
+**Area:** ai-post-scheduler/includes/class-aips-generated-posts-controller.php
+**Status:** opened PR
+**PR:** ⚡ Bolt: [performance improvement] Bulk load post caches in Generated Posts controller
+**Learning:** Generating the list of posts in the generated posts UI controller looped over the history items and called `get_post()` individually to fetch post details, resulting in N+1 queries.
+**Action:** When looping over post IDs to call `get_post()`, use `_prime_post_caches(array_unique($post_ids), false, true)` before the loop (with a `function_exists` check) to bulk load the posts.

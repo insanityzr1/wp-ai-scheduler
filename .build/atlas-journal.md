@@ -1438,3 +1438,9 @@ This refactoring resolves the "unexpected title prompts" issue by eliminating du
 **Decision:** Extracted post-execution cleanup, failure logging, success logging, and history container logic into a dedicated `AIPS_Schedule_Result_Handler` class.
 **Consequence:** `AIPS_Schedule_Processor` is now strictly focused on the execution logic. Reduced the class size significantly and decoupled the specific handling of success and error states.
 **Tests:** Created `test-schedule-result-handler.php` to verify result handling. Test execution skipped per user request.
+
+## 2024-05-24 - Extract Routing Logic from `AIPS_Admin_Assets`
+**Context:** The `enqueue_admin_assets` method in `AIPS_Admin_Assets` was bloated with a long sequence of `if`/`elseif` blocks routing specific admin pages to their respective enqueue asset methods, violating the Open-Closed Principle and making the method hard to maintain.
+**Decision:** Refactored the conditional branching into a declarative routing map `get_asset_routes()` and iterated over it within `enqueue_admin_assets`, using `is_callable()` to trigger the correct methods dynamically.
+**Consequence:** The main routing loop is now simplified, but adding new pages requires adding a new array entry to the route definitions. Backwards compatibility is maintained since all underlying enqueue methods and logic conditions remain identical.
+**Tests:** Relied on the core PHP syntax linting (`php -l`) and full PHPUnit test suite to ensure no syntax errors or regressions were introduced across the plugin.

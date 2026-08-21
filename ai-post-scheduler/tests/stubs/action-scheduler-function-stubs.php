@@ -18,14 +18,21 @@ if (!isset($GLOBALS['_aips_as_store'])) {
 	$GLOBALS['_aips_as_store'] = array();
 }
 
-// When set to true, as_schedule_single_action() simulates a storage failure.
+// When set to true, as_schedule_single_action() simulates a storage failure
+// (returns 0 and stores nothing).
 if (!isset($GLOBALS['_aips_as_fail'])) {
 	$GLOBALS['_aips_as_fail'] = false;
 }
 
+// When set to true, as_schedule_single_action() stores the action but returns a
+// falsy id, simulating Action Scheduler versions/paths that succeed silently.
+if (!isset($GLOBALS['_aips_as_silent_success'])) {
+	$GLOBALS['_aips_as_silent_success'] = false;
+}
+
 if (!function_exists('as_schedule_single_action')) {
 	/**
-	 * @return int Pseudo action ID (0 on simulated failure).
+	 * @return int Pseudo action ID (0 on simulated failure or silent success).
 	 */
 	function as_schedule_single_action($timestamp, $hook, $args = array(), $group = '', $unique = false, $priority = 10) {
 		if (!empty($GLOBALS['_aips_as_fail'])) {
@@ -38,6 +45,10 @@ if (!function_exists('as_schedule_single_action')) {
 			'args'      => $args,
 			'group'     => (string) $group,
 		);
+
+		if (!empty($GLOBALS['_aips_as_silent_success'])) {
+			return 0;
+		}
 
 		return count($GLOBALS['_aips_as_store']);
 	}

@@ -96,32 +96,6 @@ class AIPS_Job_Scheduler {
 	}
 
 	/**
-	 * Check whether a matching job is already scheduled on the active transport.
-	 *
-	 * @param string $hook  WordPress cron hook name.
-	 * @param array  $args  Hook arguments (must match the scheduled job).
-	 * @param string $group Optional queue group (grouping-capable transports).
-	 * @return int|false Unix timestamp of the next matching job, or false.
-	 */
-	public function next_scheduled(string $hook, array $args = array(), string $group = '') {
-		$job = new AIPS_Job_Definition('lookup', $hook, $args, 0, array(), '', $group);
-		return $this->dispatcher->get_transport()->next_scheduled($job);
-	}
-
-	/**
-	 * Unschedule a matching job on the active transport.
-	 *
-	 * @param string $hook  WordPress cron hook name.
-	 * @param array  $args  Hook arguments (must match the scheduled job).
-	 * @param string $group Optional queue group (grouping-capable transports).
-	 * @return bool True if unscheduled (or nothing matched), false on error.
-	 */
-	public function unschedule(string $hook, array $args = array(), string $group = ''): bool {
-		$job = new AIPS_Job_Definition('unschedule', $hook, $args, 0, array(), '', $group);
-		return $this->dispatcher->get_transport()->unschedule($job);
-	}
-
-	/**
 	 * Schedule staggered jobs for multiple items.
 	 *
 	 * Each item gets its own job dispatched with a configurable stagger delay between them.

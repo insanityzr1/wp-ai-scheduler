@@ -110,6 +110,25 @@ class Test_AIPS_Action_Scheduler_Transport extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A falsy return from as_schedule_single_action must NOT be reported as a
+	 * failure when the action was actually stored — otherwise the dispatcher
+	 * would retry and schedule a duplicate.
+	 *
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_silent_success_is_not_treated_as_failure() {
+		require dirname(__DIR__) . '/tests/stubs/action-scheduler-function-stubs.php';
+		$GLOBALS['_aips_as_silent_success'] = true;
+
+		$transport = new AIPS_Action_Scheduler_Transport();
+		$job = $this->make_job('aips_test_as_hook', array(array('x' => 1)), time() + 60, AIPS_Job_Groups::EMBEDDINGS);
+
+		$this->assertTrue($transport->schedule($job));
+		$this->assertCount(1, $GLOBALS['_aips_as_store']);
+	}
+
+	/**
 	 * Acceptance: both transports deliver the SAME positional arguments to the
 	 * hook callback. WP-Cron fires via do_action_ref_array($hook, $args); Action
 	 * Scheduler fires via do_action_ref_array($hook, array_values($args)). Given

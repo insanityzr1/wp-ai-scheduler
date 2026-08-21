@@ -83,10 +83,12 @@ class AIPS_Job_Transport_Resolver {
 	}
 
 	/**
-	 * Reset the cached resolution.
+	 * Reset this resolver's cached resolution.
 	 *
-	 * Primarily useful in tests and long-running processes where transport
-	 * availability may change.
+	 * Only clears the local cache on this instance; it does not invalidate a
+	 * transport already handed out via the container singleton or cached inside
+	 * AIPS_Job_Dispatcher. Intended for tests that re-resolve with different
+	 * availability, not for changing an already-booted request's transport.
 	 *
 	 * @return void
 	 */

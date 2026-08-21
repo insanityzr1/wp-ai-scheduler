@@ -47,20 +47,29 @@ class AIPS_Action_Scheduler_Transport implements AIPS_Job_Transport_Interface {
 			$this->group_for($job)
 		);
 
-		// as_schedule_single_action() returns the (positive) action ID on success,
-		// or 0 when the action could not be stored.
-		if (empty($action_id)) {
-			return new WP_Error(
-				'action_scheduler_schedule_failed',
-				sprintf(
-					/* translators: %s: cron hook name. */
-					__('Action Scheduler failed to schedule the "%s" job.', 'ai-post-scheduler'),
-					$job->get_hook()
-				)
-			);
+		// as_schedule_single_action() normally returns the (positive) action ID.
+		// A truthy ID is an unambiguous success.
+		if (!empty($action_id)) {
+			return true;
 		}
 
-		return true;
+		// Some Action Scheduler versions/paths can return 0/null/void even when
+		// the action was stored. Treating that as a failure would make the
+		// dispatcher retry and schedule a duplicate (Action Scheduler does not
+		// dedup by default), so confirm against the store before reporting an
+		// error.
+		if (false !== $this->next_scheduled($job)) {
+			return true;
+		}
+
+		return new WP_Error(
+			'action_scheduler_schedule_failed',
+			sprintf(
+				/* translators: %s: cron hook name. */
+				__('Action Scheduler failed to schedule the "%s" job.', 'ai-post-scheduler'),
+				$job->get_hook()
+			)
+		);
 	}
 
 	/**
@@ -99,13 +108,19 @@ class AIPS_Action_Scheduler_Transport implements AIPS_Job_Transport_Interface {
 
 		// as_unschedule_action() cancels the next matching scheduled action and
 		// returns its action ID (or null when nothing matched). Either outcome
-		// leaves no matching pending action, which is what callers want.
-		call_user_func(
-			'as_unschedule_action',
-			$job->get_hook(),
-			$job->get_args(),
-			$this->group_for($job)
-		);
+		// leaves no matching pending action, which is what callers want. A store
+		// failure surfaces as a thrown exception, so report that as an error to
+		// honor the interface contract (false on error).
+		try {
+			call_user_func(
+				'as_unschedule_action',
+				$job->get_hook(),
+				$job->get_args(),
+				$this->group_for($job)
+			);
+		} catch (\Throwable $e) {
+			return false;
+		}
 
 		return true;
 	}

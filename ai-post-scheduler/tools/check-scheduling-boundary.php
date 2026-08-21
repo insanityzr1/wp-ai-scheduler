@@ -46,7 +46,12 @@ $functions = array(
 	'as_has_scheduled_action',
 );
 
-$pattern = '/(?<![\w\$>])(' . implode('|', array_map('preg_quote', $functions)) . ')\s*\(/';
+// Negative lookbehind rejects method calls so only global-function calls match:
+//   $obj->wp_next_scheduled(  (">")   Foo::as_unschedule_action(  (":")
+//   \wp_next_scheduled(       ("\")   $wp_next_scheduled(          ("$")
+// plus any identifier char ("\w") so longer names ending in one of these are
+// not mistaken for the bare function.
+$pattern = '/(?<![\w\$>:\\\\])(' . implode('|', array_map('preg_quote', $functions)) . ')\s*\(/';
 
 $iterator = new RecursiveIteratorIterator(
 	new RecursiveDirectoryIterator($root . '/includes', FilesystemIterator::SKIP_DOTS)

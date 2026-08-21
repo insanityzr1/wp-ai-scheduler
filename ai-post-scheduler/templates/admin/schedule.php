@@ -206,6 +206,36 @@ if (!function_exists('aips_datetime_from_db_value')) {
 			<div id="aips-schedule-status-warnings" class="aips-schedule-status-warnings"></div>
 		</div>
 
+		<?php // Client-side templates for the schedule status strip (rendered by AIPS.Templates in admin.js). ?>
+		<script type="text/html" id="aips-tmpl-schedule-status-tile">
+		<div class="aips-status-tile">
+			<div class="aips-status-tile-icon"><span class="dashicons {{icon}}"></span></div>
+			<div class="aips-status-tile-content">
+				<div class="aips-status-tile-label">{{label}}</div>
+				<div class="aips-status-tile-value" title="{{valueTitle}}">{{value}}</div>
+				<div class="aips-status-tile-sub">{{sub}}</div>
+			</div>
+		</div>
+		</script>
+
+		<script type="text/html" id="aips-tmpl-schedule-health-badge">
+		<span class="aips-health-badge {{stateClass}}"><span class="aips-status-dot"></span> {{stateLabel}}</span>
+		</script>
+
+		<script type="text/html" id="aips-tmpl-schedule-timeline-event">
+		<div class="aips-schedule-status-event">
+			<div class="aips-schedule-status-event-top">
+				<span class="aips-badge aips-badge-neutral">{{typeLabel}}</span>
+				<span class="aips-schedule-status-event-time">{{time}}</span>
+			</div>
+			<div class="aips-schedule-status-event-title">{{title}}</div>
+		</div>
+		</script>
+
+		<script type="text/html" id="aips-tmpl-schedule-timeline-empty">
+		<div class="aips-schedule-status-empty">{{message}}</div>
+		</script>
+
 		<!-- Tabbed Navigation -->
 		<div class="aips-tabs">
 			<a href="#" class="aips-tab aips-tab-active" data-tab="all"><?php esc_html_e('All Schedules', 'ai-post-scheduler'); ?></a>

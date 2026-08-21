@@ -88,14 +88,6 @@
                 }
 
                 var d = resp.data;
-                var escapeHtml = function(value) {
-                    return String(value || '')
-                        .replace(/&/g, '&amp;')
-                        .replace(/</g, '&lt;')
-                        .replace(/>/g, '&gt;')
-                        .replace(/\"/g, '&quot;')
-                        .replace(/'/g, '&#39;');
-                };
 
                 var typeLabels = {
                     template_schedule: aipsScheduleL10n.typeTemplateLabel,
@@ -133,48 +125,60 @@
                     }
                 }
 
-                var healthBadgeHtml = healthState === 'healthy' ?
-                    '<span class="aips-health-badge aips-health-healthy"><span class="aips-status-dot"></span> System Operational</span>' :
-                    (healthState === 'warning' ?
-                        '<span class="aips-health-badge aips-health-warning"><span class="aips-status-dot"></span> Attention Needed</span>' :
-                        '<span class="aips-health-badge aips-health-critical"><span class="aips-status-dot"></span> System Issue</span>');
+                // Resolve the operational health badge (rendered from the
+                // #aips-tmpl-schedule-health-badge template). Anything other than
+                // 'healthy'/'warning' is treated as critical, matching the server's
+                // health_state values.
+                var esc = AIPS.Templates.escape;
+                var healthBadgeMap = {
+                    healthy: { stateClass: 'aips-health-healthy', stateLabel: 'System Operational' },
+                    warning: { stateClass: 'aips-health-warning', stateLabel: 'Attention Needed' },
+                    critical: { stateClass: 'aips-health-critical', stateLabel: 'System Issue' }
+                };
+                var healthBadgeHtml = AIPS.Templates.render(
+                    'aips-tmpl-schedule-health-badge',
+                    healthBadgeMap[healthState] || healthBadgeMap.critical
+                );
 
+                // Each tile's `subHtml` is trusted HTML: either the health badge
+                // (already rendered/escaped above) or a pre-escaped text fragment.
+                // The tile itself is composed with renderRaw so `sub` passes through
+                // untouched; the other tokens are escaped here before insertion.
                 var tiles = [
                     {
                         label: 'Schedule Health',
                         value: (counts.active || 0) + ' Active',
-                        sub: (counts.paused || 0) > 0 ? (counts.paused + ' Paused') : healthBadgeHtml,
+                        subHtml: (counts.paused || 0) > 0 ? esc(counts.paused + ' Paused') : healthBadgeHtml,
                         icon: 'dashicons-calendar-alt'
                     },
                     {
                         label: 'Next Scheduled Run',
                         value: nextRunTitle,
-                        sub: nextRunTimeStr,
+                        subHtml: esc(nextRunTimeStr),
                         icon: 'dashicons-clock'
                     },
                     {
                         label: '24h Generation Output',
                         value: (output24h.completed || 0) + ' Posts',
-                        sub: output24h.failed > 0 ? (output24h.failed + ' Failed') : (output24h.success_rate + '% Success Rate'),
+                        subHtml: esc(output24h.failed > 0 ? (output24h.failed + ' Failed') : (output24h.success_rate + '% Success Rate')),
                         icon: 'dashicons-chart-line'
                     },
                     {
                         label: 'Queue & Resilience',
                         value: queueTotal > 0 ? (queueTotal + ' Pending') : 'Queue Idle',
-                        sub: rateLimiter.enabled ? ('Rate Limit: ' + rateLimiter.remaining + '/' + rateLimiter.max_requests) : 'Rate Limiting: Off',
+                        subHtml: esc(rateLimiter.enabled ? ('Rate Limit: ' + rateLimiter.remaining + '/' + rateLimiter.max_requests) : 'Rate Limiting: Off'),
                         icon: 'dashicons-admin-generic'
                     }
                 ];
 
                 var tilesHtml = tiles.map(function(tile) {
-                    return '<div class="aips-status-tile">' +
-                        '<div class="aips-status-tile-icon"><span class="dashicons ' + escapeHtml(tile.icon) + '"></span></div>' +
-                        '<div class="aips-status-tile-content">' +
-                            '<div class="aips-status-tile-label">' + escapeHtml(tile.label) + '</div>' +
-                            '<div class="aips-status-tile-value" title="' + escapeHtml(tile.value) + '">' + escapeHtml(tile.value) + '</div>' +
-                            '<div class="aips-status-tile-sub">' + (tile.sub.indexOf('<') !== -1 ? tile.sub : escapeHtml(tile.sub)) + '</div>' +
-                        '</div>' +
-                    '</div>';
+                    return AIPS.Templates.renderRaw('aips-tmpl-schedule-status-tile', {
+                        icon: esc(tile.icon),
+                        label: esc(tile.label),
+                        value: esc(tile.value),
+                        valueTitle: esc(tile.value),
+                        sub: tile.subHtml
+                    });
                 });
 
                 $('#aips-schedule-status-summary').html(tilesHtml.join(''));
@@ -190,19 +194,18 @@
                 }
 
                 var scheduleTimelineItems = sortedTimeline.slice(0, 12).map(function(item) {
-                    var typeLabel = typeLabels[item.type] || item.type || '';
                     var dt = new Date(item.timestamp * 1000);
-                    return '<div class="aips-schedule-status-event">' +
-                        '<div class="aips-schedule-status-event-top">' +
-                            '<span class="aips-badge aips-badge-neutral">' + escapeHtml(typeLabel) + '</span>' +
-                            '<span class="aips-schedule-status-event-time">' + escapeHtml(dt.toLocaleString()) + '</span>' +
-                        '</div>' +
-                        '<div class="aips-schedule-status-event-title">' + escapeHtml(item.title || item.cron_hook || '') + '</div>' +
-                    '</div>';
+                    return AIPS.Templates.render('aips-tmpl-schedule-timeline-event', {
+                        typeLabel: typeLabels[item.type] || item.type || '',
+                        time: dt.toLocaleString(),
+                        title: item.title || item.cron_hook || ''
+                    });
                 });
 
                 $('#aips-schedule-status-timeline').html(
-                    scheduleTimelineItems.length ? scheduleTimelineItems.join('') : '<div class="aips-schedule-status-empty">' + escapeHtml(aipsScheduleL10n.noScheduleRunsNext24h) + '</div>'
+                    scheduleTimelineItems.length
+                        ? scheduleTimelineItems.join('')
+                        : AIPS.Templates.render('aips-tmpl-schedule-timeline-empty', { message: aipsScheduleL10n.noScheduleRunsNext24h })
                 );
 
                 var warnings = [];

@@ -54,6 +54,8 @@ class AIPS_Ajax_Registry {
 		'aips_unified_bulk_delete'        => 'AIPS_Schedule_Controller',
 		'aips_get_unified_schedule_history' => 'AIPS_Schedule_Controller',
 		'aips_get_schedule_status_read_model' => 'AIPS_Schedule_Controller',
+		'aips_reset_schedule_circuit'     => 'AIPS_Schedule_Controller',
+		'aips_resume_schedule_batch'      => 'AIPS_Schedule_Controller',
 
 		// Admin Campaign Wizard
 		'aips_campaign_wizard_save_draft'    => 'AIPS_Campaigns_Controller',
@@ -155,7 +157,6 @@ class AIPS_Ajax_Registry {
 
 		// History
 		'aips_bulk_delete_history'        => 'AIPS_History',
-		'aips_clear_history'              => 'AIPS_History',
 		'aips_export_history'             => 'AIPS_History',
 		'aips_get_history_details'        => 'AIPS_History',
 		'aips_get_history_logs'           => 'AIPS_History',
@@ -171,10 +172,6 @@ class AIPS_Ajax_Registry {
 
 		// Seeder Admin
 		'aips_process_seeder'             => 'AIPS_Seeder_Admin',
-
-		// Data Management
-		'aips_export_data'                => 'AIPS_Data_Management',
-		'aips_import_data'                => 'AIPS_Data_Management',
 
 		// DB Manager
 		'aips_repair_db'                  => 'AIPS_DB_Manager',
@@ -217,7 +214,6 @@ class AIPS_Ajax_Registry {
 		// Settings Ajax
 		'aips_save_settings'              => 'AIPS_Settings_Ajax',
 		'aips_test_connection'            => 'AIPS_Settings_Ajax',
-		'aips_notifications_data_hygiene' => 'AIPS_Settings_Ajax',
 
 		// Sources Controller
 		'aips_get_sources'                => 'AIPS_Sources_Controller',
@@ -225,6 +221,9 @@ class AIPS_Ajax_Registry {
 		'aips_delete_source'              => 'AIPS_Sources_Controller',
 		'aips_toggle_source_active'       => 'AIPS_Sources_Controller',
 		'aips_fetch_source_now'           => 'AIPS_Sources_Controller',
+		'aips_get_source_data'            => 'AIPS_Sources_Controller',
+		'aips_save_source_data'            => 'AIPS_Sources_Controller',
+		'aips_delete_source_data'          => 'AIPS_Sources_Controller',
 		'aips_get_source_groups'          => 'AIPS_Sources_Controller',
 		'aips_save_source_group'          => 'AIPS_Sources_Controller',
 		'aips_delete_source_group'        => 'AIPS_Sources_Controller',
@@ -253,6 +252,11 @@ class AIPS_Ajax_Registry {
 		'aips_status_clear_partial_generations' => 'AIPS_System_Status_Controller',
 		'aips_status_cleanup_stale_jobs_cache' => 'AIPS_System_Status_Controller',
 		'aips_rebuild_caches'            => 'AIPS_System_Status_Controller',
+		'aips_status_refresh_system'     => 'AIPS_System_Status_Controller',
+		'aips_status_cache_maintenance'  => 'AIPS_System_Status_Controller',
+		'aips_status_cleanup_notifications' => 'AIPS_System_Status_Controller',
+		'aips_status_reset_resilience'   => 'AIPS_System_Status_Controller',
+		'aips_status_repair_datetime'    => 'AIPS_System_Status_Controller',
 
 		// Internal Links Controller
 		'aips_internal_links_get_suggestions'        => 'AIPS_Internal_Links_Controller',
@@ -288,6 +292,11 @@ class AIPS_Ajax_Registry {
 		'aips_cache_monitor_events'            => 'AIPS_Cache_Monitor_Controller',
 		'aips_cache_monitor_maintenance'       => 'AIPS_Cache_Monitor_Controller',
 
+		// Stress Test Controller
+		'aips_stress_test_run'                 => 'AIPS_Stress_Test_Controller',
+		'aips_stress_test_cleanup'             => 'AIPS_Stress_Test_Controller',
+		'aips_stress_test_status'              => 'AIPS_Stress_Test_Controller',
+
 		// Dashboard Controller
 		'aips_get_dashboard_data'              => 'AIPS_Dashboard_Controller',
 
@@ -308,6 +317,14 @@ class AIPS_Ajax_Registry {
 
 		// Ability Catalog Controller
 		'aips_list_abilities'                  => 'AIPS_Ability_Catalog_Controller',
+		// Affiliate Links Controller
+		'aips_affiliate_links_list'          => 'AIPS_Affiliate_Links_Controller',
+		'aips_affiliate_links_get'           => 'AIPS_Affiliate_Links_Controller',
+		'aips_affiliate_links_create'        => 'AIPS_Affiliate_Links_Controller',
+		'aips_affiliate_links_update'        => 'AIPS_Affiliate_Links_Controller',
+		'aips_affiliate_links_delete'        => 'AIPS_Affiliate_Links_Controller',
+		'aips_affiliate_links_toggle'        => 'AIPS_Affiliate_Links_Controller',
+		'aips_affiliate_links_inject_post'   => 'AIPS_Affiliate_Links_Controller',
 	);
 
 	/**

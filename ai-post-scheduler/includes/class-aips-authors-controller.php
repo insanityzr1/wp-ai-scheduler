@@ -142,6 +142,7 @@ class AIPS_Authors_Controller {
 			'scheduled_post_generation_quantity' => isset($_POST['scheduled_post_generation_quantity']) ? min(AIPS_Author_Post_Generator::MAX_POSTS_PER_RUN, max(1, absint($_POST['scheduled_post_generation_quantity']))) : 1,
 			// Source group fields
 			'include_sources' => isset($_POST['include_sources']) ? 1 : 0,
+			'affiliate_links_enabled' => isset($_POST['affiliate_links_enabled']) ? 1 : 0,
 			'source_group_ids' => isset($_POST['source_group_ids']) && is_array($_POST['source_group_ids'])
 				? wp_json_encode(array_map('absint', $_POST['source_group_ids']))
 				: wp_json_encode(array()),
@@ -365,7 +366,29 @@ class AIPS_Authors_Controller {
 		
 		$posts = $this->logs_repository->get_generated_posts_by_author($author_id);
 		
+		// Pre-fetch post caches to avoid N+1 queries
+		$post_ids = array();
+		foreach ($posts as $post) {
+			if ($post->post_id) {
+				$post_ids[] = (int) $post->post_id;
+			}
+		}
+		if (!empty($post_ids) && function_exists('_prime_post_caches')) {
+			_prime_post_caches(array_unique($post_ids), false, true);
+		}
+
 		// Enrich with WordPress post data
+		$post_ids = array();
+		foreach ($posts as $post) {
+			if ($post->post_id) {
+				$post_ids[] = (int) $post->post_id;
+			}
+		}
+
+		if (!empty($post_ids) && function_exists('_prime_post_caches')) {
+			_prime_post_caches(array_unique($post_ids), false, true);
+		}
+
 		foreach ($posts as &$post) {
 			if ($post->post_id) {
 				$wp_post = get_post($post->post_id);
@@ -478,6 +501,18 @@ class AIPS_Authors_Controller {
 		// Get logs for this topic (UI display only — capped at 200 entries).
 		$logs = $this->logs_repository->get_by_topic($topic_id, 200);
 		
+		// Pre-fetch post caches to avoid N+1 queries
+		$post_ids = array();
+		foreach ($logs as $log) {
+			if ($log->action === 'post_generated' && $log->post_id) {
+				$post_ids[] = (int) $log->post_id;
+			}
+		}
+    
+		if (!empty($post_ids) && function_exists('_prime_post_caches')) {
+			_prime_post_caches(array_unique($post_ids), false, true);
+		}
+
 		$posts = array();
 		foreach ($logs as $log) {
 			// Only include post_generated logs with valid post IDs.

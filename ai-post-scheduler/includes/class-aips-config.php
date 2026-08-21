@@ -44,6 +44,14 @@ class AIPS_Config {
      *             return true for genuinely cached null values.
      */
     private $null_sentinel = null;
+
+    /**
+     * @var array Options that should use persistent cache to reduce DB hits on every page load.
+     */
+    private static $persistent_cache_options = array(
+        'aips_onboarding_completed',
+        'aips_feature_flags',
+    );
     
     /**
      * Get singleton instance.
@@ -123,14 +131,21 @@ class AIPS_Config {
             'aips_db_version' => '0',
             'aips_onboarding_completed' => false,
             'aips_log_secret' => '',
-            // AI model
+            // AI provider & model
+            'aips_ai_provider' => '', // '' = auto-detect (Meow preferred)
             'aips_ai_model' => '',
             'aips_ai_env_id' => '',
+			'aips_wp_ai_connector_mode' => 'all',
+			'aips_wp_ai_connector_ids' => array(),
+			'aips_wp_ai_connector_failover' => true,
             'aips_max_tokens_limit' => 16000,
             'aips_max_tokens_title' => 150,
             'aips_max_tokens_excerpt' => 300,
             'aips_max_tokens_content' => 4000,
             'aips_temperature' => 0.7,
+            // Conversational generation (requires a provider with supports_conversation())
+            'aips_conversational_generation' => false,
+            'aips_conversational_metadata_turn' => false,
             // Post defaults
             'aips_default_post_status' => 'draft',
             'aips_default_category' => 0,
@@ -154,6 +169,7 @@ class AIPS_Config {
 				'post_ready_for_review' => 'db',
 				'post_rejected' => 'db',
 				'partial_generation_completed' => 'db',
+				'post_generated' => 'both',
             ),
             // Notification digest state (runtime markers, not user-configurable)
             'aips_notif_daily_digest_last_sent' => '',
@@ -190,7 +206,7 @@ class AIPS_Config {
             // Ability Workflows
             'aips_enable_ability_workflows' => false,
             // Cache Monitor
-            'aips_cache_monitor_enabled'               => true,
+            'aips_cache_monitor_enabled'               => false,
             'aips_cache_monitor_index_enabled'         => true,
             'aips_cache_monitor_metrics_enabled'       => true,
             'aips_cache_monitor_event_retention_days'  => 30,
@@ -205,9 +221,8 @@ class AIPS_Config {
     /**
      * Get a specific option value with fallback to default.
      *
-     * Resolved values are stored in a per-request in-memory cache so that
-     * repeated reads of the same key within a single request do not trigger
-     * additional get_option() calls.
+     * Critical options (those accessed on every page load) use persistent cache
+     * to reduce database queries. Other values use a per-request in-memory cache.
      *
      * When an explicit $default is supplied by the caller the result is NOT
      * cached (to avoid polluting the cache with ad-hoc fallback values that
@@ -218,10 +233,26 @@ class AIPS_Config {
      * @return mixed Option value or default.
      */
     public function get_option($option_name, $default = null) {
-        // Use cached value only when no caller-supplied default is in play.
+        // For critical options, try persistent cache first to avoid DB query
+        if ($default === null && in_array($option_name, self::$persistent_cache_options)) {
+            if (AIPS_Cache_Factory::instance()->is_available()) {
+                $persistent_cache = AIPS_Cache_Factory::instance();
+                if ($persistent_cache->has($option_name)) {
+                    return $persistent_cache->get($option_name);
+                }
+                // Fetch from DB and cache persistently
+                $value = get_option($option_name);
+                if ($value !== false) {
+                    $persistent_cache->set($option_name, $value, HOUR_IN_SECONDS);
+                    return $value;
+                }
+                // Fall through to defaults if option doesn't exist in DB
+            }
+        }
+
+        // Use per-request cache for all other options
         if ($default === null && $this->cache !== null && $this->cache->has($option_name)) {
             $cached = $this->cache->get($option_name);
-            // A stored null sentinel means the resolved value is null.
             return ($cached === $this->null_sentinel) ? null : $cached;
         }
 
@@ -261,7 +292,7 @@ class AIPS_Config {
     }
 
     /**
-     * Set an option value and invalidate the per-request cache for that key.
+     * Set an option value and invalidate both per-request and persistent caches.
      *
      * @param string    $option_name Option name.
      * @param mixed     $value       Option value.
@@ -273,6 +304,9 @@ class AIPS_Config {
     public function set_option($option_name, $value, $autoload = null) {
         if ($this->cache !== null) {
             $this->cache->delete($option_name);
+        }
+        if (in_array($option_name, self::$persistent_cache_options) && AIPS_Cache_Factory::instance()->is_available()) {
+            AIPS_Cache_Factory::instance()->delete($option_name);
         }
         return update_option($option_name, $value, $autoload);
     }
@@ -380,6 +414,7 @@ class AIPS_Config {
      */
     public function get_ai_config() {
         return array(
+            'provider'         => (string) $this->get_option('aips_ai_provider'),
             'model'            => (string) $this->get_option('aips_ai_model'),
             'env_id'           => (string) $this->get_option('aips_ai_env_id'),
             'max_tokens_limit' => (int) $this->get_option('aips_max_tokens_limit'),
@@ -576,10 +611,22 @@ class AIPS_Config {
     // ========================================
     
     /**
-     * Load feature flags from database.
+     * Load feature flags from database via persistent cache.
      */
     private function load_feature_flags() {
-        $this->feature_flags = get_option('aips_feature_flags', array());
+        if (!AIPS_Cache_Factory::instance()->is_available()) {
+            $this->feature_flags = get_option('aips_feature_flags', array());
+            return;
+        }
+
+        $cache = AIPS_Cache_Factory::instance();
+        $this->feature_flags = $cache->remember(
+            'aips_feature_flags',
+            HOUR_IN_SECONDS,
+            function() {
+                return get_option('aips_feature_flags', array());
+            }
+        );
     }
     
     /**
@@ -611,9 +658,12 @@ class AIPS_Config {
      */
     public function enable_feature($feature_name) {
         $this->feature_flags[$feature_name] = true;
+        if (AIPS_Cache_Factory::instance()->is_available()) {
+            AIPS_Cache_Factory::instance()->delete('aips_feature_flags');
+        }
         return update_option('aips_feature_flags', $this->feature_flags);
     }
-    
+
     /**
      * Disable a feature.
      *
@@ -622,6 +672,9 @@ class AIPS_Config {
      */
     public function disable_feature($feature_name) {
         $this->feature_flags[$feature_name] = false;
+        if (AIPS_Cache_Factory::instance()->is_available()) {
+            AIPS_Cache_Factory::instance()->delete('aips_feature_flags');
+        }
         return update_option('aips_feature_flags', $this->feature_flags);
     }
     

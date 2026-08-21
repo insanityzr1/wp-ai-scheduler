@@ -3,7 +3,7 @@
  * Plugin Name: AI Post Scheduler
  * Plugin URI: https://nunezserver.com/nunezscheduler
  * Description: Schedule AI-generated posts using advanced features & scheduling options.
- * Version: 3.2.0
+ * Version: 3.4.1
  * Author: Raymond Nunez
  * Author URI: https://nunezserver.com
  * License: GPL v2 or later
@@ -44,7 +44,7 @@ if (!defined('AIPS_TELEMETRY_QUERY_SAMPLE_LIMIT')) {
 
 // Define plugin constants
 if (!defined('AIPS_VERSION')) {
-    define('AIPS_VERSION', '3.2.0');
+    define('AIPS_VERSION', '3.4.1');
 }
 
 if (!defined('AIPS_PLUGIN_DIR')) {
@@ -157,10 +157,12 @@ final class AI_Post_Scheduler {
      */
     private function check_dependencies() {
         add_action('admin_init', function() {
-            if (!class_exists('Meow_MWAI_Core')) {
+            // The plugin needs at least one AI backend: the Meow Apps AI Engine
+            // plugin OR a ready native WordPress AI Client text-generation connector.
+            if (class_exists('AIPS_AI_Provider_Factory') && !AIPS_AI_Provider_Factory::has_available_provider()) {
                 add_action('admin_notices', function() {
                     echo '<div class="notice notice-error"><p>';
-                    echo esc_html__('AI Post Scheduler requires Meow Apps AI Engine plugin to be installed and activated.', 'ai-post-scheduler');
+                    echo esc_html__('AI Post Scheduler requires a configured AI provider. Activate Meow Apps AI Engine, or configure credentials for an active WordPress AI Client connector (WordPress 7.0+).', 'ai-post-scheduler');
                     echo '</p></div>';
                 });
             }
@@ -401,9 +403,15 @@ final class AI_Post_Scheduler {
         $container->singleton(AIPS_Ability_Service::class, function( $container ) {
             return new AIPS_Ability_Service($container->make(AIPS_Logger_Interface::class));
         });
+      
+        $container->singleton(AIPS_AI_Provider_Interface::class, function( $container ) {
+            return AIPS_AI_Provider_Factory::create();
+        });
 
         $container->singleton(AIPS_AI_Service::class, function( $container ) {
-            return AIPS_AI_Service::instance();
+            return new AIPS_AI_Service(
+                provider: $container->make(AIPS_AI_Provider_Interface::class)
+            );
         });
 
         $container->singleton(AIPS_AI_Service_Interface::class, function( $container ) {
@@ -444,6 +452,16 @@ final class AI_Post_Scheduler {
                 $container->make(AIPS_Ability_Catalog_Service::class),
                 $container->make(AIPS_Ability_Service::class)
             );
+        });
+      
+        // Register AIPS_System_Diagnostics_Service
+        $container->singleton(AIPS_System_Diagnostics_Service::class, function( $container ) {
+            return new AIPS_System_Diagnostics_Service();
+        });
+
+        // Register AIPS_System_Status_Diagnostics_Service
+        $container->singleton(AIPS_System_Status_Diagnostics_Service::class, function( $container ) {
+            return new AIPS_System_Status_Diagnostics_Service();
         });
     }
 
@@ -818,6 +836,11 @@ final class AI_Post_Scheduler {
 
         // Export-file cleanup cron handler.
         add_action('aips_cleanup_export_files', array('AIPS_Session_To_JSON', 'handle_export_cleanup'));
+
+        // Post-save affiliate link injection — fires after every generated post.
+        add_action('aips_post_generated', function($post_id) {
+            (new AIPS_Affiliate_Links_Service())->inject_for_post(absint($post_id));
+        }, 10, 1);
     }
 
     /**
@@ -889,6 +912,7 @@ final class AI_Post_Scheduler {
         // the object (which would double-register all AJAX hooks).
         global $aips_internal_links_controller;
         $aips_internal_links_controller = new AIPS_Internal_Links_Controller();
+
     }
 
     /**

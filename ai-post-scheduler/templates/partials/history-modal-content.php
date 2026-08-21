@@ -19,6 +19,9 @@ if (empty($container) || !is_array($container)) {
 
 $display_logs = !empty($display_logs) && is_array($display_logs) ? $display_logs : array();
 $filter_counts = !empty($filter_counts) && is_array($filter_counts) ? $filter_counts : array('all' => count($display_logs));
+$ai_logs = array_values(array_filter($display_logs, static function($log) {
+	return in_array('5', $log['type_ids'], true) || in_array('6', $log['type_ids'], true);
+}));
 
 $type_labels = array(
 	2 => AIPS_History_Type::get_label(2),
@@ -38,11 +41,16 @@ $type_labels = array(
 			<h4 class="aips-history-modal-title"><?php esc_html_e('Summary', 'ai-post-scheduler'); ?></h4>
 			<p class="aips-history-modal-subtitle"><?php esc_html_e('Human-readable context first, then the full technical log trail below.', 'ai-post-scheduler'); ?></p>
 		</div>
-		<label class="aips-history-json-toggle">
-			<input type="checkbox" class="aips-json-viewer-toggle" checked>
-			<span><?php esc_html_e('JSON Viewer', 'ai-post-scheduler'); ?></span>
-		</label>
+		<button type="button" class="aips-btn aips-btn-sm aips-btn-secondary aips-copy-diagnostic" data-diagnostic="<?php echo esc_attr($container['diagnostic_text']); ?>"><?php esc_html_e('Copy diagnostic', 'ai-post-scheduler'); ?></button>
 	</div>
+	<nav class="aips-history-detail-tabs" role="tablist" aria-label="<?php esc_attr_e('History detail sections', 'ai-post-scheduler'); ?>">
+		<button type="button" class="aips-history-detail-tab is-active" role="tab" aria-selected="true" data-tab="overview"><?php esc_html_e('Overview', 'ai-post-scheduler'); ?></button>
+		<button type="button" class="aips-history-detail-tab" role="tab" aria-selected="false" data-tab="timeline"><?php esc_html_e('Timeline', 'ai-post-scheduler'); ?></button>
+		<button type="button" class="aips-history-detail-tab" role="tab" aria-selected="false" data-tab="ai-calls"><?php echo esc_html(sprintf(__('AI Calls (%d)', 'ai-post-scheduler'), count($ai_logs))); ?></button>
+		<button type="button" class="aips-history-detail-tab" role="tab" aria-selected="false" data-tab="technical"><?php esc_html_e('Technical', 'ai-post-scheduler'); ?></button>
+	</nav>
+
+	<section class="aips-history-detail-panel is-active" data-panel="overview" role="tabpanel">
 
 	<div class="aips-history-modal-summary">
 		<div class="aips-history-summary-panel">
@@ -77,6 +85,43 @@ $type_labels = array(
 			<?php endforeach; ?>
 		</div>
 	<?php endif; ?>
+	<?php if (!empty($container['root_issue'])): ?>
+		<div class="aips-history-diagnostic-callout aips-history-diagnostic-error"><strong><?php esc_html_e('Root issue', 'ai-post-scheduler'); ?></strong><p><?php echo esc_html($container['root_issue']); ?></p></div>
+	<?php endif; ?>
+	<?php if (!empty($container['suggested_action'])): ?>
+		<div class="aips-history-diagnostic-callout"><strong><?php esc_html_e('Suggested next action', 'ai-post-scheduler'); ?></strong><p><?php echo esc_html($container['suggested_action']); ?></p></div>
+	<?php endif; ?>
+	</section>
+
+	<section class="aips-history-detail-panel" data-panel="timeline" role="tabpanel" hidden>
+		<div class="aips-history-detail-timeline">
+		<?php foreach ($display_logs as $display_log): ?>
+			<article class="aips-history-detail-event">
+				<span class="aips-history-detail-event-dot <?php echo esc_attr($display_log['type_class']); ?>"></span>
+				<div><strong><?php echo esc_html($display_log['log_type'] ?: $display_log['type_label']); ?></strong><span><?php echo esc_html($display_log['timestamp']); ?></span></div>
+			</article>
+		<?php endforeach; ?>
+		<?php if (empty($display_logs)): ?><p><?php esc_html_e('No timeline events recorded.', 'ai-post-scheduler'); ?></p><?php endif; ?>
+		</div>
+	</section>
+
+	<section class="aips-history-detail-panel" data-panel="ai-calls" role="tabpanel" hidden>
+		<?php if (empty($ai_logs)): ?><p><?php esc_html_e('No AI calls were recorded for this run.', 'ai-post-scheduler'); ?></p><?php endif; ?>
+		<?php foreach ($ai_logs as $display_log): ?>
+			<article class="aips-history-ai-call-card">
+				<header><strong><?php echo esc_html($display_log['log_type']); ?></strong><span><?php echo esc_html($display_log['timestamp']); ?></span></header>
+				<?php foreach ($display_log['sections'] as $section): ?>
+					<details <?php echo count($display_log['sections']) === 1 ? 'open' : ''; ?>><summary><?php echo esc_html($section['label'] ?: $display_log['type_label']); ?></summary>
+					<?php if (!empty($section['message_html'])): ?><p><?php echo $section['message_html']; ?></p><?php endif; ?>
+					<?php if (!empty($section['has_extra'])): ?><pre><code><?php echo esc_html($section['raw_json']); ?></code></pre><?php endif; ?>
+					</details>
+				<?php endforeach; ?>
+			</article>
+		<?php endforeach; ?>
+	</section>
+
+	<section class="aips-history-detail-panel" data-panel="technical" role="tabpanel" hidden>
+		<label class="aips-history-json-toggle"><input type="checkbox" class="aips-json-viewer-toggle" checked><span><?php esc_html_e('JSON Viewer', 'ai-post-scheduler'); ?></span></label>
 
 	<?php if (!empty($display_logs)): ?>
 		<div class="aips-history-log-type-filter">
@@ -165,5 +210,6 @@ $type_labels = array(
 				</tbody>
 			</table>
 		<?php endif; ?>
+	</section>
 	</section>
 </div>

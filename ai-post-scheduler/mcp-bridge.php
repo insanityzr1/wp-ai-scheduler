@@ -428,10 +428,11 @@ class AIPS_MCP_Bridge {
 	 * @return void
 	 */
 	public function handle_request() {
-		// Verify user has admin capabilities
-		if (!current_user_can('manage_options')) {
-			$this->send_error(-32001, 'Insufficient permissions. Admin access required.');
-			return;
+		// Defense in depth: re-check the bridge is enabled even though the
+		// top-level dispatcher already gates on this before instantiating us.
+		if (!defined('AIPS_MCP_BRIDGE_ENABLED') || !AIPS_MCP_BRIDGE_ENABLED) {
+			http_response_code(404);
+			exit;
 		}
 
 		// Get request body
@@ -440,6 +441,22 @@ class AIPS_MCP_Bridge {
 
 		if (json_last_error() !== JSON_ERROR_NONE) {
 			$this->send_error(-32700, 'Parse error: Invalid JSON');
+			return;
+		}
+
+		// Require a shared-secret token before any other processing. This is
+		// the bridge's CSRF protection (the endpoint is otherwise cookie/session
+		// authenticated only) and lets non-browser MCP clients authenticate
+		// without a WordPress nonce tied to a logged-in session.
+		$provided_token = isset($request['token']) ? (string) $request['token'] : '';
+		if (!defined('AIPS_MCP_BRIDGE_TOKEN') || '' === AIPS_MCP_BRIDGE_TOKEN || !hash_equals((string) AIPS_MCP_BRIDGE_TOKEN, $provided_token)) {
+			$this->send_error(-32001, 'Unauthorized: invalid or missing token.');
+			return;
+		}
+
+		// Verify user has admin capabilities
+		if (!current_user_can('manage_options')) {
+			$this->send_error(-32001, 'Insufficient permissions. Admin access required.');
 			return;
 		}
 
@@ -898,6 +915,8 @@ class AIPS_MCP_Bridge {
 				'php_version' => phpversion(),
 				'wp_version' => get_bloginfo('version'),
 				'ai_engine_active' => class_exists('Meow_MWAI_Core'),
+				'ai_provider' => AIPS_AI_Provider_Factory::create()->get_id(),
+				'ai_provider_available' => AIPS_AI_Provider_Factory::has_available_provider(),
 				'settings' => array(
 					'default_post_status' => $config->get_option('aips_default_post_status'),
 					'default_category'    => $config->get_option('aips_default_category'),
@@ -1614,23 +1633,48 @@ class AIPS_MCP_Bridge {
 	 * Tool: Get AI models
 	 */
 	private function tool_get_ai_models($params) {
-		// Check if AI Engine is available
+		// Check if an AI provider is available
 		$ai_service = new AIPS_AI_Service();
-		
+
 		if (!$ai_service->is_available()) {
-			return new WP_Error('ai_unavailable', 'AI Engine plugin is not available or not configured');
+			return new WP_Error('ai_unavailable', 'No AI provider is available or configured');
 		}
-		
+
 		// Get the current configured model
 		$current_model = AIPS_Config::get_instance()->get_option('aips_ai_model');
-		
-		// Try to get available models from AI Engine
-		global $mwai;
+
+		$provider = AIPS_AI_Provider_Factory::create();
 		$available_models = array();
-		
+
+		if ($provider->get_id() === 'wp_ai_client') {
+			// The WordPress AI Client owns the model catalog via core's Connectors
+			// API and does not expose an enumeration; surface the configured
+			// preference list (comma-separated, first entry preferred).
+			$preferences = array_filter(array_map('trim', explode(',', (string) $current_model)));
+
+			foreach (array_values($preferences) as $index => $model_id) {
+				$available_models[] = array(
+					'id' => $model_id,
+					'name' => $model_id,
+					'provider' => 'WordPress AI Client',
+					'type' => 'chat',
+					'is_current' => ($index === 0)
+				);
+			}
+
+			return array(
+				'success' => true,
+				'current_model' => $current_model ?: null,
+				'models' => $available_models,
+				'note' => 'Models and credentials are managed by WordPress core under Settings > AI Connectors. List shows the configured model preference order.'
+			);
+		}
+
+		// Meow AI Engine: it doesn't expose a direct API for listing models, so
+		// provide the commonly available models and indicate which is configured.
+		global $mwai;
+
 		if ($mwai) {
-			// AI Engine doesn't expose a direct API for listing models
-			// We'll provide the commonly available models and indicate which is configured
 			$common_models = array(
 				'gpt-4' => array('name' => 'GPT-4', 'provider' => 'OpenAI', 'type' => 'chat'),
 				'gpt-4-turbo' => array('name' => 'GPT-4 Turbo', 'provider' => 'OpenAI', 'type' => 'chat'),
@@ -1640,7 +1684,7 @@ class AIPS_MCP_Bridge {
 				'claude-3-sonnet' => array('name' => 'Claude 3 Sonnet', 'provider' => 'Anthropic', 'type' => 'chat'),
 				'claude-3-haiku' => array('name' => 'Claude 3 Haiku', 'provider' => 'Anthropic', 'type' => 'chat'),
 			);
-			
+
 			foreach ($common_models as $model_id => $model_info) {
 				$available_models[] = array(
 					'id' => $model_id,
@@ -1651,7 +1695,7 @@ class AIPS_MCP_Bridge {
 				);
 			}
 		}
-		
+
 		return array(
 			'success' => true,
 			'current_model' => $current_model ?: null,
@@ -1666,15 +1710,15 @@ class AIPS_MCP_Bridge {
 	private function tool_test_ai_connection($params) {
 		$test_prompt = isset($params['test_prompt']) ? $params['test_prompt'] : 'Say "Hello" if you can read this.';
 		
-		// Check if AI Engine is available
+		// Check if an AI provider is available
 		$ai_service = new AIPS_AI_Service();
-		
+
 		if (!$ai_service->is_available()) {
 			return array(
 				'success' => false,
 				'connected' => false,
-				'error' => 'AI Engine plugin is not available or not installed',
-				'message' => 'Please install and activate the AI Engine plugin'
+				'error' => 'No AI provider is available or configured',
+				'message' => 'Activate the Meow Apps AI Engine plugin or configure a WordPress AI Client connector'
 			);
 		}
 		
@@ -1683,7 +1727,7 @@ class AIPS_MCP_Bridge {
 		
 		try {
 			$result = $ai_service->generate_text($test_prompt, array(
-				'maxTokens' => 50,
+				'max_tokens' => 50,
 				'temperature' => 0.7
 			));
 			
@@ -1788,6 +1832,14 @@ $is_cli = php_sapi_name() === 'cli' || php_sapi_name() === 'cli-server';
 $is_http_post = isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'POST';
 
 if ($is_http_post) {
+	// The bridge is disabled by default. It must be explicitly enabled by
+	// defining AIPS_MCP_BRIDGE_ENABLED (and AIPS_MCP_BRIDGE_TOKEN) in wp-config.php
+	// so it cannot be turned on from within the WP admin UI.
+	if (!defined('AIPS_MCP_BRIDGE_ENABLED') || !AIPS_MCP_BRIDGE_ENABLED) {
+		http_response_code(404);
+		exit;
+	}
+
 	// HTTP POST: standard JSON-RPC request/response
 	$bridge = new AIPS_MCP_Bridge();
 	$bridge->handle_request();

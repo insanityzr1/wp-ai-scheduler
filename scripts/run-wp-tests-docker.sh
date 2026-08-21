@@ -6,6 +6,15 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 PLUGIN_DIR="$REPO_ROOT/ai-post-scheduler"
 INSTALL_SCRIPT="$REPO_ROOT/scripts/install-wp-tests.sh"
 
+# Load environment variables from .env if present
+if [[ -f "$REPO_ROOT/.env" ]]; then
+  set -o allexport
+  # Load .env variables while ignoring comments and blank lines
+  eval "$(grep -v '^#' "$REPO_ROOT/.env" | grep -v '^[[:space:]]*$' | sed 's/=/="/;s/$/"/')"
+  set +o allexport
+fi
+
+
 MODE="${1:-test}"
 case "$MODE" in
   test)

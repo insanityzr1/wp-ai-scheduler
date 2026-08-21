@@ -51,7 +51,17 @@ if [ ! -d "ai-post-scheduler" ]; then
 fi
 
 echo -e "${GREEN}✓ All required files found${NC}"
+
+# Check for .env file and create from .env.example if missing
+if [ ! -f ".env" ]; then
+    if [ -f ".env.example" ]; then
+        echo -e "${YELLOW}Creating .env file from .env.example...${NC}"
+        cp .env.example .env
+        echo -e "${GREEN}✓ .env created. You can customize your AI Connector API key in .env${NC}"
+    fi
+fi
 echo ""
+
 
 # Stop any existing containers
 echo -e "${YELLOW}Stopping existing containers...${NC}"

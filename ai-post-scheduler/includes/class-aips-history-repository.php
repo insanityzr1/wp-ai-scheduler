@@ -673,26 +673,64 @@ class AIPS_History_Repository implements AIPS_History_Repository_Interface {
             $history_type_id = AIPS_History_Type::LOG;
         }
 
-        // Mirror the event identity into indexed columns so consumers can filter
-        // on event_type / event_status without LIKE-scanning the serialized
-        // details blob. The canonical source of truth remains details.input;
-        // these columns are a denormalized, indexed projection of it.
-        list($event_type, $event_status) = $this->extract_event_identity($details);
-
         $insert_data = array(
             'history_id'      => $history_id,
             'history_type_id' => $history_type_id,
-            'event_type'      => $event_type,
-            'event_status'    => $event_status,
             'details'         => wp_json_encode($details),
             'timestamp'       => AIPS_DateTime::now()->timestamp(),
         );
 
-        $format = array('%d', '%d', '%s', '%s', '%s', '%d');
+        $format = array('%d', '%d', '%s', '%d');
+
+        // Mirror the event identity into indexed columns so consumers can filter
+        // on event_type / event_status without LIKE-scanning the serialized
+        // details blob. The canonical source of truth remains details.input;
+        // these columns are a best-effort denormalized projection of it. Guard
+        // on column existence so a database that has not yet applied the 3.5.0
+        // schema (e.g. a failed/retrying upgrade) still records the log entry —
+        // the backfill migration populates the columns once the schema catches up.
+        if ($this->history_log_has_event_columns()) {
+            list($event_type, $event_status) = $this->extract_event_identity($details);
+            $insert_data['event_type']   = $event_type;
+            $insert_data['event_status'] = $event_status;
+            $format[] = '%s';
+            $format[] = '%s';
+        }
 
         $result = $this->wpdb->insert($this->table_name_log, $insert_data, $format);
 
         return $result ? $this->wpdb->insert_id : false;
+    }
+
+    /**
+     * Whether the history-log table carries the indexed event_type / event_status
+     * columns introduced in 3.5.0.
+     *
+     * Resolved once per request and memoized: a lightweight guard so log writes
+     * never fail against a database that has not yet applied the 3.5.0 schema.
+     *
+     * @var bool|null
+     */
+    private $history_log_has_event_columns = null;
+
+    /**
+     * Determine (and memoize) whether the indexed event columns exist.
+     *
+     * @return bool
+     */
+    private function history_log_has_event_columns() {
+        if ($this->history_log_has_event_columns !== null) {
+            return $this->history_log_has_event_columns;
+        }
+
+        $column = $this->wpdb->get_var($this->wpdb->prepare(
+            "SHOW COLUMNS FROM `{$this->table_name_log}` LIKE %s",
+            'event_type'
+        ));
+
+        $this->history_log_has_event_columns = ($column === 'event_type');
+
+        return $this->history_log_has_event_columns;
     }
 
     /**

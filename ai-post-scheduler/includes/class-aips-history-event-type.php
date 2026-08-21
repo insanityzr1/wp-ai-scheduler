@@ -123,54 +123,52 @@ final class AIPS_History_Event_Type {
 			return self::$catalog;
 		}
 
-		$s = 'AIPS_History_Event_Status';
-
 		self::$catalog = array(
 			// Topic review. Historical container types used the noun forms
 			// ("topic_approval"); the event names used the verb forms.
 			self::TOPIC_APPROVED => array(
 				'aliases'  => array('topic_approval'),
 				'subject'  => self::SUBJECT_TOPIC,
-				'statuses' => array($s::SUCCESS),
+				'statuses' => array(AIPS_History_Event_Status::SUCCESS),
 			),
 			self::TOPIC_REJECTED => array(
 				'aliases'  => array('topic_rejection'),
 				'subject'  => self::SUBJECT_TOPIC,
-				'statuses' => array($s::FAILED),
+				'statuses' => array(AIPS_History_Event_Status::FAILED),
 			),
 
 			// Taxonomy review.
 			self::TAXONOMY_APPROVED => array(
 				'aliases'  => array('taxonomy_approval'),
 				'subject'  => self::SUBJECT_TAXONOMY_ITEM,
-				'statuses' => array($s::SUCCESS),
+				'statuses' => array(AIPS_History_Event_Status::SUCCESS),
 			),
 			self::TAXONOMY_REJECTED => array(
 				'aliases'  => array('taxonomy_rejection'),
 				'subject'  => self::SUBJECT_TAXONOMY_ITEM,
-				'statuses' => array($s::FAILED),
+				'statuses' => array(AIPS_History_Event_Status::FAILED),
 			),
 
 			// Post lifecycle.
 			self::POST_PUBLISHED => array(
 				'aliases'  => array(),
 				'subject'  => self::SUBJECT_POST,
-				'statuses' => array($s::SUCCESS, $s::FAILED),
+				'statuses' => array(AIPS_History_Event_Status::SUCCESS, AIPS_History_Event_Status::FAILED),
 			),
 			self::POST_DRAFT => array(
 				'aliases'  => array(),
 				'subject'  => self::SUBJECT_POST,
-				'statuses' => array($s::SUCCESS),
+				'statuses' => array(AIPS_History_Event_Status::SUCCESS),
 			),
 			self::POST_REGENERATED => array(
 				'aliases'  => array(),
 				'subject'  => self::SUBJECT_POST,
-				'statuses' => array($s::SUCCESS, $s::FAILED),
+				'statuses' => array(AIPS_History_Event_Status::SUCCESS, AIPS_History_Event_Status::FAILED),
 			),
 			self::POST_DELETED => array(
 				'aliases'  => array(),
 				'subject'  => self::SUBJECT_POST,
-				'statuses' => array($s::SUCCESS, $s::FAILED),
+				'statuses' => array(AIPS_History_Event_Status::SUCCESS, AIPS_History_Event_Status::FAILED),
 			),
 
 			// Author generation. Legacy "topic_post_generation" is the historical
@@ -178,50 +176,50 @@ final class AIPS_History_Event_Type {
 			self::AUTHOR_POST_GENERATION => array(
 				'aliases'  => array('topic_post_generation'),
 				'subject'  => self::SUBJECT_AUTHOR,
-				'statuses' => array($s::SUCCESS, $s::FAILED, $s::PARTIAL),
+				'statuses' => array(AIPS_History_Event_Status::SUCCESS, AIPS_History_Event_Status::FAILED, AIPS_History_Event_Status::PARTIAL),
 			),
 			self::AUTHOR_TOPIC_GENERATION => array(
 				'aliases'  => array(),
 				'subject'  => self::SUBJECT_AUTHOR,
-				'statuses' => array($s::SUCCESS, $s::FAILED),
+				'statuses' => array(AIPS_History_Event_Status::SUCCESS, AIPS_History_Event_Status::FAILED),
 			),
 
 			// Schedule lifecycle.
-			self::SCHEDULE_CREATED          => array('aliases' => array(), 'subject' => self::SUBJECT_SCHEDULE, 'statuses' => array($s::SUCCESS)),
-			self::SCHEDULE_UPDATED          => array('aliases' => array(), 'subject' => self::SUBJECT_SCHEDULE, 'statuses' => array($s::SUCCESS)),
-			self::SCHEDULE_ENABLED          => array('aliases' => array(), 'subject' => self::SUBJECT_SCHEDULE, 'statuses' => array($s::SUCCESS)),
-			self::SCHEDULE_DISABLED         => array('aliases' => array(), 'subject' => self::SUBJECT_SCHEDULE, 'statuses' => array($s::SUCCESS)),
-			self::SCHEDULE_EXECUTED         => array('aliases' => array(), 'subject' => self::SUBJECT_SCHEDULE, 'statuses' => array($s::SUCCESS)),
-			self::SCHEDULE_FAILED           => array('aliases' => array(), 'subject' => self::SUBJECT_SCHEDULE, 'statuses' => array($s::FAILED)),
-			self::MANUAL_SCHEDULE_STARTED   => array('aliases' => array(), 'subject' => self::SUBJECT_SCHEDULE, 'statuses' => array($s::SUCCESS, $s::RUNNING)),
-			self::MANUAL_SCHEDULE_COMPLETED => array('aliases' => array(), 'subject' => self::SUBJECT_SCHEDULE, 'statuses' => array($s::SUCCESS)),
-			self::MANUAL_SCHEDULE_FAILED    => array('aliases' => array(), 'subject' => self::SUBJECT_SCHEDULE, 'statuses' => array($s::FAILED)),
-			self::RETRY_SCHEDULE_FAILED     => array('aliases' => array(), 'subject' => self::SUBJECT_SCHEDULE, 'statuses' => array($s::FAILED)),
-			self::BULK_SLICING_NOTICE       => array('aliases' => array(), 'subject' => self::SUBJECT_SCHEDULE, 'statuses' => array($s::SUCCESS)),
-			self::TEMPLATE_SLICING_NOTICE   => array('aliases' => array(), 'subject' => self::SUBJECT_TEMPLATE, 'statuses' => array($s::SUCCESS)),
+			self::SCHEDULE_CREATED          => array('aliases' => array(), 'subject' => self::SUBJECT_SCHEDULE, 'statuses' => array(AIPS_History_Event_Status::SUCCESS)),
+			self::SCHEDULE_UPDATED          => array('aliases' => array(), 'subject' => self::SUBJECT_SCHEDULE, 'statuses' => array(AIPS_History_Event_Status::SUCCESS)),
+			self::SCHEDULE_ENABLED          => array('aliases' => array(), 'subject' => self::SUBJECT_SCHEDULE, 'statuses' => array(AIPS_History_Event_Status::SUCCESS)),
+			self::SCHEDULE_DISABLED         => array('aliases' => array(), 'subject' => self::SUBJECT_SCHEDULE, 'statuses' => array(AIPS_History_Event_Status::SUCCESS)),
+			self::SCHEDULE_EXECUTED         => array('aliases' => array(), 'subject' => self::SUBJECT_SCHEDULE, 'statuses' => array(AIPS_History_Event_Status::SUCCESS)),
+			self::SCHEDULE_FAILED           => array('aliases' => array(), 'subject' => self::SUBJECT_SCHEDULE, 'statuses' => array(AIPS_History_Event_Status::FAILED)),
+			self::MANUAL_SCHEDULE_STARTED   => array('aliases' => array(), 'subject' => self::SUBJECT_SCHEDULE, 'statuses' => array(AIPS_History_Event_Status::SUCCESS, AIPS_History_Event_Status::RUNNING)),
+			self::MANUAL_SCHEDULE_COMPLETED => array('aliases' => array(), 'subject' => self::SUBJECT_SCHEDULE, 'statuses' => array(AIPS_History_Event_Status::SUCCESS)),
+			self::MANUAL_SCHEDULE_FAILED    => array('aliases' => array(), 'subject' => self::SUBJECT_SCHEDULE, 'statuses' => array(AIPS_History_Event_Status::FAILED)),
+			self::RETRY_SCHEDULE_FAILED     => array('aliases' => array(), 'subject' => self::SUBJECT_SCHEDULE, 'statuses' => array(AIPS_History_Event_Status::FAILED)),
+			self::BULK_SLICING_NOTICE       => array('aliases' => array(), 'subject' => self::SUBJECT_SCHEDULE, 'statuses' => array(AIPS_History_Event_Status::SUCCESS)),
+			self::TEMPLATE_SLICING_NOTICE   => array('aliases' => array(), 'subject' => self::SUBJECT_TEMPLATE, 'statuses' => array(AIPS_History_Event_Status::SUCCESS)),
 
 			// Batch / job execution.
-			self::BATCH_SLICE_COMPLETED       => array('aliases' => array(), 'subject' => self::SUBJECT_BATCH, 'statuses' => array($s::SUCCESS)),
-			self::BATCH_SLICE_FAILED          => array('aliases' => array(), 'subject' => self::SUBJECT_BATCH, 'statuses' => array($s::FAILED)),
-			self::BATCH_QUEUE_DISPATCHED      => array('aliases' => array(), 'subject' => self::SUBJECT_BATCH, 'statuses' => array($s::SUCCESS)),
-			self::BATCH_QUEUE_DISPATCH_FAILED => array('aliases' => array(), 'subject' => self::SUBJECT_BATCH, 'statuses' => array($s::FAILED)),
-			self::JOB_DISPATCH_FAILED         => array('aliases' => array(), 'subject' => self::SUBJECT_JOB, 'statuses' => array($s::FAILED)),
-			self::GENERATION_EXCEPTION        => array('aliases' => array(), 'subject' => self::SUBJECT_POST, 'statuses' => array($s::FAILED)),
+			self::BATCH_SLICE_COMPLETED       => array('aliases' => array(), 'subject' => self::SUBJECT_BATCH, 'statuses' => array(AIPS_History_Event_Status::SUCCESS)),
+			self::BATCH_SLICE_FAILED          => array('aliases' => array(), 'subject' => self::SUBJECT_BATCH, 'statuses' => array(AIPS_History_Event_Status::FAILED)),
+			self::BATCH_QUEUE_DISPATCHED      => array('aliases' => array(), 'subject' => self::SUBJECT_BATCH, 'statuses' => array(AIPS_History_Event_Status::SUCCESS)),
+			self::BATCH_QUEUE_DISPATCH_FAILED => array('aliases' => array(), 'subject' => self::SUBJECT_BATCH, 'statuses' => array(AIPS_History_Event_Status::FAILED)),
+			self::JOB_DISPATCH_FAILED         => array('aliases' => array(), 'subject' => self::SUBJECT_JOB, 'statuses' => array(AIPS_History_Event_Status::FAILED)),
+			self::GENERATION_EXCEPTION        => array('aliases' => array(), 'subject' => self::SUBJECT_POST, 'statuses' => array(AIPS_History_Event_Status::FAILED)),
 
 			// Embeddings.
-			self::EMBEDDINGS_BATCH_START    => array('aliases' => array(), 'subject' => self::SUBJECT_EMBEDDING, 'statuses' => array($s::RUNNING)),
-			self::EMBEDDINGS_BATCH_COMPLETE => array('aliases' => array(), 'subject' => self::SUBJECT_EMBEDDING, 'statuses' => array($s::SUCCESS)),
-			self::EMBEDDINGS_BATCH_EMPTY    => array('aliases' => array(), 'subject' => self::SUBJECT_EMBEDDING, 'statuses' => array($s::SUCCESS)),
-			self::EMBEDDING_COMPUTED        => array('aliases' => array(), 'subject' => self::SUBJECT_EMBEDDING, 'statuses' => array($s::SUCCESS)),
-			self::EMBEDDING_SKIPPED         => array('aliases' => array(), 'subject' => self::SUBJECT_EMBEDDING, 'statuses' => array($s::SKIPPED)),
-			self::EMBEDDING_FAILED          => array('aliases' => array(), 'subject' => self::SUBJECT_EMBEDDING, 'statuses' => array($s::FAILED)),
+			self::EMBEDDINGS_BATCH_START    => array('aliases' => array(), 'subject' => self::SUBJECT_EMBEDDING, 'statuses' => array(AIPS_History_Event_Status::RUNNING)),
+			self::EMBEDDINGS_BATCH_COMPLETE => array('aliases' => array(), 'subject' => self::SUBJECT_EMBEDDING, 'statuses' => array(AIPS_History_Event_Status::SUCCESS)),
+			self::EMBEDDINGS_BATCH_EMPTY    => array('aliases' => array(), 'subject' => self::SUBJECT_EMBEDDING, 'statuses' => array(AIPS_History_Event_Status::SUCCESS)),
+			self::EMBEDDING_COMPUTED        => array('aliases' => array(), 'subject' => self::SUBJECT_EMBEDDING, 'statuses' => array(AIPS_History_Event_Status::SUCCESS)),
+			self::EMBEDDING_SKIPPED         => array('aliases' => array(), 'subject' => self::SUBJECT_EMBEDDING, 'statuses' => array(AIPS_History_Event_Status::SKIPPED)),
+			self::EMBEDDING_FAILED          => array('aliases' => array(), 'subject' => self::SUBJECT_EMBEDDING, 'statuses' => array(AIPS_History_Event_Status::FAILED)),
 
 			// Notification.
-			self::NOTIFICATION_EMAIL_SENT => array('aliases' => array(), 'subject' => self::SUBJECT_NOTIFICATION, 'statuses' => array($s::SUCCESS, $s::FAILED)),
+			self::NOTIFICATION_EMAIL_SENT => array('aliases' => array(), 'subject' => self::SUBJECT_NOTIFICATION, 'statuses' => array(AIPS_History_Event_Status::SUCCESS, AIPS_History_Event_Status::FAILED)),
 
 			// Campaign lifecycle.
-			self::CAMPAIGN_CREATED => array('aliases' => array(), 'subject' => self::SUBJECT_CAMPAIGN, 'statuses' => array($s::SUCCESS)),
-			self::CAMPAIGN_UPDATED => array('aliases' => array(), 'subject' => self::SUBJECT_CAMPAIGN, 'statuses' => array($s::SUCCESS)),
+			self::CAMPAIGN_CREATED => array('aliases' => array(), 'subject' => self::SUBJECT_CAMPAIGN, 'statuses' => array(AIPS_History_Event_Status::SUCCESS)),
+			self::CAMPAIGN_UPDATED => array('aliases' => array(), 'subject' => self::SUBJECT_CAMPAIGN, 'statuses' => array(AIPS_History_Event_Status::SUCCESS)),
 		);
 
 		return self::$catalog;

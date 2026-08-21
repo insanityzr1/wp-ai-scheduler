@@ -137,10 +137,10 @@ class Test_AIPS_History_Event_Indexed_Columns extends WP_UnitTestCase {
 			AIPS_History_Type::ACTIVITY
 		);
 
-		$approved = $this->repository->get_activity_feed( 50, 0, array( 'event_type' => 'topic_approved' ) );
+		$approved = $this->filter_by_history( $this->repository->get_activity_feed( 50, 0, array( 'event_type' => 'topic_approved' ) ), $history_id );
 		$this->assertCount( 1, $approved );
 
-		$failed = $this->repository->get_activity_feed( 50, 0, array( 'event_status' => 'failed' ) );
+		$failed = $this->filter_by_history( $this->repository->get_activity_feed( 50, 0, array( 'event_status' => 'failed' ) ), $history_id );
 		$this->assertCount( 1, $failed );
 	}
 
@@ -159,7 +159,21 @@ class Test_AIPS_History_Event_Indexed_Columns extends WP_UnitTestCase {
 		);
 
 		// Filtering by the canonical status must find the synonym row.
-		$results = $this->repository->get_activity_feed( 50, 0, array( 'event_status' => 'success' ) );
+		$results = $this->filter_by_history( $this->repository->get_activity_feed( 50, 0, array( 'event_status' => 'success' ) ), $history_id );
 		$this->assertCount( 1, $results );
+	}
+
+	/**
+	 * Restrict activity-feed rows to those belonging to a given history container,
+	 * so unrelated fixture rows cannot affect exact-count assertions.
+	 *
+	 * @param array $rows       Activity feed rows.
+	 * @param int   $history_id History container id.
+	 * @return array
+	 */
+	private function filter_by_history( $rows, $history_id ) {
+		return array_values( array_filter( (array) $rows, static function ( $row ) use ( $history_id ) {
+			return isset( $row->history_id ) && (int) $row->history_id === (int) $history_id;
+		} ) );
 	}
 }

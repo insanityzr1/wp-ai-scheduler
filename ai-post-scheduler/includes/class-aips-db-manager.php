@@ -143,7 +143,6 @@ class AIPS_DB_Manager {
             KEY history_id (history_id),
             KEY history_type_id (history_type_id),
             KEY history_id_type (history_id, history_type_id),
-            KEY event_type (event_type),
             KEY event_status (event_status),
             KEY event_type_timestamp (event_type, timestamp)
         ) $charset_collate;";

@@ -52,8 +52,17 @@ services:
       # Enable entrypoint debug output
       ENTRYPOINT_DEBUG: "1"
       
+      # AI Connector Configuration
+      AIPS_AI_PROVIDER: "${AIPS_AI_PROVIDER:-wp_ai_client}"
+      DEFAULT_AI_CONNECTOR_PLUGIN: "${DEFAULT_AI_CONNECTOR_PLUGIN:-ai-provider-for-google}"
+      GOOGLE_API_KEY: "${GOOGLE_API_KEY:-}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+
+
       # PHP Configuration
       PHP_IDE_CONFIG: "serverName=localhost"
+
     volumes:
       # Use a named Docker volume for WordPress core files
       - wordpress_data_v2:/var/www/html

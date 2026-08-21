@@ -20,7 +20,7 @@ if (!defined('ABSPATH')) {
  *
  * Builds the AI prompt for post excerpt generation.
  */
-class AIPS_Prompt_Builder_Post_Excerpt {
+class AIPS_Prompt_Builder_Post_Excerpt implements AIPS_Prompt_Builder_Section {
 
 	/**
 	 * @var AIPS_Template_Processor Template processor for prompt variables.

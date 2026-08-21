@@ -23,7 +23,7 @@ if (!defined('ABSPATH')) {
  * - Historical feedback (approved/rejected topic titles)
  * - Qualitative feedback guidance (admin-supplied rejection/approval reasons)
  */
-class AIPS_Prompt_Builder_Topic {
+class AIPS_Prompt_Builder_Topic implements AIPS_Prompt_Builder_Section {
 
 	/**
 	 * @var AIPS_Prompt_Builder Base prompt builder for shared helpers.

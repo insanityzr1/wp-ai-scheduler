@@ -19,7 +19,7 @@ if (!defined('ABSPATH')) {
  * Builds complete prompts for article structures by resolving section
  * placeholders and processing template variables.
  */
-class AIPS_Prompt_Builder_Article_Structure_Section {
+class AIPS_Prompt_Builder_Article_Structure_Section implements AIPS_Prompt_Builder_Section {
 
 	/**
 	 * @var AIPS_Article_Structure_Manager

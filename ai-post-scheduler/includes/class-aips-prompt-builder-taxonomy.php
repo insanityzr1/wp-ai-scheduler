@@ -20,7 +20,7 @@ if (!defined('ABSPATH')) {
  *
  * Builds AI prompts for taxonomy suggestion generation.
  */
-class AIPS_Prompt_Builder_Taxonomy {
+class AIPS_Prompt_Builder_Taxonomy implements AIPS_Prompt_Builder_Section {
 
 	/**
 	 * @var AIPS_Prompt_Builder Base prompt builder for shared helpers.

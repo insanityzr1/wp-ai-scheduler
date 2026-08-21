@@ -20,7 +20,7 @@ if (!defined('ABSPATH')) {
  *
  * Builds AI prompts for author persona suggestion generation.
  */
-class AIPS_Prompt_Builder_Authors {
+class AIPS_Prompt_Builder_Authors implements AIPS_Prompt_Builder_Section {
 
 	/**
 	 * @var AIPS_Prompt_Builder Base prompt builder for shared helpers.

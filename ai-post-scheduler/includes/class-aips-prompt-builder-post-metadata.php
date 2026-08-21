@@ -18,7 +18,7 @@ if (!defined('ABSPATH')) {
 	exit;
 }
 
-class AIPS_Prompt_Builder_Post_Metadata {
+class AIPS_Prompt_Builder_Post_Metadata implements AIPS_Prompt_Builder_Section {
 
 	/**
 	 * @var AIPS_Template_Processor Template processor for prompt variables.

@@ -16,7 +16,7 @@
 **PR:** 🎨 Palette: Add aria-hidden to decorative Dashicons in Generated Posts
 **Learning:** Decorative icons in history interfaces must be explicitly hidden from screen readers.
 **Action:** When adding or auditing generated posts Dashicons, include aria-hidden="true".
-## 2024-05-30 - Add aria-labels to Author table checkboxes
+## 2026-08-19 - Add aria-labels to Author table checkboxes
 **Area:** Authors templates (templates/admin/authors.php)
 **Status:** opened PR
 **PR:** 🎨 Palette: Add accessible labels to author table checkboxes

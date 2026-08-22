@@ -54,12 +54,20 @@ class AIPS_Prompt_Section_Repository {
 	private $wpdb;
 
 	/**
-	 * Initialize the repository.
+	 * @var AIPS_Table_Gateway Table gateway helper
 	 */
-	public function __construct() {
+	private $gateway;
+
+	/**
+	 * Initialize the repository.
+	 *
+	 * @param AIPS_Table_Gateway|null $gateway Optional table gateway instance.
+	 */
+	public function __construct($gateway = null) {
 		global $wpdb;
 		$this->wpdb = $wpdb;
 		$this->table_name = $wpdb->prefix . 'aips_prompt_sections';
+		$this->gateway = $gateway ?: AIPS_Container::get_instance()->make(AIPS_Table_Gateway::class);
 	}
 
 	/**
@@ -77,8 +85,12 @@ class AIPS_Prompt_Section_Repository {
 			'prompt_sections.get_all',
 			array( 'active_only' => $active_only ),
 			function() use ( $active_only ) {
-				$where  = $active_only ? "WHERE is_active = 1" : "";
-				return $this->wpdb->get_results( "SELECT * FROM {$this->table_name} $where ORDER BY name ASC" );
+				$criteria = $active_only ? array( 'is_active' => 1 ) : array();
+				return $this->gateway->find_all(
+					$this->table_name,
+					$criteria,
+					array( 'order_by' => 'name ASC' )
+				);
 			}
 		);
 	}
@@ -98,10 +110,7 @@ class AIPS_Prompt_Section_Repository {
 			'prompt_sections.get_by_id',
 			array( 'section_id' => $id ),
 			function() use ( $id ) {
-				return $this->wpdb->get_row( $this->wpdb->prepare(
-					"SELECT * FROM {$this->table_name} WHERE id = %d",
-					$id
-				) );
+				return $this->gateway->find_by_id( $this->table_name, 'id', $id );
 			}
 		);
 	}
@@ -182,13 +191,13 @@ class AIPS_Prompt_Section_Repository {
 
 		$format = array('%s', '%s', '%s', '%s', '%d', '%d', '%d');
 
-		$result = $this->wpdb->insert($this->table_name, $insert_data, $format);
+		$result = $this->gateway->insert($this->table_name, $insert_data, $format);
 
 		if ( $result ) {
 			$this->invalidate_cache_domain( 'prompt_section', array(), 'prompt_section_created' );
 		}
 
-		return $result ? $this->wpdb->insert_id : false;
+		return $result;
 	}
 
 	/**
@@ -234,13 +243,13 @@ class AIPS_Prompt_Section_Repository {
 		$update_data['updated_at'] = AIPS_DateTime::now()->timestamp();
 		$format[] = '%d';
 
-		$result = $this->wpdb->update(
+		$result = $this->gateway->update_by_id(
 			$this->table_name,
+			'id',
+			$id,
 			$update_data,
-			array('id' => $id),
-			$format,
-			array('%d')
-		) !== false;
+			$format
+		);
 
 		if ( $result ) {
 			$this->invalidate_cache_domain( 'prompt_section', array( 'section_id' => absint( $id ) ), 'prompt_section_updated' );
@@ -256,7 +265,7 @@ class AIPS_Prompt_Section_Repository {
 	 * @return bool True on success, false on failure.
 	 */
 	public function delete($id) {
-		$result = $this->wpdb->delete($this->table_name, array('id' => $id), array('%d')) !== false;
+		$result = $this->gateway->delete_by_id($this->table_name, 'id', $id);
 		if ( $result ) {
 			$this->invalidate_cache_domain( 'prompt_section', array( 'section_id' => absint( $id ) ), 'prompt_section_deleted' );
 		}

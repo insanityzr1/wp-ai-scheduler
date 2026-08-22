@@ -15,6 +15,10 @@ if (!defined('ABSPATH')) {
 
 /**
  * Class AIPS_Prompt_Builder_Diversity_Injector
+ *
+ * Helper collaborator for injecting diversity prompt blocks across section builders.
+ * Intentionally standalone; does not implement AIPS_Prompt_Builder_Section because
+ * it provides specialized snippet builders rather than full section assembly.
  */
 class AIPS_Prompt_Builder_Diversity_Injector {
 

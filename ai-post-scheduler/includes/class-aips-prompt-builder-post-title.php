@@ -20,25 +20,14 @@ if (!defined('ABSPATH')) {
  *
  * Builds the AI prompt for post title generation.
  */
-class AIPS_Prompt_Builder_Post_Title {
-
-	/**
-	 * @var AIPS_Template_Processor Template processor for prompt variables.
-	 */
-	private $template_processor;
-
-	/**
-	 * @var AIPS_Prompt_Builder_Diversity_Injector Diversity block builder.
-	 */
-	private $diversity_injector;
+class AIPS_Prompt_Builder_Post_Title extends AIPS_Prompt_Builder_Section_Base {
 
 	/**
 	 * @param AIPS_Template_Processor|null                $template_processor Optional template processor.
 	 * @param AIPS_Prompt_Builder_Diversity_Injector|null $diversity_injector Optional diversity injector.
 	 */
 	public function __construct($template_processor = null, $diversity_injector = null) {
-		$this->template_processor = $template_processor ?: new AIPS_Template_Processor();
-		$this->diversity_injector = $diversity_injector ?: new AIPS_Prompt_Builder_Diversity_Injector();
+		parent::__construct($template_processor, $diversity_injector);
 	}
 
 	/**

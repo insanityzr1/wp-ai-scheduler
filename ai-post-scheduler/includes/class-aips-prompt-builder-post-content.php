@@ -20,12 +20,7 @@ if (!defined('ABSPATH')) {
  *
  * Builds the AI prompt for post content generation.
  */
-class AIPS_Prompt_Builder_Post_Content {
-
-	/**
-	 * @var AIPS_Template_Processor Template processor for prompt variables.
-	 */
-	private $template_processor;
+class AIPS_Prompt_Builder_Post_Content extends AIPS_Prompt_Builder_Section_Base {
 
 	/**
 	 * @var AIPS_Prompt_Builder_Article_Structure_Section Builder for structured section prompts.
@@ -33,19 +28,13 @@ class AIPS_Prompt_Builder_Post_Content {
 	private $article_structure_section_builder;
 
 	/**
-	 * @var AIPS_Prompt_Builder_Diversity_Injector Diversity block builder.
-	 */
-	private $diversity_injector;
-
-	/**
 	 * @param AIPS_Template_Processor|null                 $template_processor             Optional template processor.
 	 * @param AIPS_Prompt_Builder_Article_Structure_Section|null $article_structure_section_builder Optional section prompt builder.
 	 * @param AIPS_Prompt_Builder_Diversity_Injector|null  $diversity_injector            Optional diversity injector.
 	 */
 	public function __construct($template_processor = null, $article_structure_section_builder = null, $diversity_injector = null) {
-		$this->template_processor = $template_processor ?: new AIPS_Template_Processor();
+		parent::__construct($template_processor, $diversity_injector);
 		$this->article_structure_section_builder = $article_structure_section_builder ?: new AIPS_Prompt_Builder_Article_Structure_Section(null, null, $this->template_processor);
-		$this->diversity_injector = $diversity_injector ?: new AIPS_Prompt_Builder_Diversity_Injector();
 	}
 
 	/**

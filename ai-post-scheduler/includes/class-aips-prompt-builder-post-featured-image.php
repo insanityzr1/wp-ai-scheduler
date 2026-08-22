@@ -20,18 +20,13 @@ if (!defined('ABSPATH')) {
  *
  * Builds the AI prompt for featured image generation.
  */
-class AIPS_Prompt_Builder_Post_Featured_Image {
-
-	/**
-	 * @var AIPS_Template_Processor Template processor for prompt variables.
-	 */
-	private $template_processor;
+class AIPS_Prompt_Builder_Post_Featured_Image extends AIPS_Prompt_Builder_Section_Base {
 
 	/**
 	 * @param AIPS_Template_Processor|null $template_processor Optional template processor.
 	 */
 	public function __construct($template_processor = null) {
-		$this->template_processor = $template_processor ?: new AIPS_Template_Processor();
+		parent::__construct($template_processor);
 	}
 
 	/**

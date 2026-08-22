@@ -482,7 +482,16 @@ class AIPS_Admin_Quick_Actions {
 	 */
 	private function get_default_page_args($page_key) {
 		if ('automations' === $page_key) {
-			return array('tab' => AIPS_Automations_Controller::get_active_tab_key());
+			$args = array('tab' => AIPS_Automations_Controller::get_active_tab_key());
+
+			if (AIPS_Automations_Controller::TAB_AUTHOR_TOPICS === $args['tab']) {
+				$author_id = filter_input(INPUT_GET, 'author_id', FILTER_VALIDATE_INT);
+				if ($author_id) {
+					$args['author_id'] = absint($author_id);
+				}
+			}
+
+			return $args;
 		}
 
 		if ('diagnostics' === $page_key) {

@@ -440,6 +440,11 @@ final class AI_Post_Scheduler {
         $container->singleton(AIPS_System_Status_Diagnostics_Service::class, function( $container ) {
             return new AIPS_System_Status_Diagnostics_Service();
         });
+
+        // Register AIPS_Table_Gateway
+        $container->singleton(AIPS_Table_Gateway::class, function( $container ) {
+            return new AIPS_Table_Gateway();
+        });
     }
 
     /**

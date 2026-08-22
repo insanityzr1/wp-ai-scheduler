@@ -54,12 +54,20 @@ class AIPS_Voices_Repository {
     private $wpdb;
 
     /**
-     * Initialize the repository.
+     * @var AIPS_Table_Gateway Table gateway helper
      */
-    public function __construct() {
+    private $gateway;
+
+    /**
+     * Initialize the repository.
+     *
+     * @param AIPS_Table_Gateway|null $gateway Optional table gateway instance.
+     */
+    public function __construct($gateway = null) {
         global $wpdb;
         $this->wpdb = $wpdb;
         $this->table_name = $wpdb->prefix . 'aips_voices';
+        $this->gateway = $gateway ?: AIPS_Container::get_instance()->make(AIPS_Table_Gateway::class);
     }
 
     /**
@@ -77,8 +85,12 @@ class AIPS_Voices_Repository {
             'voices.get_all',
             array( 'active_only' => $active_only ),
             function() use ( $active_only ) {
-                $where  = $active_only ? "WHERE is_active = 1" : "";
-                return $this->wpdb->get_results( "SELECT * FROM {$this->table_name} $where ORDER BY name ASC" );
+                $criteria = $active_only ? array( 'is_active' => 1 ) : array();
+                return $this->gateway->find_all(
+                    $this->table_name,
+                    $criteria,
+                    array( 'order_by' => 'name ASC' )
+                );
             }
         );
     }
@@ -98,7 +110,7 @@ class AIPS_Voices_Repository {
             'voices.get_by_id',
             array( 'voice_id' => $id ),
             function() use ( $id ) {
-                return $this->wpdb->get_row( $this->wpdb->prepare( "SELECT * FROM {$this->table_name} WHERE id = %d", $id ) );
+                return $this->gateway->find_by_id( $this->table_name, 'id', $id );
             }
         );
     }
@@ -123,13 +135,13 @@ class AIPS_Voices_Repository {
 
         $format = array('%s', '%s', '%s', '%s', '%d', '%d');
 
-        $result = $this->wpdb->insert($this->table_name, $insert_data, $format);
+        $insert_id = $this->gateway->insert($this->table_name, $insert_data, $format);
 
-        if ( $result ) {
+        if ( $insert_id ) {
             $this->invalidate_cache_domain( 'voice', array(), 'voice_created' );
         }
 
-        return $result ? $this->wpdb->insert_id : false;
+        return $insert_id;
     }
 
     /**
@@ -172,19 +184,19 @@ class AIPS_Voices_Repository {
             return false;
         }
 
-        $result = $this->wpdb->update(
+        $result = $this->gateway->update_by_id(
             $this->table_name,
+            'id',
+            $id,
             $update_data,
-            array('id' => $id),
-            $format,
-            array('%d')
+            $format
         );
 
-        if ( $result !== false ) {
+        if ( $result ) {
             $this->invalidate_cache_domain( 'voice', array( 'voice_id' => absint( $id ) ), 'voice_updated' );
         }
 
-        return $result !== false;
+        return $result;
     }
 
     /**
@@ -194,11 +206,11 @@ class AIPS_Voices_Repository {
      * @return bool True on success, false on failure.
      */
     public function delete($id) {
-        $result = $this->wpdb->delete($this->table_name, array('id' => $id), array('%d'));
-        if ( $result !== false ) {
+        $result = $this->gateway->delete_by_id($this->table_name, 'id', $id);
+        if ( $result ) {
             $this->invalidate_cache_domain( 'voice', array( 'voice_id' => absint( $id ) ), 'voice_deleted' );
         }
-        return $result !== false;
+        return $result;
     }
 
     /**

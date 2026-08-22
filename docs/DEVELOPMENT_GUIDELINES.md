@@ -79,6 +79,16 @@ Never use `current_time()`, `strtotime()`, `date()`, `date_i18n()`, or `gmdate()
 
 ---
 
+## Table Gateway & CRUD Persistence Abstraction (Optional)
+
+The `AIPS_Table_Gateway` class provides safe, prepared CRUD operations (`find_by_id`, `find_all`, `insert`, `update_by_id`, `delete_by_id`) for simple database tables.
+
+- **Approved Use Cases:** Simple repositories with basic single-table persistence operations (e.g. `AIPS_Voices_Repository` and `AIPS_Article_Structure_Repository`).
+- **Rejected Use Cases:** Complex repositories with multi-table joins, custom query logic, or where the persistence is tightly coupled with domain/orchestration rules (e.g. `AIPS_History_Repository`, `AIPS_Campaigns_Repository`, or `AIPS_Schedule_Repository`).
+- **Core Rule:** Concrete repositories must retain validation, hooks, cache invalidation, and domain-specific operations. The gateway only manages raw database interaction and error capture.
+
+---
+
 ## Admin UI Design System
 
 For all admin interface work, use `ai-post-scheduler/docs/Design_Guidelines.md` as the single source of truth for tokens, shared component classes, approved usage, and migration patterns.

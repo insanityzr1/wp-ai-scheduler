@@ -47,6 +47,7 @@ if (is_object($history)) {
                     <p class="aips-page-description"><?php esc_html_e('View generation history containers and inspect every logged step, AI call, and error for each run.', 'ai-post-scheduler'); ?></p>
                 </div>
             </div>
+            <?php AIPS_Admin_Quick_Actions::render(); ?>
         </div>
 
         <?php

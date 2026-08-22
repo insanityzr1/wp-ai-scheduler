@@ -29,6 +29,7 @@ if (!defined('ABSPATH')) {
 					<p class="aips-page-description"><?php esc_html_e('View and manage all AI-generated posts including published articles and drafts pending review.', 'ai-post-scheduler'); ?></p>
 				</div>
 			</div>
+			<?php AIPS_Admin_Quick_Actions::render(); ?>
 		</div>
 
 		<!-- Tabs navigation -->

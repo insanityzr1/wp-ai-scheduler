@@ -18,6 +18,7 @@ if (!defined('ABSPATH')) {
 					<p class="aips-page-description"><?php esc_html_e('Review system health, generation operations, telemetry, seeding utilities, and developer tools from one place.', 'ai-post-scheduler'); ?></p>
 				</div>
 			</div>
+			<?php AIPS_Admin_Quick_Actions::render(); ?>
 		</div>
 
 		<div class="aips-tab-nav" role="tablist">

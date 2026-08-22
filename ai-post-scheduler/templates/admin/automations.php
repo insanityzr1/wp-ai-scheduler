@@ -51,6 +51,7 @@ if (!defined('ABSPATH')) {
 					</div>
 				<?php endif; ?>
 			</div>
+			<?php AIPS_Admin_Quick_Actions::render(); ?>
 		</div>
 
 		<div class="aips-tab-nav">

@@ -20,6 +20,19 @@ if (!defined('ABSPATH')) {
 class AIPS_Admin_Menu_Helper {
 
 	/**
+	 * Major admin pages that should share persistent quick navigation.
+	 *
+	 * @var string[]
+	 */
+	private static $major_pages = array(
+		'dashboard',
+		'automations',
+		'diagnostics',
+		'generated_posts',
+		'history',
+	);
+
+	/**
 	 * Map of logical page names to their actual slugs.
 	 *
 	 * @var array<string, string>
@@ -131,5 +144,106 @@ class AIPS_Admin_Menu_Helper {
 	 */
 	public static function get_slug($page) {
 		return isset(self::$page_slugs[$page]) ? self::$page_slugs[$page] : $page;
+	}
+
+	/**
+	 * Return the logical page key for a registered admin slug.
+	 *
+	 * @param string $slug Admin page slug.
+	 * @return string
+	 */
+	public static function get_page_key_from_slug($slug) {
+		$slug = sanitize_key((string) $slug);
+
+		foreach (self::$page_slugs as $page => $mapped_slug) {
+			if ($mapped_slug === $slug) {
+				return $page;
+			}
+		}
+
+		return $slug;
+	}
+
+	/**
+	 * Determine whether the provided slug belongs to this plugin.
+	 *
+	 * @param string $slug Admin page slug.
+	 * @return bool
+	 */
+	public static function is_plugin_page_slug($slug) {
+		$slug = (string) $slug;
+
+		return 'ai-post-scheduler' === $slug || 0 === strpos($slug, 'aips-');
+	}
+
+	/**
+	 * Get the standard label for a logical page.
+	 *
+	 * @param string $page Logical page name.
+	 * @return string
+	 */
+	public static function get_page_label($page) {
+		switch ($page) {
+			case 'dashboard':
+				return __('Dashboard', 'ai-post-scheduler');
+			case 'automations':
+				return __('Automations', 'ai-post-scheduler');
+			case 'diagnostics':
+				return __('Diagnostics', 'ai-post-scheduler');
+			case 'generated_posts':
+				return __('Content', 'ai-post-scheduler');
+			case 'history':
+				return __('History', 'ai-post-scheduler');
+			case 'authors':
+				return __('Authors', 'ai-post-scheduler');
+			case 'author_topics':
+				return __('Author Topics', 'ai-post-scheduler');
+			case 'templates':
+				return __('Templates', 'ai-post-scheduler');
+			case 'schedule':
+				return __('Schedules', 'ai-post-scheduler');
+			default:
+				return ucwords(str_replace(array('-', '_'), ' ', (string) $page));
+		}
+	}
+
+	/**
+	 * Get the standard Dashicon class for a logical page.
+	 *
+	 * @param string $page Logical page name.
+	 * @return string
+	 */
+	public static function get_page_icon($page) {
+		switch ($page) {
+			case 'dashboard':
+				return 'dashicons-chart-bar';
+			case 'automations':
+				return 'dashicons-controls-repeat';
+			case 'diagnostics':
+				return 'dashicons-admin-tools';
+			case 'generated_posts':
+				return 'dashicons-admin-post';
+			case 'history':
+				return 'dashicons-backup';
+			case 'authors':
+				return 'dashicons-admin-users';
+			case 'author_topics':
+				return 'dashicons-lightbulb';
+			case 'templates':
+				return 'dashicons-media-document';
+			case 'schedule':
+				return 'dashicons-calendar-alt';
+			default:
+				return 'dashicons-admin-links';
+		}
+	}
+
+	/**
+	 * Return the shared major-page registry.
+	 *
+	 * @return string[]
+	 */
+	public static function get_major_pages() {
+		return self::$major_pages;
 	}
 }

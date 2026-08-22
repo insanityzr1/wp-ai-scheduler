@@ -52,6 +52,7 @@ if (!defined('ABSPATH')) {
 							</form>
 						</div>
 					</div>
+					<?php AIPS_Admin_Quick_Actions::render(); ?>
 				</div>
 			</div>
 		</div>

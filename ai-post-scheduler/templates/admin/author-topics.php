@@ -293,7 +293,7 @@ $posts_count        = $logs_repository->count_generated_posts_by_author($author_
 </script>
 
 <script type="text/html" id="aips-tmpl-topic-row">
-<tr data-topic-id="{{id}}">
+<tr id="aips-topic-{{id}}" data-topic-id="{{id}}">
 	<th class="check-column"><input type="checkbox" class="aips-topic-checkbox" value="{{id}}"></th>
 	<td class="topic-title-cell column-topic">
 		<div class="aips-topic-row">

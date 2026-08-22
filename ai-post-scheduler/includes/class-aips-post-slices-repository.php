@@ -38,6 +38,11 @@ class AIPS_Post_Slices_Repository {
 	private $wpdb;
 
 	/**
+	 * @var AIPS_Table_Gateway Table gateway helper
+	 */
+	private $gateway;
+
+	/**
 	 * @return self
 	 */
 	public static function instance(): self {
@@ -50,11 +55,14 @@ class AIPS_Post_Slices_Repository {
 
 	/**
 	 * Initialize repository.
+	 *
+	 * @param AIPS_Table_Gateway|null $gateway Optional table gateway instance.
 	 */
-	public function __construct() {
+	public function __construct($gateway = null) {
 		global $wpdb;
 		$this->wpdb = $wpdb;
 		$this->table_name = $wpdb->prefix . 'aips_post_slices';
+		$this->gateway = $gateway ?: AIPS_Container::get_instance()->make(AIPS_Table_Gateway::class);
 	}
 
 	/**
@@ -72,17 +80,12 @@ class AIPS_Post_Slices_Repository {
 			'post_slices.get_all',
 			array( 'active_only' => $active_only ),
 			function() use ( $active_only ) {
-				if ($active_only) {
-					$sql = $this->wpdb->prepare(
-						"SELECT * FROM {$this->table_name} WHERE is_active = %d ORDER BY sort_order ASC, name ASC, id ASC",
-						1
-					);
-				} else {
-					$sql = "SELECT * FROM {$this->table_name} ORDER BY sort_order ASC, name ASC, id ASC";
-				}
-
-				$result = $this->wpdb->get_results($sql);
-				return is_array($result) ? $result : array();
+				$criteria = $active_only ? array( 'is_active' => 1 ) : array();
+				return $this->gateway->find_all(
+					$this->table_name,
+					$criteria,
+					array( 'order_by' => 'sort_order ASC, name ASC, id ASC' )
+				);
 			}
 		);
 	}
@@ -99,12 +102,7 @@ class AIPS_Post_Slices_Repository {
 			'post_slices.get_by_id',
 			array( 'slice_id' => $id ),
 			function() use ( $id ) {
-				return $this->wpdb->get_row(
-					$this->wpdb->prepare(
-						"SELECT * FROM {$this->table_name} WHERE id = %d",
-						$id
-					)
-				);
+				return $this->gateway->find_by_id( $this->table_name, 'id', $id );
 			}
 		);
 	}
@@ -126,7 +124,7 @@ class AIPS_Post_Slices_Repository {
 			'updated_at'  => isset($data['updated_at']) ? absint($data['updated_at']) : $now,
 		);
 
-		$result = $this->wpdb->insert(
+		$result = $this->gateway->insert(
 			$this->table_name,
 			$insert_data,
 			array('%s', '%s', '%d', '%d', '%d', '%d')
@@ -136,7 +134,7 @@ class AIPS_Post_Slices_Repository {
 			$this->invalidate_cache_domain( 'post_slice', array(), 'post_slice_created' );
 		}
 
-		return $result ? $this->wpdb->insert_id : false;
+		return $result;
 	}
 
 	/**
@@ -173,12 +171,12 @@ class AIPS_Post_Slices_Repository {
 		$update_data['updated_at'] = isset($data['updated_at']) ? absint($data['updated_at']) : AIPS_DateTime::now()->timestamp();
 		$formats[] = '%d';
 
-		$result = $this->wpdb->update(
+		$result = $this->gateway->update_by_id(
 			$this->table_name,
+			'id',
+			$id,
 			$update_data,
-			array('id' => absint($id)),
-			$formats,
-			array('%d')
+			$formats
 		);
 
 		if ($result !== false) {
@@ -195,11 +193,7 @@ class AIPS_Post_Slices_Repository {
 	 * @return int|false
 	 */
 	public function delete($id) {
-		$result = $this->wpdb->delete(
-			$this->table_name,
-			array('id' => absint($id)),
-			array('%d')
-		);
+		$result = $this->gateway->delete_by_id($this->table_name, 'id', $id);
 
 		if ($result !== false) {
 			$this->invalidate_cache_domain( 'post_slice', array( 'slice_id' => absint( $id ) ), 'post_slice_deleted' );

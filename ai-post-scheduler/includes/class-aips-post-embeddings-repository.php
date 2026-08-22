@@ -12,12 +12,22 @@ if (!defined('ABSPATH')) {
 	exit;
 }
 
+if (!trait_exists('AIPS_Cacheable_Repository')) {
+	require_once __DIR__ . '/trait-aips-cacheable-repository.php';
+}
+
+if (!trait_exists('AIPS_Repository_Tables')) {
+	require_once __DIR__ . '/trait-aips-repository-tables.php';
+}
+
 /**
  * Class AIPS_Post_Embeddings_Repository
  *
  * Manages CRUD operations for the aips_post_embeddings table.
  */
 class AIPS_Post_Embeddings_Repository {
+	use AIPS_Cacheable_Repository;
+	use AIPS_Repository_Tables;
 
 	/**
 	 * @var wpdb WordPress database object.
@@ -35,7 +45,9 @@ class AIPS_Post_Embeddings_Repository {
 	public function __construct() {
 		global $wpdb;
 		$this->wpdb  = $wpdb;
-		$this->table = $wpdb->prefix . 'aips_post_embeddings';
+		// table() is the AIPS_Repository_Tables trait method; $this->table is the
+		// cached table-name property (PHP keeps method/property names separate).
+		$this->table = $this->table('aips_post_embeddings');
 	}
 
 	/**
@@ -45,11 +57,19 @@ class AIPS_Post_Embeddings_Repository {
 	 * @return object|null Row object or null if not found.
 	 */
 	public function get_by_post_id($post_id) {
-		return $this->wpdb->get_row(
-			$this->wpdb->prepare(
-				"SELECT * FROM {$this->table} WHERE post_id = %d LIMIT 1",
-				absint($post_id)
-			)
+		return $this->cache_read(
+			'post_embeddings.get_by_post_id',
+			array(
+				'post_id' => absint($post_id),
+			),
+			function() use ( $post_id ) {
+				return $this->wpdb->get_row(
+					$this->wpdb->prepare(
+						"SELECT * FROM {$this->table} WHERE post_id = %d LIMIT 1",
+						absint($post_id)
+					)
+				);
+			}
 		);
 	}
 
@@ -65,21 +85,30 @@ class AIPS_Post_Embeddings_Repository {
 		}
 
 		$post_ids = array_map('absint', $post_ids);
-		$placeholders = implode(',', array_fill(0, count($post_ids), '%d'));
 
-		$rows = $this->wpdb->get_results(
-			$this->wpdb->prepare(
-				"SELECT * FROM {$this->table} WHERE post_id IN ($placeholders)",
-				...$post_ids
-			)
+		return $this->cache_read(
+			'post_embeddings.get_by_post_ids',
+			array(
+				'post_ids' => array_values($post_ids),
+			),
+			function() use ( $post_ids ) {
+				$placeholders = implode(',', array_fill(0, count($post_ids), '%d'));
+
+				$rows = $this->wpdb->get_results(
+					$this->wpdb->prepare(
+						"SELECT * FROM {$this->table} WHERE post_id IN ($placeholders)",
+						...$post_ids
+					)
+				);
+
+				$indexed = array();
+				foreach ($rows as $row) {
+					$indexed[(int) $row->post_id] = $row;
+				}
+
+				return $indexed;
+			}
 		);
-
-		$indexed = array();
-		foreach ($rows as $row) {
-			$indexed[(int) $row->post_id] = $row;
-		}
-
-		return $indexed;
 	}
 
 	/**
@@ -88,11 +117,17 @@ class AIPS_Post_Embeddings_Repository {
 	 * @return int[] Array of post IDs that have embeddings.
 	 */
 	public function get_all_indexed_post_ids() {
-		$results = $this->wpdb->get_col(
-			"SELECT post_id FROM {$this->table} ORDER BY post_id ASC"
-		);
+		return $this->cache_read(
+			'post_embeddings.get_all_indexed_post_ids',
+			array(),
+			function() {
+				$results = $this->wpdb->get_col(
+					"SELECT post_id FROM {$this->table} ORDER BY post_id ASC"
+				);
 
-		return array_map('intval', $results);
+				return array_map('intval', $results);
+			}
+		);
 	}
 
 	/**
@@ -140,8 +175,14 @@ class AIPS_Post_Embeddings_Repository {
 	 * @return int Count of indexed posts.
 	 */
 	public function count() {
-		return (int) $this->wpdb->get_var(
-			"SELECT COUNT(*) FROM {$this->table}"
+		return $this->cache_read(
+			'post_embeddings.count',
+			array(),
+			function() {
+				return (int) $this->wpdb->get_var(
+					"SELECT COUNT(*) FROM {$this->table}"
+				);
+			}
 		);
 	}
 
@@ -189,7 +230,7 @@ class AIPS_Post_Embeddings_Repository {
 		$existing = $this->get_by_post_id($post_id);
 
 		if ($existing) {
-			return $this->wpdb->update(
+			$result = $this->wpdb->update(
 				$this->table,
 				array(
 					'embedding'  => wp_json_encode($embedding),
@@ -200,18 +241,24 @@ class AIPS_Post_Embeddings_Repository {
 				array('%s', '%s', '%d'),
 				array('%d')
 			);
+		} else {
+			$result = $this->wpdb->insert(
+				$this->table,
+				array(
+					'post_id'    => $post_id,
+					'embedding'  => wp_json_encode($embedding),
+					'model'      => sanitize_text_field($model),
+					'indexed_at' => $now,
+				),
+				array('%d', '%s', '%s', '%d')
+			);
 		}
 
-		return $this->wpdb->insert(
-			$this->table,
-			array(
-				'post_id'    => $post_id,
-				'embedding'  => wp_json_encode($embedding),
-				'model'      => sanitize_text_field($model),
-				'indexed_at' => $now,
-			),
-			array('%d', '%s', '%s', '%d')
-		);
+		if ($result !== false) {
+			$this->invalidate_embeddings_cache($post_id, 'post_embedding_upserted');
+		}
+
+		return $result;
 	}
 
 	/**
@@ -221,11 +268,17 @@ class AIPS_Post_Embeddings_Repository {
 	 * @return int|false Number of rows deleted or false on failure.
 	 */
 	public function delete($post_id) {
-		return $this->wpdb->delete(
+		$result = $this->wpdb->delete(
 			$this->table,
 			array('post_id' => absint($post_id)),
 			array('%d')
 		);
+
+		if ($result) {
+			$this->invalidate_embeddings_cache($post_id, 'post_embedding_deleted');
+		}
+
+		return $result;
 	}
 
 	/**
@@ -288,6 +341,84 @@ class AIPS_Post_Embeddings_Repository {
 	 * @return int|false Number of rows deleted or false on failure.
 	 */
 	public function delete_all() {
-		return $this->wpdb->query( "DELETE FROM {$this->table}" );
+		$result = $this->wpdb->query( "DELETE FROM {$this->table}" );
+
+		if ($result) {
+			$this->invalidate_embeddings_cache(0, 'post_embeddings_deleted_all');
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Return the repository cache group for post-embedding reads.
+	 *
+	 * @return string
+	 */
+	protected function repository_cache_group(): string {
+		return 'aips_post_embeddings';
+	}
+
+	/**
+	 * Return the explicit repository cache policies for post-embedding reads.
+	 *
+	 * Only reads over the embeddings table alone are cached, under the broad
+	 * `post_embeddings` tag that every write invalidates. The full-corpus
+	 * similarity reads (get_all_for_similarity*), the wp_posts-joined counts
+	 * (count_indexed_for_type), and the queue-driving get_unindexed_post_ids read
+	 * are intentionally left uncached — they are large, depend on external post
+	 * state, or drive the indexing batch.
+	 *
+	 * @return array
+	 */
+	protected function repository_cache_policies(): array {
+		return array(
+			'post_embeddings.get_by_post_id' => array(
+				'tier'        => 'medium',
+				'ttl'         => 300,
+				'tags'        => array( 'post_embeddings', 'post_embedding:{post_id}' ),
+				'cache_null'  => false,
+				'description' => 'Cache single-post embedding reads by post ID.',
+			),
+			'post_embeddings.get_by_post_ids' => array(
+				'tier'        => 'medium',
+				'ttl'         => 300,
+				'tags'        => array( 'post_embeddings' ),
+				'description' => 'Cache bulk embedding reads by post IDs.',
+			),
+			'post_embeddings.get_all_indexed_post_ids' => array(
+				'tier'        => 'medium',
+				'ttl'         => 300,
+				'tags'        => array( 'post_embeddings' ),
+				'description' => 'Cache the list of indexed post IDs.',
+			),
+			'post_embeddings.count' => array(
+				'tier'        => 'medium',
+				'ttl'         => 300,
+				'tags'        => array( 'post_embeddings' ),
+				'description' => 'Cache the total indexed-post count.',
+			),
+		);
+	}
+
+	/**
+	 * Invalidate post-embedding read caches after a write.
+	 *
+	 * Bumps the broad `post_embeddings` tag (present on every cached read) plus an
+	 * optional post-scoped tag when a single post is affected.
+	 *
+	 * @param int    $post_id Post ID, or 0 when unknown/bulk.
+	 * @param string $reason Invalidation reason.
+	 * @return void
+	 */
+	private function invalidate_embeddings_cache($post_id, $reason) {
+		$tags = array( 'post_embeddings' );
+
+		$post_id = absint($post_id);
+		if ($post_id > 0) {
+			$tags[] = 'post_embedding:' . $post_id;
+		}
+
+		$this->invalidate_cache_tags($tags, (string) $reason);
 	}
 }

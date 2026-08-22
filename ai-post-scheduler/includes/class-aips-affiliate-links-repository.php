@@ -107,6 +107,7 @@ class AIPS_Affiliate_Links_Repository {
 		}
 
 		$lower_tags = array_map( 'strtolower', $tags );
+		sort( $lower_tags ); // Order-independent result; sort so equal tag sets share a cache key.
 
 		return $this->cache_read(
 			'affiliate_links.get_enabled_by_tags',

@@ -85,6 +85,7 @@ class AIPS_Post_Embeddings_Repository {
 		}
 
 		$post_ids = array_map('absint', $post_ids);
+		sort($post_ids); // Order-independent result map; sort so equal sets share a cache key.
 
 		return $this->cache_read(
 			'post_embeddings.get_by_post_ids',
@@ -227,7 +228,12 @@ class AIPS_Post_Embeddings_Repository {
 		$post_id = absint($post_id);
 		$now     = AIPS_DateTime::now()->timestamp();
 
-		$existing = $this->get_by_post_id($post_id);
+		// Bypass the read cache for this write-path existence check: caching the
+		// pre-write row just to invalidate it moments later is wasted work on the
+		// bulk-indexing hot path.
+		$existing = $this->without_repository_cache(function() use ( $post_id ) {
+			return $this->get_by_post_id($post_id);
+		});
 
 		if ($existing) {
 			$result = $this->wpdb->update(

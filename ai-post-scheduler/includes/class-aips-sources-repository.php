@@ -317,6 +317,7 @@ class AIPS_Sources_Repository {
 		}
 
 		$source_ids   = array_map('intval', $source_ids);
+		sort($source_ids); // Order-independent result map; sort so equal sets share a cache key.
 
 		return $this->cache_read(
 			'sources.get_term_ids_for_sources',
@@ -391,6 +392,9 @@ class AIPS_Sources_Repository {
 		if (empty($term_ids)) {
 			return array();
 		}
+
+		$term_ids = array_map('intval', $term_ids);
+		sort($term_ids); // Order-independent result; sort so equal sets share a cache key.
 
 		return $this->cache_read(
 			'sources.get_urls_by_group_term_ids',
@@ -586,6 +590,9 @@ class AIPS_Sources_Repository {
 		if ( empty( $term_ids ) ) {
 			return array();
 		}
+
+		$term_ids = array_map( 'intval', $term_ids );
+		sort( $term_ids ); // Order-independent result; sort so equal sets share a cache key.
 
 		return $this->cache_read(
 			'sources.get_by_group_term_ids',

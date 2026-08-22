@@ -852,6 +852,7 @@ class AIPS_Sources_Data_Repository {
 		}
 
 		$source_ids   = array_map( 'absint', $source_ids );
+		sort( $source_ids ); // Order-independent result map; sort so equal sets share a cache key.
 
 		return $this->cache_read(
 			'sources_data.get_counts_by_source_ids',

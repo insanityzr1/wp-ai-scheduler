@@ -389,6 +389,7 @@ class AIPS_Feedback_Repository {
 		if (empty($author_ids)) {
 			return array();
 		}
+		sort($author_ids); // Order-independent result map; sort so equal sets share a cache key.
 
 		return $this->cache_read(
 			'feedback.get_statistics_bulk',
@@ -441,6 +442,7 @@ class AIPS_Feedback_Repository {
 		if (empty($topic_ids)) {
 			return array();
 		}
+		sort($topic_ids); // Order-independent result map; sort so equal sets share a cache key.
 
 		return $this->cache_read(
 			'feedback.get_latest_by_topics',

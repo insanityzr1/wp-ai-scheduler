@@ -90,9 +90,13 @@ class AIPS_Table_Gateway {
 			$id
 		);
 
-		$row = $this->wpdb->get_row($query);
+		$row = $this->wpdb->get_row( $query );
 
-		if (empty($row) || !is_object($row)) {
+		if ( $row === null && ! empty( $this->wpdb->last_error ) ) {
+			$this->log_db_error( 'find_by_id', $table );
+		}
+
+		if ( empty( $row ) || ! is_object( $row ) ) {
 			return null;
 		}
 

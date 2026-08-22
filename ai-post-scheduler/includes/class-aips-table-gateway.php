@@ -150,9 +150,13 @@ class AIPS_Table_Gateway {
 			$query = $this->wpdb->prepare($query, $params);
 		}
 
-		$results = $this->wpdb->get_results($query);
+		$results = $this->wpdb->get_results( $query );
 
-		return is_array($results) ? $results : array();
+		if ( $results === null && ! empty( $this->wpdb->last_error ) ) {
+			$this->log_db_error( 'find_all', $table );
+		}
+
+		return is_array( $results ) ? $results : array();
 	}
 
 	/**

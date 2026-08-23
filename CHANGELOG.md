@@ -4,6 +4,10 @@
 ### Added
 - **WordPress AI Connector Routing**: Added Settings > AI controls for using all available WordPress AI connectors or an ordered allowlist, with connector-specific failover and short-lived health cooldowns. Request validation and content-policy failures are surfaced without provider shopping.
 
+### Changed
+- **Cache Read Refactor**: Refactored `AIPS_Cacheable_Repository::cache_read` God method into smaller components to enforce Separation of Concerns.
+
+
 ### Fixed
 - **Short-form AI Responses**: Reserve at least 1200 output tokens for title and excerpt requests so reasoning-capable connector models do not cut off visible responses after spending the smaller configured budget on internal reasoning. The global Max Tokens Limit remains authoritative.
 - **WordPress AI Client Detection**: Treat locally registered connectors with configured credentials as available without requiring a successful remote model-catalog request during admin page loads. Live generation now surfaces the AI Client's connector/model error instead of showing a false missing-provider notice.

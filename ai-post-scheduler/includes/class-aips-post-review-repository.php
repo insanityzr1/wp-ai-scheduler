@@ -29,14 +29,22 @@ class AIPS_Post_Review_Repository {
 	 * @var wpdb WordPress database abstraction object
 	 */
 	private $wpdb;
+
+	/**
+	 * @var AIPS_Table_Gateway Table gateway helper
+	 */
+	private $gateway;
 	
 	/**
 	 * Initialize the repository.
+	 *
+	 * @param AIPS_Table_Gateway|null $gateway Optional table gateway instance.
 	 */
-	public function __construct() {
+	public function __construct($gateway = null) {
 		global $wpdb;
 		$this->wpdb = $wpdb;
 		$this->table_name = $wpdb->prefix . 'aips_history';
+		$this->gateway = $gateway ?: AIPS_Container::get_instance()->make(AIPS_Table_Gateway::class);
 	}
 	
 	/**

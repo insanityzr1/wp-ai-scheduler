@@ -36,13 +36,21 @@ class AIPS_Sources_Repository {
 	private $wpdb;
 
 	/**
-	 * Initialize the repository.
+	 * @var AIPS_Table_Gateway Table gateway helper.
 	 */
-	public function __construct() {
+	private $gateway;
+
+	/**
+	 * Initialize the repository.
+	 *
+	 * @param AIPS_Table_Gateway|null $gateway Optional table gateway instance.
+	 */
+	public function __construct($gateway = null) {
 		global $wpdb;
 		$this->wpdb         = $wpdb;
 		$this->table_name   = $wpdb->prefix . 'aips_sources';
 		$this->groups_table = $wpdb->prefix . 'aips_source_group_terms';
+		$this->gateway      = $gateway ?: AIPS_Container::get_instance()->make(AIPS_Table_Gateway::class);
 	}
 
 	/**
@@ -52,9 +60,11 @@ class AIPS_Sources_Repository {
 	 * @return array Array of source objects.
 	 */
 	public function get_all($active_only = false) {
-		$where = $active_only ? 'WHERE is_active = 1' : '';
-		return $this->wpdb->get_results(
-			"SELECT * FROM {$this->table_name} {$where} ORDER BY created_at ASC"
+		$criteria = $active_only ? array( 'is_active' => 1 ) : array();
+		return $this->gateway->find_all(
+			$this->table_name,
+			$criteria,
+			array( 'order_by' => 'created_at ASC' )
 		);
 	}
 
@@ -65,12 +75,7 @@ class AIPS_Sources_Repository {
 	 * @return object|null Source object or null if not found.
 	 */
 	public function get_by_id($id) {
-		return $this->wpdb->get_row(
-			$this->wpdb->prepare(
-				"SELECT * FROM {$this->table_name} WHERE id = %d",
-				$id
-			)
-		);
+		return $this->gateway->find_by_id($this->table_name, 'id', absint($id));
 	}
 
 	/**
@@ -117,9 +122,7 @@ class AIPS_Sources_Repository {
 
 		$format = array('%s', '%s', '%s', '%d', '%d', '%d');
 
-		$result = $this->wpdb->insert($this->table_name, $insert_data, $format);
-
-		return $result ? $this->wpdb->insert_id : false;
+		return $this->gateway->insert($this->table_name, $insert_data, $format);
 	}
 
 	/**
@@ -160,13 +163,13 @@ class AIPS_Sources_Repository {
 		$update_data['updated_at'] = AIPS_DateTime::now()->timestamp();
 		$format[]                  = '%d';
 
-		return $this->wpdb->update(
+		return $this->gateway->update_by_id(
 			$this->table_name,
+			'id',
+			absint($id),
 			$update_data,
-			array('id' => $id),
-			$format,
-			array('%d')
-		) !== false;
+			$format
+		);
 	}
 
 	/**
@@ -176,11 +179,7 @@ class AIPS_Sources_Repository {
 	 * @return bool True on success, false on failure.
 	 */
 	public function delete($id) {
-		return $this->wpdb->delete(
-			$this->table_name,
-			array('id' => $id),
-			array('%d')
-		) !== false;
+		return $this->gateway->delete_by_id($this->table_name, 'id', absint($id));
 	}
 
 	/**

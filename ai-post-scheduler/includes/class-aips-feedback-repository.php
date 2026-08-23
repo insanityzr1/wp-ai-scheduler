@@ -30,14 +30,22 @@ class AIPS_Feedback_Repository {
 	 * @var wpdb WordPress database abstraction object
 	 */
 	private $wpdb;
+
+	/**
+	 * @var AIPS_Table_Gateway Table gateway helper
+	 */
+	private $gateway;
 	
 	/**
 	 * Initialize the repository.
+	 *
+	 * @param AIPS_Table_Gateway|null $gateway Optional table gateway instance.
 	 */
-	public function __construct() {
+	public function __construct($gateway = null) {
 		global $wpdb;
 		$this->wpdb = $wpdb;
 		$this->table_name = $wpdb->prefix . 'aips_topic_feedback';
+		$this->gateway = $gateway ?: AIPS_Container::get_instance()->make(AIPS_Table_Gateway::class);
 	}
 	
 	/**
@@ -101,10 +109,7 @@ class AIPS_Feedback_Repository {
 	 * @return object|null Feedback object or null if not found.
 	 */
 	public function get_by_id($id) {
-		return $this->wpdb->get_row($this->wpdb->prepare(
-			"SELECT * FROM {$this->table_name} WHERE id = %d",
-			$id
-		));
+		return $this->gateway->find_by_id($this->table_name, 'id', absint($id));
 	}
 	
 	/**
@@ -135,8 +140,7 @@ class AIPS_Feedback_Repository {
 			'created_at' => AIPS_DateTime::now()->timestamp()
 		);
 		
-		$result = $this->wpdb->insert($this->table_name, $insert_data);
-		return $result ? $this->wpdb->insert_id : false;
+		return $this->gateway->insert($this->table_name, $insert_data);
 	}
 	
 	/**
@@ -189,14 +193,10 @@ class AIPS_Feedback_Repository {
 	 * Delete feedback by ID.
 	 *
 	 * @param int $id Feedback ID.
-	 * @return int|false The number of rows deleted, or false on error.
+	 * @return bool True on success, false on failure.
 	 */
 	public function delete($id) {
-		return $this->wpdb->delete(
-			$this->table_name,
-			array('id' => $id),
-			array('%d')
-		);
+		return $this->gateway->delete_by_id($this->table_name, 'id', absint($id));
 	}
 	
 	/**

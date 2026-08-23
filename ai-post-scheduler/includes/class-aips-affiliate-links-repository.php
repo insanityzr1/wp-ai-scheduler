@@ -25,16 +25,22 @@ class AIPS_Affiliate_Links_Repository {
 	private $table;
 
 	/**
+	 * @var AIPS_Table_Gateway
+	 */
+	private $gateway;
+
+	/**
 	 * Valid CTA position values.
 	 *
 	 * @var string[]
 	 */
 	const VALID_POSITIONS = array( 'append', 'prepend', 'after_heading', 'after_text' );
 
-	public function __construct() {
+	public function __construct($gateway = null) {
 		global $wpdb;
-		$this->wpdb  = $wpdb;
-		$this->table = $wpdb->prefix . 'aips_affiliate_links';
+		$this->wpdb    = $wpdb;
+		$this->table   = $wpdb->prefix . 'aips_affiliate_links';
+		$this->gateway = $gateway ?: AIPS_Container::get_instance()->make(AIPS_Table_Gateway::class);
 	}
 
 	/**
@@ -44,12 +50,7 @@ class AIPS_Affiliate_Links_Repository {
 	 * @return object|null Row object or null if not found.
 	 */
 	public function get_by_id( $id ) {
-		return $this->wpdb->get_row(
-			$this->wpdb->prepare(
-				"SELECT * FROM {$this->table} WHERE id = %d",
-				absint( $id )
-			)
-		);
+		return $this->gateway->find_by_id( $this->table, 'id', absint( $id ) );
 	}
 
 	/**
@@ -59,10 +60,8 @@ class AIPS_Affiliate_Links_Repository {
 	 * @return object[]
 	 */
 	public function get_all( $enabled_only = false ) {
-		$where = $enabled_only ? 'WHERE enabled = 1' : '';
-		return $this->wpdb->get_results(
-			"SELECT * FROM {$this->table} {$where} ORDER BY tag ASC" // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		);
+		$criteria = $enabled_only ? array( 'enabled' => 1 ) : array();
+		return $this->gateway->find_all( $this->table, $criteria, array( 'order_by' => 'tag ASC' ) );
 	}
 
 	/**
@@ -154,26 +153,23 @@ class AIPS_Affiliate_Links_Repository {
 	 */
 	public function insert( array $data ) {
 		$now    = AIPS_DateTime::now()->timestamp();
-		$result = $this->wpdb->insert(
-			$this->table,
-			array(
-				'tag'                  => sanitize_text_field( $data['tag'] ?? '' ),
-				'label'                => sanitize_text_field( $data['label'] ?? '' ),
-				'affiliate_url'        => esc_url_raw( $data['affiliate_url'] ?? '' ),
-				'enabled'              => isset( $data['enabled'] ) ? (int) (bool) $data['enabled'] : 1,
-				'cta_html'             => wp_kses_post( $data['cta_html'] ?? '' ),
-				'cta_position'         => $this->sanitize_position( $data['cta_position'] ?? 'append' ),
-				'cta_heading'          => sanitize_text_field( $data['cta_heading'] ?? '' ),
-				'cta_match_text'       => sanitize_text_field( $data['cta_match_text'] ?? '' ),
-				'cta_max_insertions'   => max( 1, absint( $data['cta_max_insertions'] ?? 1 ) ),
-				'use_ai_injection'     => isset( $data['use_ai_injection'] ) ? (int) (bool) $data['use_ai_injection'] : 0,
-				'created_at'           => $now,
-				'updated_at'           => $now,
-			),
-			array( '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%d', '%d', '%d', '%d' )
+		$insert_data = array(
+			'tag'                  => sanitize_text_field( $data['tag'] ?? '' ),
+			'label'                => sanitize_text_field( $data['label'] ?? '' ),
+			'affiliate_url'        => esc_url_raw( $data['affiliate_url'] ?? '' ),
+			'enabled'              => isset( $data['enabled'] ) ? (int) (bool) $data['enabled'] : 1,
+			'cta_html'             => wp_kses_post( $data['cta_html'] ?? '' ),
+			'cta_position'         => $this->sanitize_position( $data['cta_position'] ?? 'append' ),
+			'cta_heading'          => sanitize_text_field( $data['cta_heading'] ?? '' ),
+			'cta_match_text'       => sanitize_text_field( $data['cta_match_text'] ?? '' ),
+			'cta_max_insertions'   => max( 1, absint( $data['cta_max_insertions'] ?? 1 ) ),
+			'use_ai_injection'     => isset( $data['use_ai_injection'] ) ? (int) (bool) $data['use_ai_injection'] : 0,
+			'created_at'           => $now,
+			'updated_at'           => $now,
 		);
+		$format = array( '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%d', '%d', '%d', '%d' );
 
-		return $result ? $this->wpdb->insert_id : false;
+		return $this->gateway->insert( $this->table, $insert_data, $format );
 	}
 
 	/**
@@ -181,7 +177,7 @@ class AIPS_Affiliate_Links_Repository {
 	 *
 	 * @param int   $id   Row ID.
 	 * @param array $data Fields to update (same keys as insert).
-	 * @return int|false Rows updated or false on failure.
+	 * @return bool True on success, false on failure.
 	 */
 	public function update( $id, array $data ) {
 		$update = array( 'updated_at' => AIPS_DateTime::now()->timestamp() );
@@ -223,12 +219,12 @@ class AIPS_Affiliate_Links_Repository {
 			$format[]                   = '%d';
 		}
 
-		return $this->wpdb->update(
+		return $this->gateway->update_by_id(
 			$this->table,
+			'id',
+			absint( $id ),
 			$update,
-			array( 'id' => absint( $id ) ),
-			$format,
-			array( '%d' )
+			$format
 		);
 	}
 
@@ -237,18 +233,18 @@ class AIPS_Affiliate_Links_Repository {
 	 *
 	 * @param int  $id      Row ID.
 	 * @param bool $enabled New state.
-	 * @return int|false
+	 * @return bool True on success, false on failure.
 	 */
 	public function set_enabled( $id, $enabled ) {
-		return $this->wpdb->update(
+		return $this->gateway->update_by_id(
 			$this->table,
+			'id',
+			absint( $id ),
 			array(
 				'enabled'    => (int) (bool) $enabled,
 				'updated_at' => AIPS_DateTime::now()->timestamp(),
 			),
-			array( 'id' => absint( $id ) ),
-			array( '%d', '%d' ),
-			array( '%d' )
+			array( '%d', '%d' )
 		);
 	}
 
@@ -256,14 +252,10 @@ class AIPS_Affiliate_Links_Repository {
 	 * Delete a mapping by ID.
 	 *
 	 * @param int $id Row ID.
-	 * @return int|false
+	 * @return bool True on success, false on failure.
 	 */
 	public function delete( $id ) {
-		return $this->wpdb->delete(
-			$this->table,
-			array( 'id' => absint( $id ) ),
-			array( '%d' )
-		);
+		return $this->gateway->delete_by_id( $this->table, 'id', absint( $id ) );
 	}
 
 	/**

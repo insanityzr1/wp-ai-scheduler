@@ -146,8 +146,7 @@ if (is_object($history)) {
                 </div>
             </div>
 
-            <div class="aips-panel-body">
-                <div class="aips-history-main-column">
+            <div class="aips-history-main-column">
                     <!-- History Containers Table -->
                     <div class="aips-panel-body no-padding">
                         <table class="aips-table aips-history-table">
@@ -201,7 +200,6 @@ if (is_object($history)) {
                         </div>
                     </div>
                 </div>
-            </div><!-- .aips-panel-body -->
         </div><!-- .aips-content-panel -->
 
         <?php else: ?>

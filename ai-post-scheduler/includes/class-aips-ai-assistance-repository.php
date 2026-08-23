@@ -31,12 +31,20 @@ class AIPS_AI_Assistance_Repository {
 	private $table_name;
 
 	/**
-	 * Initialize the repository.
+	 * @var AIPS_Table_Gateway Table gateway helper.
 	 */
-	public function __construct() {
+	private $gateway;
+
+	/**
+	 * Initialize the repository.
+	 *
+	 * @param AIPS_Table_Gateway|null $gateway Optional table gateway instance.
+	 */
+	public function __construct($gateway = null) {
 		global $wpdb;
 		$this->wpdb       = $wpdb;
 		$this->table_name = $wpdb->prefix . 'aips_ai_assistance';
+		$this->gateway    = $gateway ?: AIPS_Container::get_instance()->make(AIPS_Table_Gateway::class);
 	}
 
 	/**
@@ -55,21 +63,19 @@ class AIPS_AI_Assistance_Repository {
 	 * @return int|false New record ID on success, false on failure.
 	 */
 	public function create( array $data ) {
-		$result = $this->wpdb->insert(
-			$this->table_name,
-			array(
-				'session_id'     => sanitize_text_field( $data['session_id'] ),
-				'user_id'        => isset( $data['user_id'] ) ? absint( $data['user_id'] ) : null,
-				'form_context'   => sanitize_text_field( $data['form_context'] ),
-				'field_key'      => sanitize_text_field( $data['field_key'] ),
-				'request_object' => isset( $data['request_object'] ) ? $data['request_object'] : '',
-				'prompt'         => $data['prompt'],
-				'response'       => $data['response'],
-				'created_at'     => AIPS_DateTime::now()->timestamp(),
-			),
-			array( '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%d' )
+		$insert_data = array(
+			'session_id'     => sanitize_text_field( $data['session_id'] ),
+			'user_id'        => isset( $data['user_id'] ) ? absint( $data['user_id'] ) : null,
+			'form_context'   => sanitize_text_field( $data['form_context'] ),
+			'field_key'      => sanitize_text_field( $data['field_key'] ),
+			'request_object' => isset( $data['request_object'] ) ? $data['request_object'] : '',
+			'prompt'         => $data['prompt'],
+			'response'       => $data['response'],
+			'created_at'     => AIPS_DateTime::now()->timestamp(),
 		);
-		return $result ? $this->wpdb->insert_id : false;
+		$formats = array( '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%d' );
+
+		return $this->gateway->insert( $this->table_name, $insert_data, $formats );
 	}
 
 	/**

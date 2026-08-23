@@ -41,12 +41,20 @@ class AIPS_Notifications_Repository implements AIPS_Notifications_Repository_Int
 	private $table;
 
 	/**
-	 * Constructor.
+	 * @var AIPS_Table_Gateway Table gateway helper.
 	 */
-	public function __construct() {
+	private $gateway;
+
+	/**
+	 * Constructor.
+	 *
+	 * @param AIPS_Table_Gateway|null $gateway Optional table gateway instance.
+	 */
+	public function __construct($gateway = null) {
 		global $wpdb;
-		$this->wpdb  = $wpdb;
-		$this->table = $wpdb->prefix . 'aips_notifications';
+		$this->wpdb    = $wpdb;
+		$this->table   = $wpdb->prefix . 'aips_notifications';
+		$this->gateway = $gateway ?: AIPS_Container::get_instance()->make(AIPS_Table_Gateway::class);
 	}
 
 	/**
@@ -92,28 +100,21 @@ class AIPS_Notifications_Repository implements AIPS_Notifications_Repository_Int
 			$meta_json = is_string($data['meta']) ? $data['meta'] : wp_json_encode($data['meta']);
 		}
 
-		$result = $this->wpdb->insert(
-			$this->table,
-			array(
-				'type'       => sanitize_text_field($data['type']),
-				'title'      => sanitize_text_field($data['title']),
-				'message'    => sanitize_textarea_field($data['message']),
-				'url'        => esc_url_raw($data['url']),
-				'level'      => sanitize_key($data['level']),
-				'meta'       => $meta_json,
-				'dedupe_key' => sanitize_text_field($data['dedupe_key']),
-				'is_read'    => absint($data['is_read']) ? 1 : 0,
-				'read_at'    => !empty($data['read_at']) ? absint($data['read_at']) : 0,
-				'created_at' => !empty($data['created_at']) ? absint($data['created_at']) : AIPS_DateTime::now()->timestamp(),
-			),
-			array('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%d')
+		$insert_data = array(
+			'type'       => sanitize_text_field($data['type']),
+			'title'      => sanitize_text_field($data['title']),
+			'message'    => sanitize_textarea_field($data['message']),
+			'url'        => esc_url_raw($data['url']),
+			'level'      => sanitize_key($data['level']),
+			'meta'       => $meta_json,
+			'dedupe_key' => sanitize_text_field($data['dedupe_key']),
+			'is_read'    => absint($data['is_read']) ? 1 : 0,
+			'read_at'    => !empty($data['read_at']) ? absint($data['read_at']) : 0,
+			'created_at' => !empty($data['created_at']) ? absint($data['created_at']) : AIPS_DateTime::now()->timestamp(),
 		);
+		$formats = array('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%d');
 
-		if ($result === false) {
-			return false;
-		}
-
-		return (int) $this->wpdb->insert_id;
+		return $this->gateway->insert($this->table, $insert_data, $formats);
 	}
 
 	/**
@@ -178,21 +179,19 @@ class AIPS_Notifications_Repository implements AIPS_Notifications_Repository_Int
 	 * Mark a single notification as read.
 	 *
 	 * @param int $id Notification ID.
-	 * @return bool True on success.
+	 * @return bool True on success, false on failure.
 	 */
 	public function mark_as_read($id) {
-		$result = $this->wpdb->update(
+		return $this->gateway->update_by_id(
 			$this->table,
+			'id',
+			absint($id),
 			array(
 				'is_read' => 1,
 				'read_at' => AIPS_DateTime::now()->timestamp(),
 			),
-			array('id' => absint($id)),
-			array('%d', '%d'),
-			array('%d')
+			array('%d', '%d')
 		);
-
-		return $result !== false;
 	}
 
 	/**

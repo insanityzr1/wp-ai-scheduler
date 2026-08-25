@@ -92,7 +92,7 @@ class AIPS_Table_Gateway {
 
 		$row = $this->wpdb->get_row( $query );
 
-		if ( $row === null && ! empty( $this->wpdb->last_error ) ) {
+		if ( ! empty( $this->wpdb->last_error ) ) {
 			$this->log_db_error( 'find_by_id', $table );
 		}
 
@@ -152,7 +152,7 @@ class AIPS_Table_Gateway {
 
 		$results = $this->wpdb->get_results( $query );
 
-		if ( $results === null && ! empty( $this->wpdb->last_error ) ) {
+		if ( ! empty( $this->wpdb->last_error ) ) {
 			$this->log_db_error( 'find_all', $table );
 		}
 

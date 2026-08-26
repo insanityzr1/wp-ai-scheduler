@@ -113,7 +113,7 @@ class AIPS_DB_Manager {
             campaign_id bigint(20) DEFAULT NULL,
             author_id bigint(20) DEFAULT NULL,
             topic_id bigint(20) DEFAULT NULL,
-            creation_method varchar(20) DEFAULT NULL,
+            creation_method varchar(64) DEFAULT NULL,
             status varchar(50) NOT NULL DEFAULT 'pending',
             prompt text,
             generated_title varchar(500),
@@ -141,12 +141,16 @@ class AIPS_DB_Manager {
             id bigint(20) NOT NULL AUTO_INCREMENT,
             history_id bigint(20) NOT NULL,
             history_type_id int DEFAULT 1,
+            event_type varchar(64) DEFAULT NULL,
+            event_status varchar(32) DEFAULT NULL,
             timestamp bigint(20) unsigned NOT NULL DEFAULT 0,
             details longtext,
             PRIMARY KEY  (id),
             KEY history_id (history_id),
             KEY history_type_id (history_type_id),
-            KEY history_id_log_type (history_id, history_type_id)
+            KEY history_id_type (history_id, history_type_id),
+            KEY event_status (event_status),
+            KEY event_type_timestamp (event_type, timestamp)
         ) $charset_collate;";
 
         $sql[] = "CREATE TABLE $table_campaigns (

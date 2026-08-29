@@ -15,6 +15,10 @@
 
 ## [Unreleased]
 
+### Added
+- **Gutenberg Real-Time Semantic Link Inserter Sidebar**: Interactive editor panel (`PluginSidebar`) that provides authors with live, context-aware internal linking recommendations and AI anchor phrase suggestions while typing in the block editor. Powered by the unified vector store and relationship matrix with 1-click in-memory paragraph insertion.
+- **REST Editor API**: Introduced `AIPS_REST_Editor_Controller` (`/wp-json/aips/v1/editor/link-suggestions` and `/wp-json/aips/v1/editor/find-anchors`) supporting permission-checked in-editor semantic analysis.
+
 - **Accessibility:** Added missing `aria-label` attributes to checkboxes in the Planner and Research admin templates to improve screen reader accessibility.
 
 - **Performance:** Fixed N+1 queries in Generated Posts controller by batching `get_post()` calls using `_prime_post_caches()`.

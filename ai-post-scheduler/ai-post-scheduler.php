@@ -627,6 +627,11 @@ final class AI_Post_Scheduler {
         new AIPS_Related_Posts_Frontend(
             AIPS_Container::get_instance()->make(AIPS_Related_Posts_Service::class)
         );
+
+        // REST API routes for block editor integrations
+        add_action('rest_api_init', function () {
+            (new AIPS_REST_Editor_Controller())->register_routes();
+        });
     }
 
     /**

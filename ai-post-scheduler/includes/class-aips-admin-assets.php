@@ -63,6 +63,7 @@ class AIPS_Admin_Assets {
      */
     public function __construct() {
         add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_assets'));
+        add_action('enqueue_block_editor_assets', array($this, 'enqueue_block_editor_assets'));
     }
 
     /**
@@ -561,6 +562,110 @@ class AIPS_Admin_Assets {
         </div>
         <?php
     }
+
+	/**
+	 * Enqueue assets for Gutenberg block editor (e.g. Semantic Link Inserter Sidebar).
+	 *
+	 * @return void
+	 */
+	public function enqueue_block_editor_assets() {
+		$screen = function_exists('get_current_screen') ? get_current_screen() : null;
+		if ($screen && !empty($screen->post_type)) {
+			$supported_types = apply_filters('aips_editor_supported_post_types', array('post', 'page'));
+			if (!in_array($screen->post_type, $supported_types, true)) {
+				return;
+			}
+		}
+
+		if (!current_user_can('edit_posts')) {
+			return;
+		}
+
+		$post    = function_exists('get_post') ? get_post() : null;
+		$post_id = $post ? (int) $post->ID : 0;
+
+		wp_enqueue_script(
+			'aips-editor-sidebar-link-inserter',
+			AIPS_PLUGIN_URL . 'assets/js/blocks/editor-sidebar-link-inserter.js',
+			array(
+				'wp-plugins',
+				'wp-edit-post',
+				'wp-element',
+				'wp-components',
+				'wp-data',
+				'wp-i18n',
+				'wp-api-fetch',
+				'wp-notices',
+			),
+			AIPS_VERSION,
+			true
+		);
+
+		wp_enqueue_style(
+			'aips-editor-sidebar-link-inserter-css',
+			AIPS_PLUGIN_URL . 'assets/css/editor-sidebar-link-inserter.css',
+			array('wp-components'),
+			AIPS_VERSION
+		);
+
+		$config = AIPS_Config::get_instance();
+
+		$registered_types  = get_post_types(array('public' => true), 'objects');
+		$post_type_options = array(
+			array(
+				'label' => __('All Post Types', 'ai-post-scheduler'),
+				'value' => '',
+			),
+		);
+		foreach ($registered_types as $pt_name => $pt_obj) {
+			if ('attachment' === $pt_name) {
+				continue;
+			}
+			$post_type_options[] = array(
+				'label' => !empty($pt_obj->labels->singular_name) ? $pt_obj->labels->singular_name : $pt_name,
+				'value' => $pt_name,
+			);
+		}
+
+		wp_localize_script(
+			'aips-editor-sidebar-link-inserter',
+			'aipsEditorSettings',
+			array(
+				'restUrl'        => esc_url_raw(rest_url('aips/v1/editor/')),
+				'nonce'          => wp_create_nonce('wp_rest'),
+				'postId'         => $post_id,
+				'similarityMin'  => (float) $config->get_option('aips_links_similarity_threshold', 0.60),
+				'maxSuggestions' => (int) $config->get_option('aips_links_max_suggestions', 5),
+				'postTypes'      => $post_type_options,
+				'i18n'           => array(
+					'title'                    => __('AI Link Inserter', 'ai-post-scheduler'),
+					'panelTitle'               => __('Semantic Link & Anchor Suggestions', 'ai-post-scheduler'),
+					'noSuggestions'            => __('No semantic link suggestions found for this content yet. Keep writing or check back once more articles are indexed.', 'ai-post-scheduler'),
+					'searching'                => __('Scanning semantic graph for relevant articles...', 'ai-post-scheduler'),
+					'findAnchors'              => __('Find Insertion Anchors', 'ai-post-scheduler'),
+					'findingAnchors'           => __('Analyzing content for anchor points...', 'ai-post-scheduler'),
+					'insertLink'               => __('Insert Link', 'ai-post-scheduler'),
+					'linkInserted'             => __('Link inserted successfully!', 'ai-post-scheduler'),
+					'matchSnippet'             => __('Context:', 'ai-post-scheduler'),
+					'recommendedAnchor'        => __('Suggested Anchor:', 'ai-post-scheduler'),
+					'similarity'               => __('Match', 'ai-post-scheduler'),
+					'precomputed'              => __('Precomputed Relationship', 'ai-post-scheduler'),
+					'realtime'                 => __('Real-Time Vector Match', 'ai-post-scheduler'),
+					'viewPost'                 => __('View Post', 'ai-post-scheduler'),
+					'refresh'                  => __('Refresh Suggestions', 'ai-post-scheduler'),
+					'noAnchorsFound'           => __('No natural anchor positions found in the current draft text for this article.', 'ai-post-scheduler'),
+					'activeBlockNote'          => __('Context-aware internal link recommendations powered by semantic vector graph.', 'ai-post-scheduler'),
+					'filtersTitle'             => __('Filters & Custom Search', 'ai-post-scheduler'),
+					'searchLabel'              => __('Topic / Keyword Search', 'ai-post-scheduler'),
+					'searchPlaceholder'        => __('e.g. Docker caching, vector store...', 'ai-post-scheduler'),
+					'similarityThresholdLabel' => __('Min Similarity (%):', 'ai-post-scheduler'),
+					'maxSuggestionsLabel'      => __('Max Suggestions:', 'ai-post-scheduler'),
+					'postTypeLabel'            => __('Target Post Type:', 'ai-post-scheduler'),
+					'resetFilters'             => __('Reset Filters', 'ai-post-scheduler'),
+				),
+			)
+		);
+	}
 
     /**
      * Enqueue assets for the authors page.

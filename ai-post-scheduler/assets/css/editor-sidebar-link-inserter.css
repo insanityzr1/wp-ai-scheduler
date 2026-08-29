@@ -197,3 +197,20 @@
 	color: #646970;
 	font-size: 12px;
 }
+
+.aips-editor-sidebar-panel .components-panel__body {
+	border: 1px solid #dcdcde;
+	border-radius: 6px;
+	margin-bottom: 12px;
+	background: #ffffff;
+}
+
+.aips-editor-sidebar-panel .components-panel__body-title {
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.aips-editor-sidebar-panel .components-base-control {
+	margin-bottom: 12px;
+}
+

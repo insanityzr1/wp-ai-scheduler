@@ -77,4 +77,66 @@ class Test_AIPS_Content_Links_Repository extends WP_UnitTestCase {
 		$this->assertSame(0, $this->repo->get_outbound_count($post_a));
 		$this->assertSame(0, $this->repo->get_inbound_count($post_b));
 	}
+
+	/**
+	 * Pin the save_post closure's revision/autosave guard.
+	 *
+	 * WordPress fires save_post for every revision and autosave. Without a guard
+	 * the plugin's link-graph closure would call sync_post_links($revision_id, [])
+	 * — issuing a DELETE FROM wp_aips_content_links WHERE source_id = <revision_id>
+	 * on every keystroke autosave. This test drops a canary row keyed by the
+	 * revision ID, fires save_post for the revision, and asserts the canary is
+	 * still there — proving the guard short-circuited before the DELETE.
+	 */
+	public function test_save_post_closure_skips_revisions() {
+		global $wpdb;
+		$table = $wpdb->prefix . 'aips_content_links';
+
+		$parent_id = $this->factory->post->create(array(
+			'post_title'  => 'Parent Post',
+			'post_status' => 'publish',
+		));
+
+		$revision_id = wp_save_post_revision($parent_id);
+		$this->assertNotEmpty($revision_id, 'wp_save_post_revision should return a revision ID.');
+		$revision_post = get_post($revision_id);
+		$this->assertInstanceOf(WP_Post::class, $revision_post);
+		$this->assertSame('revision', $revision_post->post_type);
+
+		// Drop a canary row keyed by the revision ID. If the guard fails the
+		// closure will call sync_post_links($revision_id, []) which purges every
+		// row with source_id = $revision_id — including this one.
+		$now = current_time('mysql');
+		$wpdb->insert(
+			$table,
+			array(
+				'source_id'   => (int) $revision_id,
+				'target_id'   => (int) $parent_id,
+				'anchor_text' => 'canary',
+				'link_url'    => 'https://example.test/canary',
+				'post_type'   => 'revision',
+				'created_at'  => $now,
+				'updated_at'  => $now,
+			),
+			array('%d', '%d', '%s', '%s', '%s', '%s', '%s')
+		);
+		$canary_count = (int) $wpdb->get_var($wpdb->prepare(
+			"SELECT COUNT(*) FROM {$table} WHERE source_id = %d",
+			$revision_id
+		));
+		$this->assertSame(1, $canary_count, 'Canary row must exist before firing save_post.');
+
+		// Fire save_post for the revision exactly as WordPress would.
+		do_action('save_post', (int) $revision_id, $revision_post, false);
+
+		$canary_survived = (int) $wpdb->get_var($wpdb->prepare(
+			"SELECT COUNT(*) FROM {$table} WHERE source_id = %d",
+			$revision_id
+		));
+		$this->assertSame(
+			1,
+			$canary_survived,
+			'save_post closure must skip revisions — sync_post_links($revision_id, []) would have deleted the canary row.'
+		);
+	}
 }

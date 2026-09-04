@@ -501,7 +501,8 @@ final class AI_Post_Scheduler {
         // Register AIPS_Link_Graph_Service
         $container->singleton(AIPS_Link_Graph_Service::class, function( $container ) {
             return new AIPS_Link_Graph_Service(
-                $container->make(AIPS_Content_Links_Repository::class)
+                $container->make(AIPS_Content_Links_Repository::class),
+                $container->make(AIPS_Editor_Registry::class)
             );
         });
 
@@ -640,10 +641,22 @@ final class AI_Post_Scheduler {
             AIPS_Container::get_instance()->make(AIPS_Content_Indexer_Service::class)->on_post_save($post_id, $post);
             if ('publish' === $post->post_status) {
                 AIPS_Container::get_instance()->make(AIPS_Link_Graph_Service::class)->index_post_links($post_id);
+            } else {
+                // If status changed away from publish (draft, pending), purge its outbound links from graph
+                AIPS_Container::get_instance()->make(AIPS_Content_Links_Repository::class)->sync_post_links($post_id, array());
             }
         }, 10, 2);
 
-        // Remove links from graph on post deletion
+        // Remove links from graph on post trashing or permanent deletion
+        add_action('trashed_post', function ($post_id) {
+            AIPS_Container::get_instance()->make(AIPS_Content_Links_Repository::class)->delete_by_post($post_id);
+        });
+        add_action('untrashed_post', function ($post_id) {
+            $post = get_post($post_id);
+            if ($post && 'publish' === $post->post_status) {
+                AIPS_Container::get_instance()->make(AIPS_Link_Graph_Service::class)->index_post_links($post_id);
+            }
+        });
         add_action('deleted_post', function ($post_id) {
             AIPS_Container::get_instance()->make(AIPS_Content_Links_Repository::class)->delete_by_post($post_id);
         });

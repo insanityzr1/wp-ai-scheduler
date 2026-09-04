@@ -571,6 +571,46 @@
 							el('span', { className: 'aips-card-type-tag' }, item.post_type || 'post'),
 							el(Button, {
 								isSmall: true,
+								variant: 'tertiary',
+								title: t('copyLink', 'Copy URL to clipboard'),
+								onClick: function () {
+									if (navigator.clipboard && item.url) {
+										navigator.clipboard.writeText(item.url);
+										if (createNotice) {
+											createNotice('info', t('urlCopied', 'Link copied to clipboard!'), {
+												type: 'snackbar',
+												isDismissible: true
+											});
+										}
+									}
+								}
+							}, '📋 ' + t('copyLinkShort', 'Copy')),
+							el(Button, {
+								isSmall: true,
+								variant: 'secondary',
+								title: t('insertDirectTitle', 'Insert link into active paragraph'),
+								onClick: function () {
+									if (activeBlock && activeBlock.name === 'core/paragraph') {
+										const currentHtml = (activeBlock.attributes && activeBlock.attributes.content) ? activeBlock.attributes.content : '';
+										const linkTag = '<a href="' + encodeURI(item.url) + '">' + item.title + '</a>';
+										const newHtml = currentHtml ? (currentHtml + ' ' + linkTag) : linkTag;
+										updateBlockAttributes(activeBlock.clientId, { content: newHtml });
+										if (createNotice) {
+											createNotice('success', t('linkInserted', 'Link inserted successfully!'), {
+												type: 'snackbar',
+												isDismissible: true
+											});
+										}
+									} else if (createNotice) {
+										createNotice('warning', t('selectParagraphFirst', 'Please click inside a paragraph block to insert link.'), {
+											type: 'snackbar',
+											isDismissible: true
+										});
+									}
+								}
+							}, '🔗 ' + t('insertDirect', 'Direct Link')),
+							el(Button, {
+								isSmall: true,
 								variant: isExpanded ? 'primary' : 'secondary',
 								'aria-expanded': isExpanded,
 								'aria-label': (isExpanded ? 'Hide' : 'Find') + ' anchor opportunities for ' + item.title,

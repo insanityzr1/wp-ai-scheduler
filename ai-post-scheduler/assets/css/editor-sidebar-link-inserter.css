@@ -119,9 +119,10 @@
 
 .aips-card-actions {
 	display: flex;
-	justify-content: space-between;
+	justify-content: flex-end;
 	align-items: center;
 	gap: 6px;
+	flex-wrap: wrap;
 }
 
 .aips-card-type-tag {

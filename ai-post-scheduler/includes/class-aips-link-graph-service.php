@@ -26,6 +26,13 @@ class AIPS_Link_Graph_Service {
 	protected $links_repo;
 
 	/**
+	 * Editor Registry.
+	 *
+	 * @var AIPS_Editor_Registry
+	 */
+	protected $editor_registry;
+
+	/**
 	 * Memoized adjacency graph for request cache.
 	 *
 	 * @var array|null
@@ -33,13 +40,22 @@ class AIPS_Link_Graph_Service {
 	protected $graph_cache = null;
 
 	/**
+	 * Memoized reverse adjacency graph for request cache.
+	 *
+	 * @var array|null
+	 */
+	protected $reverse_graph_cache = null;
+
+	/**
 	 * Initialize the service.
 	 *
 	 * @param AIPS_Content_Links_Repository|null $links_repo Optional repository.
+	 * @param AIPS_Editor_Registry|null          $editor_registry Optional editor registry.
 	 */
-	public function __construct($links_repo = null) {
-		$container        = AIPS_Container::get_instance();
-		$this->links_repo = $links_repo ?: ($container->has(AIPS_Content_Links_Repository::class) ? $container->make(AIPS_Content_Links_Repository::class) : new AIPS_Content_Links_Repository());
+	public function __construct($links_repo = null, $editor_registry = null) {
+		$container             = AIPS_Container::get_instance();
+		$this->links_repo      = $links_repo ?: ($container->has(AIPS_Content_Links_Repository::class) ? $container->make(AIPS_Content_Links_Repository::class) : new AIPS_Content_Links_Repository());
+		$this->editor_registry = $editor_registry ?: ($container->has(AIPS_Editor_Registry::class) ? $container->make(AIPS_Editor_Registry::class) : new AIPS_Editor_Registry());
 	}
 
 	/**
@@ -57,7 +73,14 @@ class AIPS_Link_Graph_Service {
 		$detected_links = array();
 		$site_url       = get_site_url();
 		$home_url       = get_home_url();
-		$site_host      = wp_parse_url($site_url, PHP_URL_HOST);
+		$site_host      = strtolower((string) wp_parse_url($site_url, PHP_URL_HOST));
+		$home_host      = strtolower((string) wp_parse_url($home_url, PHP_URL_HOST));
+		$allowed_hosts  = array_unique(array_filter(array(
+			$site_host,
+			$home_host,
+			preg_replace('/^www\./', '', $site_host),
+			preg_replace('/^www\./', '', $home_host),
+		)));
 
 		// Match <a> tags
 		if (!preg_match_all('/<a\s+[^>]*href=[\'"]([^\'"]+)[\'"][^>]*>(.*?)<\/a>/is', $html, $matches, PREG_SET_ORDER)) {
@@ -76,13 +99,14 @@ class AIPS_Link_Graph_Service {
 			}
 
 			// Check if internal
-			$url_host = wp_parse_url($raw_url, PHP_URL_HOST);
+			$url_host    = strtolower((string) wp_parse_url($raw_url, PHP_URL_HOST));
+			$clean_uhost = preg_replace('/^www\./', '', $url_host);
 			$is_internal = false;
 
 			if (empty($url_host) && $raw_url[0] === '/') {
 				$is_internal = true;
 				$full_url    = home_url($raw_url);
-			} elseif ($url_host && strtolower($url_host) === strtolower($site_host)) {
+			} elseif (!empty($url_host) && (in_array($url_host, $allowed_hosts, true) || in_array($clean_uhost, $allowed_hosts, true))) {
 				$is_internal = true;
 				$full_url    = $raw_url;
 			}
@@ -96,7 +120,7 @@ class AIPS_Link_Graph_Service {
 
 			// Fallback: check if homepage or page_on_front
 			if ($target_id <= 0) {
-				$clean_path = trim(wp_parse_url($full_url, PHP_URL_PATH) ?? '', '/');
+				$clean_path = trim((string) wp_parse_url($full_url, PHP_URL_PATH), '/');
 				if (empty($clean_path)) {
 					$target_id = (int) get_option('page_on_front');
 				} else {
@@ -105,6 +129,18 @@ class AIPS_Link_Graph_Service {
 					$post_by_slug = get_page_by_path($slug, OBJECT, array('post', 'page'));
 					if ($post_by_slug) {
 						$target_id = (int) $post_by_slug->ID;
+					} else {
+						// Additional fallback by post_name query
+						$matching = get_posts(array(
+							'name'           => $slug,
+							'post_type'      => array('post', 'page'),
+							'post_status'    => 'publish',
+							'posts_per_page' => 1,
+							'fields'         => 'ids',
+						));
+						if (!empty($matching)) {
+							$target_id = (int) $matching[0];
+						}
 					}
 				}
 			}
@@ -136,6 +172,8 @@ class AIPS_Link_Graph_Service {
 	/**
 	 * Index all internal links in a post and synchronize to database.
 	 *
+	 * Utilizes active editor adapter when content is not explicitly provided.
+	 *
 	 * @param int         $post_id Post ID.
 	 * @param string|null $content Optional content override.
 	 * @return array Detected link items.
@@ -147,18 +185,22 @@ class AIPS_Link_Graph_Service {
 		}
 
 		if ($content === null) {
-			$post = get_post($post_id);
-			if (!$post) {
-				return array();
+			$adapter = $this->editor_registry ? $this->editor_registry->get_active_adapter_for_post($post_id) : null;
+			if ($adapter) {
+				$links = $adapter->extract_links($post_id);
+			} else {
+				$post = get_post($post_id);
+				$links = $post ? $this->parse_content_for_internal_links($post->post_content, $post_id) : array();
 			}
-			$content = $post->post_content;
+		} else {
+			$links = $this->parse_content_for_internal_links($content, $post_id);
 		}
 
-		$links = $this->parse_content_for_internal_links($content, $post_id);
 		$this->links_repo->sync_post_links($post_id, $links);
 
-		// Invalidate graph cache
-		$this->graph_cache = null;
+		// Invalidate graph caches
+		$this->graph_cache         = null;
+		$this->reverse_graph_cache = null;
 
 		return $links;
 	}
@@ -364,6 +406,10 @@ class AIPS_Link_Graph_Service {
 	 * @return array Map of target_id => array of source_ids.
 	 */
 	protected function get_reverse_adjacency_list() {
+		if ($this->reverse_graph_cache !== null) {
+			return $this->reverse_graph_cache;
+		}
+
 		$edges   = $this->links_repo->get_all_directed_edges();
 		$rev_adj = array();
 
@@ -376,6 +422,7 @@ class AIPS_Link_Graph_Service {
 			$rev_adj[$t][] = $s;
 		}
 
-		return $rev_adj;
+		$this->reverse_graph_cache = $rev_adj;
+		return $this->reverse_graph_cache;
 	}
 }

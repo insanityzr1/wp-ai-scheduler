@@ -212,7 +212,8 @@ class AIPS_Content_Links_Repository {
 	 */
 	public function get_orphan_post_ids(array $post_types = array('post', 'page'), $limit = 100) {
 		global $wpdb;
-		$limit = max(1, min(500, absint($limit)));
+		$limit      = max(1, min(500, absint($limit)));
+		$post_types = !empty($post_types) ? $post_types : array('post', 'page');
 
 		$pt_escaped = array();
 		foreach ($post_types as $pt) {
@@ -230,6 +231,42 @@ class AIPS_Content_Links_Repository {
 
 		$ids = $wpdb->get_col($sql);
 		return is_array($ids) ? array_map('intval', $ids) : array();
+	}
+
+	/**
+	 * Retrieve all directed edges where both source and target belong to the given node list.
+	 *
+	 * Eliminates N+1 queries when building micro-graph modal topologies.
+	 *
+	 * @param array $node_ids Array of post IDs.
+	 * @return array Array of array('source' => int, 'target' => int).
+	 */
+	public function get_edges_between_nodes(array $node_ids) {
+		global $wpdb;
+		$clean_ids = array_values(array_unique(array_filter(array_map('absint', $node_ids))));
+		if (count($clean_ids) < 2) {
+			return array();
+		}
+
+		$placeholders = implode(',', array_fill(0, count($clean_ids), '%d'));
+		$query_params = array_merge($clean_ids, $clean_ids);
+
+		$sql = $wpdb->prepare(
+			"SELECT DISTINCT source_id, target_id FROM {$this->table} WHERE source_id IN ($placeholders) AND target_id IN ($placeholders)",
+			$query_params
+		);
+
+		$results = $wpdb->get_results($sql, ARRAY_A);
+		if (!is_array($results)) {
+			return array();
+		}
+
+		return array_map(function ($row) {
+			return array(
+				'source' => (int) $row['source_id'],
+				'target' => (int) $row['target_id'],
+			);
+		}, $results);
 	}
 
 	/**

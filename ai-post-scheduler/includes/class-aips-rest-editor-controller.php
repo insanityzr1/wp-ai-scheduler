@@ -411,6 +411,51 @@ class AIPS_REST_Editor_Controller extends WP_REST_Controller {
 			}
 		}
 
+		// Priority 3: Text search fallback when vector similarity yields no results or embeddings are unavailable
+		if (empty($candidates)) {
+			$search_args = array(
+				'post_type'      => !empty($target_post_type) ? $target_post_type : apply_filters('aips_editor_indexable_post_types', array('post', 'page')),
+				'post_status'    => 'publish',
+				'posts_per_page' => $limit * 2,
+				'orderby'        => 'date',
+				'order'          => 'DESC',
+			);
+
+			if (!empty($query)) {
+				$search_args['s'] = $query;
+			} elseif (!empty($content)) {
+				$words = array_filter(explode(' ', preg_replace('/[^\p{L}\p{N}\s]/u', '', wp_strip_all_tags($content))), function ($w) {
+					return mb_strlen($w) >= 4;
+				});
+				if (!empty($words)) {
+					$search_args['s'] = implode(' ', array_slice(array_unique($words), 0, 4));
+				}
+			}
+
+			if ($post_id > 0) {
+				$search_args['post__not_in'] = array($post_id);
+			}
+
+			$fallback_query = new WP_Query($search_args);
+			if ($fallback_query->have_posts()) {
+				foreach ($fallback_query->posts as $f_post) {
+					$f_id    = (int) $f_post->ID;
+					$excerpt = !empty($f_post->post_excerpt) ? $f_post->post_excerpt : wp_trim_words($f_post->post_content, 20);
+
+					$candidates[] = array(
+						'id'             => $f_id,
+						'title'          => html_entity_decode(get_the_title($f_id), ENT_QUOTES, 'UTF-8'),
+						'url'            => get_permalink($f_id),
+						'post_type'      => $f_post->post_type,
+						'similarity'     => 0.50,
+						'similarity_pct' => 50,
+						'excerpt'        => wp_strip_all_tags($excerpt),
+						'is_precomputed' => false,
+					);
+				}
+			}
+		}
+
 		// Batch enrich with SEO Link Graph metrics
 		$target_ids     = array_column($candidates, 'id');
 		$inbound_counts = !empty($target_ids) ? $this->links_repo->get_inbound_counts($target_ids) : array();
@@ -531,20 +576,9 @@ class AIPS_REST_Editor_Controller extends WP_REST_Controller {
 			}
 		}
 
-		// Compute edges between the collected nodes
+		// Compute edges between the collected nodes in a single batch query
 		$all_node_ids = array_keys($node_map);
-		foreach ($all_node_ids as $n_id) {
-			$outbound = $this->links_repo->get_outbound_links($n_id);
-			foreach ($outbound as $out) {
-				$dest_id = (int) $out->target_id;
-				if (isset($node_map[$dest_id])) {
-					$links[] = array(
-						'source' => $n_id,
-						'target' => $dest_id,
-					);
-				}
-			}
-		}
+		$links        = $this->links_repo->get_edges_between_nodes($all_node_ids);
 
 		return rest_ensure_response(array(
 			'success' => true,

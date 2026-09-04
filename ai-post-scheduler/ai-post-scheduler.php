@@ -1010,6 +1010,8 @@ final class AI_Post_Scheduler {
         global $aips_internal_links_controller;
         $aips_internal_links_controller = new AIPS_Internal_Links_Controller();
 
+        // Editor Sidebar Meta-Box (Classic Editor & post edit screens)
+        new AIPS_Editor_Meta_Box();
     }
 
     /**

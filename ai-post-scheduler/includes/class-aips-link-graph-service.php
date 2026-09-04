@@ -87,7 +87,11 @@ class AIPS_Link_Graph_Service {
 			return array();
 		}
 
-		$seen_targets = array();
+		$seen_targets    = array();
+		// First pass: resolve target IDs and record the metadata we'll need in the
+		// second pass so a single _prime_post_caches() covers every get_post() and
+		// get_permalink() lookup, avoiding an N+1 for link-heavy documents.
+		$resolved = array();
 
 		foreach ($matches as $match) {
 			$raw_url     = trim($match[1]);
@@ -155,13 +159,30 @@ class AIPS_Link_Graph_Service {
 			}
 			$seen_targets[$target_id] = true;
 
+			$resolved[] = array(
+				'target_id'   => $target_id,
+				'anchor_text' => $anchor_text,
+				'full_url'    => $full_url,
+			);
+		}
+
+		if (empty($resolved)) {
+			return array();
+		}
+
+		if (function_exists('_prime_post_caches')) {
+			_prime_post_caches(array_column($resolved, 'target_id'), false, false);
+		}
+
+		foreach ($resolved as $entry) {
+			$target_id   = $entry['target_id'];
 			$target_post = get_post($target_id);
 			$post_type   = $target_post ? $target_post->post_type : 'post';
 
 			$detected_links[] = array(
 				'target_id'   => $target_id,
-				'anchor_text' => $anchor_text,
-				'link_url'    => get_permalink($target_id) ?: $full_url,
+				'anchor_text' => $entry['anchor_text'],
+				'link_url'    => get_permalink($target_id) ?: $entry['full_url'],
 				'post_type'   => $post_type,
 			);
 		}
@@ -410,16 +431,21 @@ class AIPS_Link_Graph_Service {
 			return $this->reverse_graph_cache;
 		}
 
-		$edges   = $this->links_repo->get_all_directed_edges();
+		// Derive from the forward adjacency list rather than re-scanning the edges
+		// table. get_adjacency_list() memoizes its result, so on a request that has
+		// already asked for the forward map this avoids a second full-table SELECT.
+		$adj     = $this->get_adjacency_list();
 		$rev_adj = array();
 
-		foreach ($edges as $edge) {
-			$s = (int) $edge['source_id'];
-			$t = (int) $edge['target_id'];
-			if (!isset($rev_adj[$t])) {
-				$rev_adj[$t] = array();
+		foreach ($adj as $source_id => $targets) {
+			$s = (int) $source_id;
+			foreach ($targets as $target_id) {
+				$t = (int) $target_id;
+				if (!isset($rev_adj[$t])) {
+					$rev_adj[$t] = array();
+				}
+				$rev_adj[$t][] = $s;
 			}
-			$rev_adj[$t][] = $s;
 		}
 
 		$this->reverse_graph_cache = $rev_adj;

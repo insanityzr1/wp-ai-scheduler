@@ -638,6 +638,16 @@ final class AI_Post_Scheduler {
             if (!is_object($post) || !isset($post->post_status)) {
                 return;
             }
+            // Ignore revisions, autosaves, and the DOING_AUTOSAVE constant: WordPress
+            // fires save_post for every autosave/revision write, and treating those as
+            // real edits would issue needless DELETEs against wp_aips_content_links on
+            // every keystroke autosave and re-index post revisions.
+            if (wp_is_post_revision($post_id) || wp_is_post_autosave($post_id)) {
+                return;
+            }
+            if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
+                return;
+            }
             AIPS_Container::get_instance()->make(AIPS_Content_Indexer_Service::class)->on_post_save($post_id, $post);
             if ('publish' === $post->post_status) {
                 AIPS_Container::get_instance()->make(AIPS_Link_Graph_Service::class)->index_post_links($post_id);

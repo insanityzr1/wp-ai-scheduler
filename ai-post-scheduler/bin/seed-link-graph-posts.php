@@ -257,6 +257,12 @@ foreach ($newly_created_ids as $new_id) {
 
 	$target_ids_picked = (array) array_rand(array_flip($candidates_for_outbound), min(count($candidates_for_outbound), rand(1, 2)));
 	$new_post          = get_post($new_id);
+	if (!$new_post) {
+		// Skip if the freshly created post is not retrievable (object-cache miss,
+		// filter, or transient failure). Missing a single outbound weave is
+		// preferable to aborting the seeder mid-run.
+		continue;
+	}
 	$outbound_html     = "\n\n<h3>Related Topological Readings</h3>\n<ul>\n";
 
 	foreach ($target_ids_picked as $t_picked_id) {

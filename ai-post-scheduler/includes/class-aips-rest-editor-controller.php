@@ -625,11 +625,13 @@ class AIPS_REST_Editor_Controller extends WP_REST_Controller {
 		);
 
 		if (is_wp_error($result)) {
-			return new WP_Error(
-				$result->get_error_code(),
-				$result->get_error_message(),
-				array('status' => 500)
-			);
+			// Preserve the error's own status when present (e.g. 400/404 from the
+			// inserter service); default to 500 only when no status is attached.
+			$error_data = $result->get_error_data();
+			if (!is_array($error_data) || !isset($error_data['status'])) {
+				$result->add_data(array('status' => 500));
+			}
+			return $result;
 		}
 
 		return rest_ensure_response(array(

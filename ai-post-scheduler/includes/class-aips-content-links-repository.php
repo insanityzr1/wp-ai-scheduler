@@ -57,14 +57,23 @@ class AIPS_Content_Links_Repository {
 			return false;
 		}
 
+		// Wrap the delete + inserts in a transaction so a mid-loop failure
+		// (deadlock, PHP fatal, request timeout) does not leave the source with
+		// a partial outbound set. On InnoDB this rolls back cleanly; on storage
+		// engines without transaction support the calls are effectively no-ops
+		// and behavior degrades gracefully to the prior non-atomic path.
+		$wpdb->query('START TRANSACTION');
+
 		// Delete existing outbound links for this source
 		$wpdb->delete($this->table, array('source_id' => $source_id), array('%d'));
 
 		if (empty($links)) {
+			$wpdb->query('COMMIT');
 			return true;
 		}
 
-		$now = current_time('mysql');
+		$now           = current_time('mysql');
+		$insert_failed = false;
 		foreach ($links as $link) {
 			$target_id   = absint($link['target_id'] ?? 0);
 			$link_url    = esc_url_raw($link['link_url'] ?? '');
@@ -80,7 +89,7 @@ class AIPS_Content_Links_Repository {
 				continue;
 			}
 
-			$wpdb->insert(
+			$inserted = $wpdb->insert(
 				$this->table,
 				array(
 					'source_id'   => $source_id,
@@ -93,8 +102,18 @@ class AIPS_Content_Links_Repository {
 				),
 				array('%d', '%d', '%s', '%s', '%s', '%s', '%s')
 			);
+			if (false === $inserted) {
+				$insert_failed = true;
+				break;
+			}
 		}
 
+		if ($insert_failed) {
+			$wpdb->query('ROLLBACK');
+			return false;
+		}
+
+		$wpdb->query('COMMIT');
 		return true;
 	}
 
@@ -213,21 +232,24 @@ class AIPS_Content_Links_Repository {
 	public function get_orphan_post_ids(array $post_types = array('post', 'page'), $limit = 100) {
 		global $wpdb;
 		$limit      = max(1, min(500, absint($limit)));
-		$post_types = !empty($post_types) ? $post_types : array('post', 'page');
-
-		$pt_escaped = array();
-		foreach ($post_types as $pt) {
-			$pt_escaped[] = "'" . esc_sql(sanitize_key($pt)) . "'";
+		$post_types = array_values(array_unique(array_filter(array_map('sanitize_key', $post_types))));
+		if (empty($post_types)) {
+			$post_types = array('post', 'page');
 		}
-		$types_in = implode(',', $pt_escaped);
 
-		$sql = "SELECT p.ID FROM {$wpdb->posts} p
+		$placeholders = implode(',', array_fill(0, count($post_types), '%s'));
+		$params       = array_merge($post_types, array($limit));
+
+		$sql = $wpdb->prepare(
+			"SELECT p.ID FROM {$wpdb->posts} p
 			LEFT JOIN {$this->table} l ON p.ID = l.target_id
 			WHERE p.post_status = 'publish'
-			AND p.post_type IN ({$types_in})
+			AND p.post_type IN ($placeholders)
 			AND l.id IS NULL
 			ORDER BY p.post_date DESC
-			LIMIT {$limit}";
+			LIMIT %d",
+			$params
+		);
 
 		$ids = $wpdb->get_col($sql);
 		return is_array($ids) ? array_map('intval', $ids) : array();

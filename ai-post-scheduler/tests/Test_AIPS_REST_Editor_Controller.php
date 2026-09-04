@@ -15,21 +15,18 @@ class Test_AIPS_REST_Editor_Controller extends WP_UnitTestCase {
 	/**
 	 * Set up before each test method.
 	 */
-	public function set_up() {
-		parent::set_up();
+	public function setUp(): void {
+		parent::setUp();
 
 		global $wp_rest_server;
 		$this->server = $wp_rest_server = new WP_REST_Server();
 		do_action('rest_api_init');
 	}
 
-	/**
-	 * Clean up after each test method.
-	 */
-	public function tear_down() {
+	public function tearDown(): void {
 		global $wp_rest_server;
 		$wp_rest_server = null;
-		parent::tear_down();
+		parent::tearDown();
 	}
 
 	/**

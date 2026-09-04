@@ -292,11 +292,17 @@ class AIPS_Link_Graph_Service {
 			$root_id = (int) get_option('page_on_front');
 			if ($root_id <= 0) {
 				// Fallback: earliest published post as de facto pillar
-				global $wpdb;
-				$root_id = (int) $wpdb->get_var(
-					"SELECT ID FROM {$wpdb->posts} WHERE post_status = 'publish' AND post_type IN ('post', 'page') ORDER BY ID ASC LIMIT 1"
-				);
-			}
+				$root_posts = get_posts(array(
+					'post_type'        => array('post', 'page'),
+					'post_status'      => 'publish',
+					'posts_per_page'   => 1,
+					'orderby'          => 'ID',
+					'order'            => 'ASC',
+					'fields'           => 'ids',
+					'no_found_rows'    => true,
+					'suppress_filters' => true,
+				));
+				$root_id = !empty($root_posts) ? (int) $root_posts[0] : 0;
 		}
 
 		if ($root_id <= 0 || $post_id === $root_id) {

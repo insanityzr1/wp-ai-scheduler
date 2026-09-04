@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * Tests for AIPS_Content_Links_Repository
  *

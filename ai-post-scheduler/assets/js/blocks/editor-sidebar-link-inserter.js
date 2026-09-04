@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Semantic Link Inserter & Anchor Suggestion Gutenberg Sidebar
  *
  * @package AI_Post_Scheduler

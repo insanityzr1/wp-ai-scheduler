@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * Editor Adapter Interface
  *

@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * Tests for AIPS_Link_Graph_Service
  *

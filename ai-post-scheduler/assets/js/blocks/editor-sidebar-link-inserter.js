@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Semantic Link Inserter & Anchor Suggestion Gutenberg Sidebar
  *
  * @package AI_Post_Scheduler
@@ -24,7 +24,8 @@
 		Tooltip,
 		RangeControl,
 		SelectControl,
-		TextControl
+		TextControl,
+		Modal
 	} = wp.components;
 	const { useSelect, useDispatch } = wp.data;
 	const apiFetch = wp.apiFetch;
@@ -37,7 +38,20 @@
 		similarityMin: 0.60,
 		maxSuggestions: 5,
 		postTypes: [{ label: 'All Post Types', value: '' }],
+		linkGraphConfig: {
+			showPostMetrics: true,
+			showCardBadges: true,
+			enableOpportunitySort: true,
+			enableVisualModal: false
+		},
 		i18n: {}
+	};
+
+	const linkGraphConfig = settings.linkGraphConfig || {
+		showPostMetrics: true,
+		showCardBadges: true,
+		enableOpportunitySort: true,
+		enableVisualModal: false
 	};
 
 	const t = function (key, defaultText) {
@@ -52,7 +66,7 @@
 		const [isLoading, setIsLoading] = useState(false);
 		const [errorMessage, setErrorMessage] = useState('');
 		const [expandedPostId, setExpandedPostId] = useState(null);
-		const [anchorsState, setAnchorsState] = useState({}); // { [postId]: { loading: bool, locations: [], error: '' } }
+		const [anchorsState, setAnchorsState] = useState({});
 		const [insertedAnchors, setInsertedAnchors] = useState({});
 
 		// Filter & search options state
@@ -60,6 +74,21 @@
 		const [maxSuggestions, setMaxSuggestions] = useState(settings.maxSuggestions || 5);
 		const [selectedPostType, setSelectedPostType] = useState('');
 		const [searchQuery, setSearchQuery] = useState('');
+		const [sortBy, setSortBy] = useState('similarity');
+
+		// SEO Graph metrics state
+		const [postSeoMetrics, setPostSeoMetrics] = useState({
+			inbound_count: 0,
+			outbound_count: 0,
+			depth_level: 0,
+			is_orphan: false,
+			equity_tier: 'low'
+		});
+
+		// Visual graph modal state
+		const [isGraphModalOpen, setIsGraphModalOpen] = useState(false);
+		const [modalGraphData, setModalGraphData] = useState({ nodes: [], links: [] });
+		const [isGraphLoading, setIsGraphLoading] = useState(false);
 
 		const debounceTimerRef = useRef(null);
 
@@ -78,6 +107,22 @@
 
 		const { updateBlockAttributes } = useDispatch('core/block-editor');
 		const { createNotice } = useDispatch('core/notices');
+
+		// Fetch SEO metrics for current post
+		useEffect(function () {
+			if (postId > 0 && linkGraphConfig.showPostMetrics !== false) {
+				apiFetch({
+					path: '/aips/v1/editor/post-seo-metrics?post_id=' + postId,
+					method: 'GET'
+				})
+				.then(function (res) {
+					if (res && res.success && res.metrics) {
+						setPostSeoMetrics(res.metrics);
+					}
+				})
+				.catch(function () {});
+			}
+		}, [postId]);
 
 		/**
 		 * Fetch link suggestions based on current content & filters
@@ -102,6 +147,7 @@
 					content: contentToScan,
 					query: searchQuery ? searchQuery.trim() : '',
 					target_post_type: selectedPostType || '',
+					sort_by: sortBy || 'similarity',
 					limit: maxSuggestions || 5,
 					min_similarity: similarityThreshold || 0.60
 				}
@@ -118,7 +164,7 @@
 				setIsLoading(false);
 				setErrorMessage((error && error.message) ? error.message : 'Error fetching link suggestions.');
 			});
-		}, [postId, postContent, searchQuery, selectedPostType, maxSuggestions, similarityThreshold]);
+		}, [postId, postContent, searchQuery, selectedPostType, sortBy, maxSuggestions, similarityThreshold]);
 
 		// Debounce suggestions fetch on content or filter changes
 		useEffect(function () {
@@ -135,32 +181,47 @@
 					clearTimeout(debounceTimerRef.current);
 				}
 			};
-		}, [postContent, searchQuery, selectedPostType, maxSuggestions, similarityThreshold, fetchSuggestions]);
+		}, [postContent, searchQuery, selectedPostType, sortBy, maxSuggestions, similarityThreshold, fetchSuggestions]);
 
 		/**
 		 * Fetch AI Anchor locations for a specific target post
 		 */
 		const fetchAnchorsForPost = function (targetPostId, targetTitle) {
+			const targetId = parseInt(targetPostId, 10);
+			if (!targetId) {
+				return;
+			}
+
+			const contentToScan = (activeBlock && activeBlock.attributes && activeBlock.attributes.content)
+				? activeBlock.attributes.content
+				: postContent;
+
+			if (!contentToScan || contentToScan.replace(/<[^>]*>/g, '').trim().length < 10) {
+				setAnchorsState(function (prev) {
+					const next = Object.assign({}, prev);
+					next[targetId] = {
+						loading: false,
+						locations: [],
+						error: 'Write a little more content in your draft before generating anchor insertion points.'
+					};
+					return next;
+				});
+				return;
+			}
+
 			setAnchorsState(function (prev) {
 				const next = Object.assign({}, prev);
-				next[targetPostId] = { loading: true, locations: [], error: '' };
+				next[targetId] = { loading: true, locations: [], error: '' };
 				return next;
 			});
-
-			// If active block is a paragraph and has text, analyze that or full content
-			let textToAnalyze = '';
-			if (activeBlock && activeBlock.name === 'core/paragraph' && activeBlock.attributes && activeBlock.attributes.content) {
-				textToAnalyze = activeBlock.attributes.content;
-			} else {
-				textToAnalyze = postContent;
-			}
 
 			apiFetch({
 				path: '/aips/v1/editor/find-anchors',
 				method: 'POST',
 				data: {
-					source_content: textToAnalyze,
-					target_post_id: targetPostId,
+					source_content: contentToScan,
+					target_post_id: targetId,
+					post_id: postId || 0,
 					limit: 3
 				}
 			})
@@ -168,18 +229,21 @@
 				if (response && response.success && response.data && Array.isArray(response.data.locations)) {
 					setAnchorsState(function (prev) {
 						const next = Object.assign({}, prev);
-						next[targetPostId] = {
+						next[targetId] = {
 							loading: false,
 							locations: response.data.locations,
-							targetUrl: response.data.target_url || '',
-							error: response.data.locations.length === 0 ? t('noAnchorsFound', 'No natural anchor positions found.') : ''
+							error: response.data.locations.length === 0 ? t('noAnchorsFound', 'No natural anchor points found in draft text.') : ''
 						};
 						return next;
 					});
 				} else {
 					setAnchorsState(function (prev) {
 						const next = Object.assign({}, prev);
-						next[targetPostId] = { loading: false, locations: [], error: t('noAnchorsFound', 'No anchor locations found.') };
+						next[targetId] = {
+							loading: false,
+							locations: [],
+							error: 'Failed to retrieve anchor opportunities.'
+						};
 						return next;
 					});
 				}
@@ -187,10 +251,10 @@
 			.catch(function (error) {
 				setAnchorsState(function (prev) {
 					const next = Object.assign({}, prev);
-					next[targetPostId] = {
+					next[targetId] = {
 						loading: false,
 						locations: [],
-						error: (error && error.message) ? error.message : 'Error finding anchor positions.'
+						error: (error && error.message) ? error.message : 'Error extracting anchor locations.'
 					};
 					return next;
 				});
@@ -198,61 +262,67 @@
 		};
 
 		/**
-		 * Helper: Decode HTML entities for fuzzy matching
+		 * Open Mini Link Graph Modal
 		 */
-		const decodeEntities = function (html) {
-			if (!html) {
-				return '';
-			}
-			const txt = document.createElement('textarea');
-			txt.innerHTML = html;
-			return txt.value;
+		const openLinkGraphModal = function () {
+			setIsGraphModalOpen(true);
+			setIsGraphLoading(true);
+
+			const targetIds = suggestions.map(function (s) { return s.id; }).join(',');
+			apiFetch({
+				path: '/aips/v1/editor/link-graph-modal-data?post_id=' + (postId || 0) + '&target_ids=' + targetIds,
+				method: 'GET'
+			})
+			.then(function (res) {
+				setIsGraphLoading(false);
+				if (res && res.success && res.data) {
+					setModalGraphData(res.data);
+				}
+			})
+			.catch(function () {
+				setIsGraphLoading(false);
+			});
 		};
 
 		/**
-		 * Execute 1-Click Link Insertion into Gutenberg block
+		 * 1-Click Link Insertion into active/matching paragraph block
 		 */
-		const handleInsertLink = function (targetUrl, locationObj, anchorCardKey) {
-			if (!targetUrl || !locationObj) {
-				return;
-			}
+		const insertLinkIntoBlock = function (item, loc, anchorCardKey) {
+			const anchorPhrase = loc.anchor_phrase;
+			const targetUrl    = item.url;
+			const matchSnippet = loc.match_snippet;
 
-			const rawMatch       = locationObj.match_snippet || '';
-			const rawReplacement = locationObj.replacement_snippet || '';
-
-			// Parse [[anchor]] from replacement snippet
-			let anchorPhrase = '';
-			const markerMatch = /\[\[(.*?)\]\]/.exec(rawReplacement);
-			if (markerMatch && markerMatch[1]) {
-				anchorPhrase = markerMatch[1];
-			}
-
-			if (!anchorPhrase) {
+			if (!anchorPhrase || !targetUrl) {
 				return;
 			}
 
 			const anchorLinkHtml = '<a href="' + encodeURI(targetUrl) + '">' + anchorPhrase + '</a>';
-			const targetReplacementHtml = rawReplacement.replace(/\[\[(.*?)\]\]/, anchorLinkHtml);
-
-			const decodedMatch  = decodeEntities(rawMatch);
-			const decodedAnchor = decodeEntities(anchorPhrase);
+			const targetReplacementHtml = matchSnippet
+				? matchSnippet.replace('[[' + anchorPhrase + ']]', anchorLinkHtml)
+				: anchorLinkHtml;
 
 			let insertionApplied = false;
 
-			// Helper to try replacing in block HTML
+			const decodeEntities = function (str) {
+				if (!str) return '';
+				const textarea = document.createElement('textarea');
+				textarea.innerHTML = str;
+				return textarea.value;
+			};
+
 			const tryReplaceInContent = function (content) {
-				if (!content) {
-					return null;
+				if (!content) return null;
+				if (content.indexOf(matchSnippet) !== -1) {
+					return content.replace(matchSnippet, targetReplacementHtml);
 				}
-				if (content.indexOf(rawMatch) !== -1) {
-					return content.replace(rawMatch, targetReplacementHtml);
-				}
+				const decodedMatch = decodeEntities(matchSnippet);
 				if (decodedMatch && content.indexOf(decodedMatch) !== -1) {
 					return content.replace(decodedMatch, targetReplacementHtml);
 				}
 				if (content.indexOf(anchorPhrase) !== -1) {
 					return content.replace(anchorPhrase, anchorLinkHtml);
 				}
+				const decodedAnchor = decodeEntities(anchorPhrase);
 				if (decodedAnchor && content.indexOf(decodedAnchor) !== -1) {
 					return content.replace(decodedAnchor, anchorLinkHtml);
 				}
@@ -349,18 +419,49 @@
 					el(Dashicon, { icon: 'admin-links', size: 14 }),
 					suggestions.length + ' ' + t('similarity', 'Matches')
 				),
-				el(Button, {
-					isSmall: true,
-					variant: 'tertiary',
-					icon: 'update',
-					label: t('refresh', 'Refresh Suggestions'),
-					onClick: function () { fetchSuggestions(); }
-				})
+				el('div', { className: 'aips-toolbar-btns' },
+					linkGraphConfig.enableVisualModal && el(Button, {
+						isSmall: true,
+						variant: 'tertiary',
+						icon: 'networking',
+						label: t('viewLinkGraph', 'View Mini Link Graph'),
+						onClick: openLinkGraphModal
+					}),
+					el(Button, {
+						isSmall: true,
+						variant: 'tertiary',
+						icon: 'update',
+						label: t('refresh', 'Refresh Suggestions'),
+						onClick: function () { fetchSuggestions(); }
+					})
+				)
 			),
+
+			// Active Post SEO Metric Bar
+			linkGraphConfig.showPostMetrics !== false && el('div', { className: 'aips-seo-metrics-bar' },
+				el('div', { className: 'aips-metric-badge', title: t('inboundLinks', 'Inbound Links') },
+					el('span', { className: 'aips-metric-val' }, '📥 ' + postSeoMetrics.inbound_count),
+					el('span', { className: 'aips-metric-label' }, t('inboundLinks', 'Inbound'))
+				),
+				el('div', { className: 'aips-metric-badge', title: t('outboundLinks', 'Outbound Links') },
+					el('span', { className: 'aips-metric-val' }, '📤 ' + postSeoMetrics.outbound_count),
+					el('span', { className: 'aips-metric-label' }, t('outboundLinks', 'Outbound'))
+				),
+				el('div', { className: 'aips-metric-badge', title: t('crawlDepth', 'Crawl Depth from Root') },
+					el('span', { className: 'aips-metric-val' }, (postSeoMetrics.depth_level === 99 ? '∞' : ('L' + postSeoMetrics.depth_level))),
+					el('span', { className: 'aips-metric-label' }, t('crawlDepth', 'Depth'))
+				),
+				postSeoMetrics.is_orphan && el('div', { className: 'aips-orphan-alert' },
+					el(Dashicon, { icon: 'warning', size: 14 }),
+					el('span', {}, t('orphanPostAlert', 'Orphan Post: 0 inbound links pointing here!'))
+				)
+			),
+
 			el('p', { className: 'aips-sidebar-intro' },
 				t('activeBlockNote', 'Context-aware internal link recommendations powered by semantic vector graph.')
 			),
 
+			// Collapsible Filters & Custom Search Panel
 			el(PanelBody, {
 				title: t('filtersTitle', 'Filters & Custom Search'),
 				initialOpen: false
@@ -370,6 +471,15 @@
 					value: searchQuery,
 					placeholder: t('searchPlaceholder', 'e.g. Docker caching, vector store...'),
 					onChange: function (val) { setSearchQuery(val); }
+				}),
+				linkGraphConfig.enableOpportunitySort !== false && el(SelectControl, {
+					label: t('sortByLabel', 'Sort Suggestions By:'),
+					value: sortBy,
+					options: [
+						{ label: t('sortSimilarity', 'Relevance / Similarity'), value: 'similarity' },
+						{ label: t('sortOpportunity', 'SEO Opportunity (Under-linked First)'), value: 'seo_opportunity' }
+					],
+					onChange: function (val) { setSortBy(val); }
 				}),
 				el(RangeControl, {
 					label: t('similarityThresholdLabel', 'Min Similarity (%):'),
@@ -399,6 +509,7 @@
 					onClick: function () {
 						setSearchQuery('');
 						setSelectedPostType('');
+						setSortBy('similarity');
 						setSimilarityThreshold(settings.similarityMin || 0.60);
 						setMaxSuggestions(settings.maxSuggestions || 5);
 					}
@@ -446,92 +557,142 @@
 							}, item.similarity_pct + '%')
 						),
 
+						// SEO Card Badges
+						linkGraphConfig.showCardBadges !== false && el('div', { className: 'aips-card-seo-row' },
+							el('span', { className: 'aips-seo-pill' }, '📥 ' + (item.inbound_count || 0) + ' ' + t('inboundLinks', 'inbound')),
+							item.is_orphan && el('span', { className: 'aips-seo-pill is-orphan' }, '⚠️ ' + t('highOpportunityBadge', 'High Opportunity')),
+							item.is_already_linked && el('span', { className: 'aips-seo-pill is-linked' }, '🔗 ' + t('alreadyLinkedBadge', 'Already Linked')),
+							(item.cross_link && item.cross_link.is_two_hop) && el('span', { className: 'aips-seo-pill is-crosslink' }, '2-Hop Cross Link')
+						),
+
 						item.excerpt && el('p', { className: 'aips-card-excerpt' }, item.excerpt),
 
 						el('div', { className: 'aips-card-actions' },
-							el('span', { className: 'aips-card-type-tag' },
-								item.post_type || 'post'
-							),
+							el('span', { className: 'aips-card-type-tag' }, item.post_type || 'post'),
 							el(Button, {
-								isSecondary: !isExpanded,
-								isPrimary: isExpanded,
 								isSmall: true,
+								variant: isExpanded ? 'primary' : 'secondary',
 								'aria-expanded': isExpanded,
-								'aria-label': isExpanded ? __('Close anchor opportunities', 'ai-post-scheduler') : t('findAnchors', 'Find Insertion Anchors'),
+								'aria-label': (isExpanded ? 'Hide' : 'Find') + ' anchor opportunities for ' + item.title,
 								onClick: function () {
-									const nextExpanded = isExpanded ? null : item.id;
-									setExpandedPostId(nextExpanded);
-									if (nextExpanded && (!anchorData.locations || anchorData.locations.length === 0)) {
-										fetchAnchorsForPost(item.id, item.title);
+									if (isExpanded) {
+										setExpandedPostId(null);
+									} else {
+										setExpandedPostId(item.id);
+										if (!anchorsState[item.id] || (!anchorsState[item.id].locations.length && !anchorsState[item.id].loading)) {
+											fetchAnchorsForPost(item.id, item.title);
+										}
 									}
 								}
-							}, isExpanded ? __('Close Anchors', 'ai-post-scheduler') : t('findAnchors', 'Find Anchors'))
+							}, isExpanded ? __('Hide Anchors', 'ai-post-scheduler') : t('findAnchors', 'Find Anchors'))
 						),
 
-						// Expanded Anchor Exploration Panel
-						isExpanded && el('div', { className: 'aips-anchors-container' },
-							el('div', { className: 'aips-anchors-title' },
-								t('recommendedAnchor', 'Anchor Opportunities')
-							),
-
+						// Expandable Anchors Panel
+						isExpanded && el(
+							'div',
+							{ className: 'aips-anchors-container' },
 							anchorData.loading && el('div', { className: 'aips-loading-box' },
 								el(Spinner, {}),
-								el('span', {}, t('findingAnchors', 'Analyzing text for anchor points...'))
+								el('span', {}, t('findingAnchors', 'Analyzing content for anchor points...'))
 							),
 
-							anchorData.error && el('div', { className: 'aips-empty-box' },
-								anchorData.error
-							),
+							anchorData.error && el(Notice, {
+								status: 'warning',
+								isDismissible: false
+							}, anchorData.error),
 
-							!anchorData.loading && Array.isArray(anchorData.locations) && anchorData.locations.map(function (loc, locIdx) {
-								const cardKey = item.id + '_' + locIdx;
-								const isInserted = !!insertedAnchors[cardKey];
+							!anchorData.loading && anchorData.locations && anchorData.locations.length > 0 && el(
+								Fragment,
+								{},
+								el('div', { className: 'aips-anchors-title' },
+									__('Available Anchor Opportunities:', 'ai-post-scheduler')
+								),
+								anchorData.locations.map(function (loc, locIdx) {
+									const cardKey = item.id + '_' + locIdx;
+									const isInserted = !!insertedAnchors[cardKey];
 
-								return el(
-									'div',
-									{ key: locIdx, className: 'aips-anchor-card' },
-									loc.reason && el('div', { className: 'aips-anchor-reason' }, loc.reason),
-									el('div', { className: 'aips-anchor-snippet' },
-										renderSnippet(loc.replacement_snippet || loc.match_snippet)
-									),
-									el(Button, {
-										isPrimary: true,
-										isSmall: true,
-										icon: isInserted ? 'yes' : 'admin-links',
-										disabled: isInserted,
-										'aria-label': isInserted ? __('Link already inserted', 'ai-post-scheduler') : t('insertLink', 'Insert Link'),
-										onClick: function () {
-											handleInsertLink(item.url, loc, cardKey);
-										}
-									}, isInserted ? __('Inserted', 'ai-post-scheduler') : t('insertLink', 'Insert Link'))
-								);
-							})
+									return el(
+										'div',
+										{ key: locIdx, className: 'aips-anchor-card' },
+										loc.match_snippet && el('div', { className: 'aips-anchor-snippet' },
+											renderSnippet(loc.match_snippet)
+										),
+										loc.anchor_phrase && el('div', { className: 'aips-anchor-reason' },
+											el('strong', {}, t('recommendedAnchor', 'Anchor: ')),
+											loc.anchor_phrase
+										),
+										loc.reason && el('div', { className: 'aips-anchor-reason' },
+											el('em', {}, loc.reason)
+										),
+										el(Button, {
+											isPrimary: !isInserted,
+											isSecondary: isInserted,
+											isSmall: true,
+											disabled: isInserted,
+											onClick: function () {
+												insertLinkIntoBlock(item, loc, cardKey);
+											}
+										}, isInserted ? __('✓ Link Inserted', 'ai-post-scheduler') : t('insertLink', 'Insert Link'))
+									);
+								})
+							)
 						)
 					);
 				})
+			),
+
+			// Interactive Mini Link Graph Modal
+			isGraphModalOpen && el(Modal, {
+				title: t('linkGraphModalTitle', 'Cross-Link Topology Graph'),
+				onRequestClose: function () { setIsGraphModalOpen(false); },
+				className: 'aips-link-graph-modal'
+			},
+				isGraphLoading && el('div', { className: 'aips-loading-box' },
+					el(Spinner, {}),
+					el('span', {}, __('Building micro-topology graph...', 'ai-post-scheduler'))
+				),
+				!isGraphLoading && el('div', { className: 'aips-graph-viz-container' },
+					el('p', { className: 'aips-graph-viz-intro' },
+						__('Visualizing local cross-link paths between current draft and suggested posts.', 'ai-post-scheduler')
+					),
+					el('div', { className: 'aips-graph-nodes-list' },
+						modalGraphData.nodes.map(function (n) {
+							return el('div', {
+								key: n.id,
+								className: 'aips-graph-node-pill' + (n.is_source ? ' is-source' : '')
+							}, (n.is_source ? '★ Current: ' : '📄 ') + n.title);
+						})
+					),
+					el('div', { className: 'aips-graph-edges-list' },
+						modalGraphData.links.length === 0 && el('p', {}, __('No direct internal link paths established between these posts yet.', 'ai-post-scheduler')),
+						modalGraphData.links.map(function (l, lIdx) {
+							return el('div', { key: lIdx, className: 'aips-graph-edge-item' },
+								'Post #' + l.source + ' ➔ Post #' + l.target
+							);
+						})
+					)
+				)
 			)
 		);
 	}
 
-	if (PluginSidebar && PluginSidebarMoreMenuItem) {
-		registerPlugin('aips-semantic-link-inserter', {
-			icon: 'admin-links',
-			render: function () {
-				return el(
-					Fragment,
-					{},
-					el(PluginSidebarMoreMenuItem, {
-						target: 'aips-semantic-link-inserter-sidebar',
-						icon: 'admin-links'
-					}, t('title', 'AI Link Inserter')),
-					el(PluginSidebar, {
-						name: 'aips-semantic-link-inserter-sidebar',
-						title: t('panelTitle', 'Semantic Link Suggestions'),
-						icon: 'admin-links'
-					}, el(SemanticLinkInserterSidebar, {}))
-				);
-			}
-		});
-	}
+	// Register Plugin in Gutenberg
+	registerPlugin('aips-semantic-link-inserter', {
+		render: function () {
+			return el(
+				Fragment,
+				{},
+				el(PluginSidebarMoreMenuItem, {
+					target: 'aips-semantic-link-inserter-sidebar',
+					icon: 'admin-links'
+				}, t('title', 'AI Link Inserter')),
+				el(PluginSidebar, {
+					name: 'aips-semantic-link-inserter-sidebar',
+					title: t('panelTitle', 'Semantic Link & Anchor Suggestions'),
+					icon: 'admin-links'
+				}, el(SemanticLinkInserterSidebar, {}))
+			);
+		}
+	});
 
 })(window.wp);

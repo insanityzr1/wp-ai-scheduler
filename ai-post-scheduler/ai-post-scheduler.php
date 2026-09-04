@@ -492,6 +492,23 @@ final class AI_Post_Scheduler {
                 $container->make(AIPS_Logger_Interface::class)
             );
         });
+
+        // Register AIPS_Content_Links_Repository
+        $container->singleton(AIPS_Content_Links_Repository::class, function( $container ) {
+            return new AIPS_Content_Links_Repository();
+        });
+
+        // Register AIPS_Link_Graph_Service
+        $container->singleton(AIPS_Link_Graph_Service::class, function( $container ) {
+            return new AIPS_Link_Graph_Service(
+                $container->make(AIPS_Content_Links_Repository::class)
+            );
+        });
+
+        // Register AIPS_Editor_Registry
+        $container->singleton(AIPS_Editor_Registry::class, function( $container ) {
+            return new AIPS_Editor_Registry();
+        });
     }
 
     /**
@@ -621,7 +638,15 @@ final class AI_Post_Scheduler {
                 return;
             }
             AIPS_Container::get_instance()->make(AIPS_Content_Indexer_Service::class)->on_post_save($post_id, $post);
+            if ('publish' === $post->post_status) {
+                AIPS_Container::get_instance()->make(AIPS_Link_Graph_Service::class)->index_post_links($post_id);
+            }
         }, 10, 2);
+
+        // Remove links from graph on post deletion
+        add_action('deleted_post', function ($post_id) {
+            AIPS_Container::get_instance()->make(AIPS_Content_Links_Repository::class)->delete_by_post($post_id);
+        });
 
         // Related Posts Frontend integration (content filter, shortcode, block)
         new AIPS_Related_Posts_Frontend(

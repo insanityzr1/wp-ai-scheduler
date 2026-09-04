@@ -637,6 +637,12 @@ class AIPS_Admin_Assets {
 				'similarityMin'  => (float) $config->get_option('aips_links_similarity_threshold', 0.60),
 				'maxSuggestions' => (int) $config->get_option('aips_links_max_suggestions', 5),
 				'postTypes'      => $post_type_options,
+				'linkGraphConfig' => array(
+					'showPostMetrics'       => (bool) $config->get_option('aips_link_graph_show_post_metrics', true),
+					'showCardBadges'        => (bool) $config->get_option('aips_link_graph_show_card_badges', true),
+					'enableOpportunitySort' => (bool) $config->get_option('aips_link_graph_enable_opportunity_sort', true),
+					'enableVisualModal'     => (bool) $config->get_option('aips_link_graph_enable_visual_modal', false),
+				),
 				'i18n'           => array(
 					'title'                    => __('AI Link Inserter', 'ai-post-scheduler'),
 					'panelTitle'               => __('Semantic Link & Anchor Suggestions', 'ai-post-scheduler'),
@@ -662,6 +668,17 @@ class AIPS_Admin_Assets {
 					'maxSuggestionsLabel'      => __('Max Suggestions:', 'ai-post-scheduler'),
 					'postTypeLabel'            => __('Target Post Type:', 'ai-post-scheduler'),
 					'resetFilters'             => __('Reset Filters', 'ai-post-scheduler'),
+					'inboundLinks'             => __('Inbound Links', 'ai-post-scheduler'),
+					'outboundLinks'            => __('Outbound Links', 'ai-post-scheduler'),
+					'crawlDepth'               => __('Depth', 'ai-post-scheduler'),
+					'orphanPostAlert'          => __('Orphan Post: 0 inbound links pointing to this article!', 'ai-post-scheduler'),
+					'highOpportunityBadge'     => __('High SEO Opportunity', 'ai-post-scheduler'),
+					'alreadyLinkedBadge'       => __('Already Linked', 'ai-post-scheduler'),
+					'sortByLabel'              => __('Sort Suggestions By:', 'ai-post-scheduler'),
+					'sortSimilarity'           => __('Relevance / Similarity', 'ai-post-scheduler'),
+					'sortOpportunity'          => __('SEO Opportunity (Under-linked First)', 'ai-post-scheduler'),
+					'viewLinkGraph'            => __('View Mini Link Graph', 'ai-post-scheduler'),
+					'linkGraphModalTitle'      => __('Cross-Link Topology Graph', 'ai-post-scheduler'),
 				),
 			)
 		);

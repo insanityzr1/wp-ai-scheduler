@@ -214,3 +214,142 @@
 	margin-bottom: 12px;
 }
 
+/* Active Post SEO Metric Bar */
+.aips-seo-metrics-bar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	background: #f0f6fc;
+	border: 1px solid #c5d9ed;
+	border-radius: 6px;
+	padding: 8px 10px;
+	margin-bottom: 12px;
+}
+
+.aips-metric-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	background: #ffffff;
+	border: 1px solid #d0e1fd;
+	border-radius: 4px;
+	padding: 2px 6px;
+	font-size: 11px;
+}
+
+.aips-metric-val {
+	font-weight: 700;
+	color: #0b4b8a;
+}
+
+.aips-metric-label {
+	color: #50575e;
+	font-size: 10px;
+	text-transform: uppercase;
+}
+
+.aips-orphan-alert {
+	width: 100%;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	background: #fff8e5;
+	border: 1px solid #f0b849;
+	color: #8c5b00;
+	padding: 4px 8px;
+	border-radius: 4px;
+	font-size: 11px;
+	font-weight: 500;
+	margin-top: 4px;
+}
+
+/* Card SEO Badges Row */
+.aips-card-seo-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	margin-bottom: 8px;
+}
+
+.aips-seo-pill {
+	display: inline-flex;
+	align-items: center;
+	font-size: 10px;
+	font-weight: 600;
+	padding: 1px 6px;
+	border-radius: 10px;
+	background: #f0f0f1;
+	color: #50575e;
+}
+
+.aips-seo-pill.is-orphan {
+	background: #fcf0f0;
+	color: #d63638;
+	border: 1px solid #f8d7da;
+}
+
+.aips-seo-pill.is-linked {
+	background: #e7f6eb;
+	color: #008a20;
+	border: 1px solid #c3e6cb;
+}
+
+.aips-seo-pill.is-crosslink {
+	background: #f3e8ff;
+	color: #6b21a8;
+	border: 1px solid #e9d5ff;
+}
+
+/* Mini Link Graph Modal */
+.aips-graph-viz-container {
+	padding: 16px;
+}
+
+.aips-graph-viz-intro {
+	font-size: 12px;
+	color: #646970;
+	margin-bottom: 12px;
+}
+
+.aips-graph-nodes-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-bottom: 16px;
+}
+
+.aips-graph-node-pill {
+	padding: 4px 10px;
+	background: #f0f6fc;
+	border: 1px solid #c5d9ed;
+	border-radius: 16px;
+	font-size: 11px;
+	font-weight: 500;
+}
+
+.aips-graph-node-pill.is-source {
+	background: #2271b1;
+	color: #ffffff;
+	border-color: #2271b1;
+	font-weight: 700;
+}
+
+.aips-graph-edges-list {
+	background: #f6f7f7;
+	border: 1px solid #dcdcde;
+	border-radius: 6px;
+	padding: 12px;
+	font-size: 11px;
+	color: #2c3338;
+}
+
+.aips-graph-edge-item {
+	padding: 4px 0;
+	border-bottom: 1px dashed #e0e0e0;
+}
+
+.aips-graph-edge-item:last-child {
+	border-bottom: none;
+}
+
+

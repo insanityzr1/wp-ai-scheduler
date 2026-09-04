@@ -141,21 +141,49 @@
 		 * Tab switching.
 		 */
 		initTabs: function () {
+			var self = this;
+
+			// Check for direct URL hash on load
+			var initialHash = window.location.hash ? window.location.hash.replace('#', '') : '';
+			if (initialHash && $('#' + initialHash + '-tab').length) {
+				self.switchTab(initialHash);
+			}
+
 			$('.aips-tab-link').on('click', function (e) {
 				e.preventDefault();
 				var tab = $(this).data('tab');
-
-				$('.aips-tab-link').removeClass('active');
-				$('.aips-tab-content').removeClass('active');
-
-				$(this).addClass('active');
-				$('#' + tab + '-tab').addClass('active');
-
-				if (tab === 'visualizer' && window.AIPS.ContentIndexer.graphData) {
-					window.AIPS.ContentIndexer.renderSvgGraph(window.AIPS.ContentIndexer.graphData);
+				if (tab) {
+					self.switchTab(tab);
+					if (history.replaceState) {
+						history.replaceState(null, null, '#' + tab);
+					} else {
+						window.location.hash = '#' + tab;
+					}
 				}
 			});
 		},
+
+		/**
+		 * Switch to a specific tab by key.
+		 *
+		 * @param {string} tab Tab identifier.
+		 */
+		switchTab: function (tab) {
+			if (!tab || !$('#' + tab + '-tab').length) {
+				return;
+			}
+
+			$('.aips-tab-link').removeClass('active');
+			$('.aips-tab-link[data-tab="' + tab + '"]').addClass('active');
+
+			$('.aips-indexer-page .aips-tab-content').removeClass('active').hide().attr('aria-hidden', 'true');
+			$('#' + tab + '-tab').addClass('active').show().attr('aria-hidden', 'false');
+
+			if (tab === 'visualizer' && this.graphData) {
+				this.renderSvgGraph(this.graphData);
+			}
+		},
+
 
 		/**
 		 * Start / Resume backfill indexing.

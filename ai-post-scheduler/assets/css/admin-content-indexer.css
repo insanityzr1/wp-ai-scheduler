@@ -354,3 +354,13 @@
 .aips-risk-high   { background: #fee2e2; color: #b91c1c; }
 .aips-risk-medium { background: #fef3c7; color: #b45309; }
 .aips-risk-low    { background: #e0f2fe; color: #0369a1; }
+
+/* Content Indexer Tab Content Panels */
+.aips-indexer-page .aips-tab-content {
+	display: none;
+}
+
+.aips-indexer-page .aips-tab-content.active {
+	display: block;
+}
+

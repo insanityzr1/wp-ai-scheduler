@@ -190,7 +190,7 @@ $active_dims  = !empty($stats['models']) ? (int) $stats['models'][0]->dimensions
 		<!-- =====================================================================
 		     TAB 1: SEMANTIC GRAPH VISUALIZER
 		     ===================================================================== -->
-		<div id="visualizer-tab" class="aips-tab-content active" role="tabpanel">
+		<div id="visualizer-tab" class="aips-tab-content active" role="tabpanel" aria-hidden="false">
 			<div class="aips-content-panel aips-visualizer-panel">
 				
 				<!-- Graph Toolbar -->
@@ -274,7 +274,7 @@ $active_dims  = !empty($stats['models']) ? (int) $stats['models'][0]->dimensions
 		<!-- =====================================================================
 		     TAB 2: BACKFILL SCANNER & SCOPE
 		     ===================================================================== -->
-		<div id="scanner-tab" class="aips-tab-content" role="tabpanel">
+		<div id="scanner-tab" class="aips-tab-content" role="tabpanel" aria-hidden="true" style="display:none;">
 			<div class="aips-content-panel">
 				<div class="aips-panel-header">
 					<h3 class="aips-panel-title"><?php esc_html_e('Backfill Indexing Status & Breakdown', 'ai-post-scheduler'); ?></h3>
@@ -332,7 +332,7 @@ $active_dims  = !empty($stats['models']) ? (int) $stats['models'][0]->dimensions
 		<!-- =====================================================================
 		     TAB 3: CANNIBALIZATION & DUPLICATE AUDIT
 		     ===================================================================== -->
-		<div id="cannibalization-tab" class="aips-tab-content" role="tabpanel">
+		<div id="cannibalization-tab" class="aips-tab-content" role="tabpanel" aria-hidden="true" style="display:none;">
 			<div class="aips-content-panel">
 				<div class="aips-panel-header" style="display:flex;justify-content:space-between;align-items:center;">
 					<div>
@@ -375,7 +375,7 @@ $active_dims  = !empty($stats['models']) ? (int) $stats['models'][0]->dimensions
 		<!-- =====================================================================
 		     TAB 4: SETTINGS & THRESHOLDS
 		     ===================================================================== -->
-		<div id="settings-tab" class="aips-tab-content" role="tabpanel">
+		<div id="settings-tab" class="aips-tab-content" role="tabpanel" aria-hidden="true" style="display:none;">
 			<form id="aips-indexer-settings-form">
 				<div class="aips-content-panel" style="margin-bottom:20px;">
 					<div class="aips-panel-header">

@@ -218,6 +218,7 @@ class AIPS_Config {
             'aips_embeddings_model'                    => 'text-embedding-3-small',
             'aips_embeddings_env_id'                   => '',
             'aips_embeddings_dimensions'               => 1536,
+            'aips_indexer_verbose_history'             => false,
             'aips_indexer_post_types'                  => array('post'),
             'aips_indexer_similarity_threshold'        => 0.65,
             'aips_auto_index_on_publish'               => true,
@@ -233,6 +234,13 @@ class AIPS_Config {
             'aips_deduplication_mode'                  => 'warn',
             'aips_deduplication_threshold'             => 0.85,
             'aips_generation_inject_related_context'   => true,
+            // Semantic Link Inserter & Link Graph
+            'aips_links_similarity_threshold'          => 0.60,
+            'aips_links_max_suggestions'               => 5,
+            'aips_link_graph_show_post_metrics'        => true,
+            'aips_link_graph_show_card_badges'         => true,
+            'aips_link_graph_enable_opportunity_sort'  => true,
+            'aips_link_graph_enable_visual_modal'      => false,
         );
     }
     

@@ -1012,6 +1012,9 @@ final class AI_Post_Scheduler {
 
         // Editor Sidebar Meta-Box (Classic Editor & post edit screens)
         new AIPS_Editor_Meta_Box();
+
+        // Native WordPress post/page list columns & orphan filter (edit.php)
+        new AIPS_Post_List_Columns();
       
         // Ensure Seeder admin hooks are registered when developer mode is enabled
         // so the Seeder JS will be enqueued on the Dev Tools diagnostics tab.

@@ -366,4 +366,34 @@ class AIPS_Content_Links_Repository {
 			)
 		);
 	}
+
+	/**
+	 * Count total directed internal links in repository.
+	 *
+	 * @return int Total edges.
+	 */
+	public function get_total_links_count() {
+		global $wpdb;
+		return (int) $wpdb->get_var("SELECT COUNT(*) FROM {$this->table}");
+	}
+
+	/**
+	 * Count orphan published posts for a given post type.
+	 *
+	 * @param string $post_type Post type slug.
+	 * @return int Number of orphan posts.
+	 */
+	public function count_orphan_posts($post_type = 'post') {
+		global $wpdb;
+		$post_type = sanitize_key($post_type);
+		$sql = $wpdb->prepare(
+			"SELECT COUNT(p.ID) FROM {$wpdb->posts} p
+			LEFT JOIN {$this->table} l ON p.ID = l.target_id
+			WHERE p.post_status = 'publish'
+			AND p.post_type = %s
+			AND l.id IS NULL",
+			$post_type
+		);
+		return (int) $wpdb->get_var($sql);
+	}
 }

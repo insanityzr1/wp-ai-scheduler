@@ -1,6 +1,11 @@
 ## [3.6.6] - 2026-09-04
 
 ### Added
+- **Admin-Wide SEO Link Metrics & Orphan Mitigation**: Integrated internal link health indicators and orphan alerts across all administrative touchpoints via the unified, reusable `AIPS_SEO_Link_Metrics_Component`:
+  - **WordPress Posts List Table (`edit.php`)**: Sortable "Internal Links" column with compact `In: X | Out: Y` pill badges, `⚠️ Orphan` tags, `🌟 Hub` tags, and a `⚠️ Orphans (N)` quick-filter view.
+  - **AIPS Main Dashboard (`admin.php?page=ai-post-scheduler`)**: "SEO Link Health & Orphan Monitor" widget summarizing published posts, directed edges, orphan content, and deep hierarchies with direct navigation to the link graph.
+  - **Content Indexer (`admin.php?page=aips-content-indexer`)**: Semantic inspector flyout drawer displaying real-time inbound/outbound link counts and equity badges for selected nodes.
+  - **Generated Posts View (`admin.php?page=aips-generated-posts`)**: Added "Internal Links" table column with zero-N+1 batch priming.
 - **SEO Link Graph Database & Topology Engine (`wp_aips_content_links`)**: Dedicated internal link graph table and `AIPS_Content_Links_Repository` mapping directed edges (`source_id`, `target_id`, `anchor_text`), computing BFS crawl depth hierarchies from site root, identifying orphan content (`inbound = 0`), and batch-querying sub-graph edges without N+1 overhead.
 - **Gutenberg Real-Time Semantic Link Inserter Sidebar**: Live contextual internal linking assistant in the block editor sidebar (`PluginSidebar`) featuring vector similarity scoring, SEO depth badges, orphan indicators, 1-click paragraph link insertion, and clipboard copy actions.
 - **Multi-Editor Abstraction Layer (`AIPS_Editor_Registry`)**: Extensible adapter architecture supporting internal link extraction and injection across Gutenberg, Elementor (`_elementor_data`), and Classic Editor.

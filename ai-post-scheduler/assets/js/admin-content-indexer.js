@@ -524,6 +524,27 @@
 				$('#aips-drawer-view-link').hide();
 			}
 
+			// Internal Link Graph Metrics
+			if (node.inbound_count !== undefined) {
+				$('#aips-drawer-inbound-cnt').text(node.inbound_count);
+				$('#aips-drawer-outbound-cnt').text(node.outbound_count || 0);
+
+				if (node.is_orphan) {
+					$('#aips-drawer-orphan-pill').show();
+					$('#aips-drawer-hub-pill').hide();
+				} else if (node.inbound_count >= 5) {
+					$('#aips-drawer-hub-pill').show();
+					$('#aips-drawer-orphan-pill').hide();
+				} else {
+					$('#aips-drawer-orphan-pill').hide();
+					$('#aips-drawer-hub-pill').hide();
+				}
+
+				$('#aips-drawer-link-metrics').show();
+			} else {
+				$('#aips-drawer-link-metrics').hide();
+			}
+
 			$('#aips-drawer-focus-btn').data('raw-id', node.raw_id);
 			$('#aips-node-drawer').show();
 		},

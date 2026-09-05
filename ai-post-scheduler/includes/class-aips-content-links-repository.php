@@ -223,6 +223,37 @@ class AIPS_Content_Links_Repository {
 	}
 
 	/**
+	 * Batch lookup outbound link counts for multiple posts.
+	 *
+	 * @param array $post_ids Array of post IDs.
+	 * @return array Map of post_id => count.
+	 */
+	public function get_outbound_counts(array $post_ids) {
+		global $wpdb;
+		$clean_ids = array_filter(array_map('absint', $post_ids));
+		if (empty($clean_ids)) {
+			return array();
+		}
+
+		$placeholders = implode(',', array_fill(0, count($clean_ids), '%d'));
+		$sql          = $wpdb->prepare(
+			"SELECT source_id, COUNT(*) as cnt FROM {$this->table} WHERE source_id IN ($placeholders) GROUP BY source_id",
+			$clean_ids
+		);
+
+		$rows    = $wpdb->get_results($sql);
+		$results = array_fill_keys($clean_ids, 0);
+
+		if (!empty($rows)) {
+			foreach ($rows as $row) {
+				$results[(int) $row->source_id] = (int) $row->cnt;
+			}
+		}
+
+		return $results;
+	}
+
+	/**
 	 * Find orphan published posts (posts having 0 inbound internal links).
 	 *
 	 * @param array $post_types Post types to check.

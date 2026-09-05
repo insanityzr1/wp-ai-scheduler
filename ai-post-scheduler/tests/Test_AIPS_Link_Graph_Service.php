@@ -111,4 +111,21 @@ class Test_AIPS_Link_Graph_Service extends WP_UnitTestCase {
 		$this->assertTrue($rel_ac['is_co_cited']);
 		$this->assertContains($hub, $rel_ac['co_cited_by']);
 	}
+
+	public function test_get_all_graph_depths() {
+		$root = $this->factory->post->create(array('post_title' => 'R', 'post_status' => 'publish'));
+		$hop1 = $this->factory->post->create(array('post_title' => 'H1', 'post_status' => 'publish'));
+		$hop2 = $this->factory->post->create(array('post_title' => 'H2', 'post_status' => 'publish'));
+		$disc = $this->factory->post->create(array('post_title' => 'D', 'post_status' => 'publish'));
+
+		$this->repo->sync_post_links($root, array(array('target_id' => $hop1, 'anchor_text' => 'H1', 'link_url' => get_permalink($hop1), 'post_type' => 'post')));
+		$this->repo->sync_post_links($hop1, array(array('target_id' => $hop2, 'anchor_text' => 'H2', 'link_url' => get_permalink($hop2), 'post_type' => 'post')));
+
+		$depths = $this->service->get_all_graph_depths($root);
+
+		$this->assertSame(0, $depths[$root]);
+		$this->assertSame(1, $depths[$hop1]);
+		$this->assertSame(2, $depths[$hop2]);
+		$this->assertArrayNotHasKey($disc, $depths);
+	}
 }

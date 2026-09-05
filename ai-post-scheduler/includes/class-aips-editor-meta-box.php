@@ -38,6 +38,14 @@ class AIPS_Editor_Meta_Box {
 	 */
 	public function register_meta_box() {
 		$post_types = get_post_types(array('public' => true));
+		unset($post_types['attachment']);
+
+		/**
+		 * Filter post types that receive the AIPS Semantic Links & SEO sidebar meta box.
+		 *
+		 * @param array $post_types Array of post type slugs.
+		 */
+		$post_types = apply_filters('aips_editor_meta_box_post_types', array_values($post_types));
 
 		foreach ($post_types as $post_type) {
 			add_meta_box(

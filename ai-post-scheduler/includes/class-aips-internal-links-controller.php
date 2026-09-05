@@ -789,7 +789,7 @@ class AIPS_Internal_Links_Controller {
 			return;
 		}
 
-		if (!current_user_can('manage_options')) {
+		if (!current_user_can('edit_posts')) {
 			wp_send_json_error(array('message' => __('Permission denied.', 'ai-post-scheduler')), 403);
 			return;
 		}
@@ -800,32 +800,12 @@ class AIPS_Internal_Links_Controller {
 		$per_page      = isset($_POST['per_page']) ? min(100, max(5, absint($_POST['per_page']))) : 20;
 		$status_filter = isset($_POST['status_filter']) ? sanitize_key($_POST['status_filter']) : 'all';
 		$search        = isset($_POST['search']) ? sanitize_text_field(wp_unslash($_POST['search'])) : '';
+		$offset        = ($page - 1) * $per_page;
 
-		// Query published posts/pages
-		$post_types = apply_filters('aips_editor_indexable_post_types', array('post', 'page'));
-		$args = array(
-			'post_type'      => $post_types,
-			'post_status'    => 'publish',
-			'posts_per_page' => -1,
-			'fields'         => 'ids',
-			'orderby'        => 'ID',
-			'order'          => 'DESC',
-		);
+		$post_types      = apply_filters('aips_editor_indexable_post_types', array('post', 'page'));
+		$pt_placeholders = implode(',', array_fill(0, count($post_types), '%s'));
 
-		if (!empty($search)) {
-			$args['s'] = $search;
-		}
-
-		$all_post_ids = get_posts($args);
-		if (!is_array($all_post_ids)) {
-			$all_post_ids = array();
-		}
-
-		// Compute metrics for posts and compute summary counts.
-		// Post types come from a filter and defaults so their contents are
-		// developer-controlled, but the plugin's SQL convention (per CLAUDE.md)
-		// is $wpdb->prepare with placeholders — keep this consistent.
-		$pt_placeholders     = implode(',', array_fill(0, count($post_types), '%s'));
+		// Compute network aggregate counts using indexed queries
 		$total_network_posts = (int) $wpdb->get_var(
 			$wpdb->prepare(
 				"SELECT COUNT(ID) FROM {$wpdb->posts} WHERE post_status = 'publish' AND post_type IN ($pt_placeholders)",
@@ -836,52 +816,138 @@ class AIPS_Internal_Links_Controller {
 			"SELECT COUNT(*) FROM {$wpdb->prefix}aips_content_links"
 		);
 
-		// Pass 1: compute metrics and filter. Do NOT build presentation entries
-		// yet — title/permalink/edit-url lookups are deferred so the paginated
-		// slice can prime the post-object cache in one call instead of an N+1
-		// per matched post.
-		$filtered_metrics = array();
-		$total_orphans    = 0;
-		$total_deep       = 0;
+		// Compute total orphans directly via SQL (published indexable posts with 0 inbound links)
+		$total_orphans = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(p.ID) FROM {$wpdb->posts} p LEFT JOIN {$wpdb->prefix}aips_content_links l ON p.ID = l.target_id WHERE p.post_status = 'publish' AND p.post_type IN ($pt_placeholders) AND l.id IS NULL",
+				$post_types
+			)
+		);
 
-		foreach ($all_post_ids as $p_id) {
-			$p_id    = (int) $p_id;
-			$metrics = $this->link_graph_service->calculate_post_seo_metrics($p_id);
-
-			if ($metrics['is_orphan']) {
-				$total_orphans++;
-			}
-			if ($metrics['depth_level'] >= 3 && $metrics['depth_level'] !== 99) {
+		// Single-pass BFS for graph depth calculation
+		$all_depths = $this->link_graph_service->get_all_graph_depths();
+		$total_deep = 0;
+		foreach ($all_depths as $d) {
+			if ($d >= 3) {
 				$total_deep++;
 			}
-
-			// Apply status filter
-			if ('orphans' === $status_filter && !$metrics['is_orphan']) {
-				continue;
-			}
-			if ('deep' === $status_filter && ($metrics['depth_level'] < 3 || $metrics['depth_level'] === 99)) {
-				continue;
-			}
-			if ('hubs' === $status_filter && $metrics['inbound_count'] < 5) {
-				continue;
-			}
-
-			$filtered_metrics[$p_id] = $metrics;
 		}
 
-		$total_items       = count($filtered_metrics);
-		$total_pages       = $total_items > 0 ? (int) ceil($total_items / $per_page) : 1;
-		$offset            = ($page - 1) * $per_page;
-		$paged_metrics     = array_slice($filtered_metrics, $offset, $per_page, true);
-		$paged_ids         = array_keys($paged_metrics);
+		$paged_ids   = array();
+		$total_items = 0;
+
+		// Database-level filtering and pagination
+		if ('orphans' === $status_filter) {
+			if (!empty($search)) {
+				$like        = '%' . $wpdb->esc_like($search) . '%';
+				$total_items = (int) $wpdb->get_var(
+					$wpdb->prepare(
+						"SELECT COUNT(p.ID) FROM {$wpdb->posts} p LEFT JOIN {$wpdb->prefix}aips_content_links l ON p.ID = l.target_id WHERE p.post_status = 'publish' AND p.post_type IN ($pt_placeholders) AND l.id IS NULL AND p.post_title LIKE %s",
+						array_merge($post_types, array($like))
+					)
+				);
+				$paged_ids   = array_map('intval', $wpdb->get_col(
+					$wpdb->prepare(
+						"SELECT p.ID FROM {$wpdb->posts} p LEFT JOIN {$wpdb->prefix}aips_content_links l ON p.ID = l.target_id WHERE p.post_status = 'publish' AND p.post_type IN ($pt_placeholders) AND l.id IS NULL AND p.post_title LIKE %s ORDER BY p.ID DESC LIMIT %d OFFSET %d",
+						array_merge($post_types, array($like, $per_page, $offset))
+					)
+				));
+			} else {
+				$total_items = $total_orphans;
+				$paged_ids   = array_map('intval', $wpdb->get_col(
+					$wpdb->prepare(
+						"SELECT p.ID FROM {$wpdb->posts} p LEFT JOIN {$wpdb->prefix}aips_content_links l ON p.ID = l.target_id WHERE p.post_status = 'publish' AND p.post_type IN ($pt_placeholders) AND l.id IS NULL ORDER BY p.ID DESC LIMIT %d OFFSET %d",
+						array_merge($post_types, array($per_page, $offset))
+					)
+				));
+			}
+		} elseif ('hubs' === $status_filter) {
+			$hub_ids = array_map('intval', $wpdb->get_col(
+				"SELECT target_id FROM {$wpdb->prefix}aips_content_links GROUP BY target_id HAVING COUNT(*) >= 5"
+			));
+			if (!empty($hub_ids)) {
+				$hub_query = new WP_Query(array(
+					'post_type'      => $post_types,
+					'post_status'    => 'publish',
+					'post__in'       => $hub_ids,
+					'posts_per_page' => $per_page,
+					'paged'          => $page,
+					'fields'         => 'ids',
+					's'              => $search,
+					'orderby'        => 'ID',
+					'order'          => 'DESC',
+				));
+				$total_items = (int) $hub_query->found_posts;
+				$paged_ids   = array_map('intval', $hub_query->posts);
+			}
+		} elseif ('deep' === $status_filter) {
+			$deep_candidate_ids = array();
+			foreach ($all_depths as $cand_id => $d) {
+				if ($d >= 3) {
+					$deep_candidate_ids[] = (int) $cand_id;
+				}
+			}
+			if (!empty($deep_candidate_ids)) {
+				$deep_query = new WP_Query(array(
+					'post_type'      => $post_types,
+					'post_status'    => 'publish',
+					'post__in'       => $deep_candidate_ids,
+					'posts_per_page' => $per_page,
+					'paged'          => $page,
+					'fields'         => 'ids',
+					's'              => $search,
+					'orderby'        => 'ID',
+					'order'          => 'DESC',
+				));
+				$total_items = (int) $deep_query->found_posts;
+				$paged_ids   = array_map('intval', $deep_query->posts);
+			}
+		} else {
+			// 'all' status
+			$query_args = array(
+				'post_type'      => $post_types,
+				'post_status'    => 'publish',
+				'posts_per_page' => $per_page,
+				'paged'          => $page,
+				'fields'         => 'ids',
+				'orderby'        => 'ID',
+				'order'          => 'DESC',
+			);
+			if (!empty($search)) {
+				$query_args['s'] = $search;
+			}
+			$main_query  = new WP_Query($query_args);
+			$total_items = (int) $main_query->found_posts;
+			$paged_ids   = array_map('intval', $main_query->posts);
+		}
+
+		$total_pages = $total_items > 0 ? (int) ceil($total_items / $per_page) : 1;
 
 		if (!empty($paged_ids) && function_exists('_prime_post_caches')) {
 			_prime_post_caches($paged_ids, false, false);
 		}
 
+		// Batch load inbound & outbound counts for the paginated slice
+		$inbound_map  = !empty($paged_ids) ? $this->content_links_repo->get_inbound_counts($paged_ids) : array();
+		$outbound_map = !empty($paged_ids) ? $this->content_links_repo->get_outbound_counts($paged_ids) : array();
+
 		$paged_items = array();
-		foreach ($paged_metrics as $p_id => $metrics) {
-			$depth_display = (99 === $metrics['depth_level']) ? '∞' : ('L' . $metrics['depth_level']);
+		foreach ($paged_ids as $p_id) {
+			$inbound       = isset($inbound_map[$p_id]) ? (int) $inbound_map[$p_id] : 0;
+			$outbound      = isset($outbound_map[$p_id]) ? (int) $outbound_map[$p_id] : 0;
+			$depth         = isset($all_depths[$p_id]) ? (int) $all_depths[$p_id] : 99;
+			$depth_display = (99 === $depth) ? '∞' : ('L' . $depth);
+			$is_orphan     = (0 === $inbound);
+
+			if ($is_orphan) {
+				$equity_tier = 'orphan';
+			} elseif ($inbound >= 5) {
+				$equity_tier = 'hub';
+			} elseif ($inbound <= 2) {
+				$equity_tier = 'low';
+			} else {
+				$equity_tier = 'moderate';
+			}
 
 			$paged_items[] = array(
 				'id'            => $p_id,
@@ -889,11 +955,11 @@ class AIPS_Internal_Links_Controller {
 				'url'           => get_permalink($p_id),
 				'edit_url'      => get_edit_post_link($p_id, 'raw'),
 				'post_type'     => get_post_type($p_id),
-				'inbound_count' => $metrics['inbound_count'],
-				'outbound_count'=> $metrics['outbound_count'],
+				'inbound_count' => $inbound,
+				'outbound_count'=> $outbound,
 				'depth_level'   => $depth_display,
-				'is_orphan'     => $metrics['is_orphan'],
-				'equity_tier'   => $metrics['equity_tier'],
+				'is_orphan'     => $is_orphan,
+				'equity_tier'   => $equity_tier,
 			);
 		}
 
@@ -925,7 +991,7 @@ class AIPS_Internal_Links_Controller {
 			return;
 		}
 
-		if (!current_user_can('manage_options')) {
+		if (!current_user_can('edit_posts')) {
 			wp_send_json_error(array('message' => __('Permission denied.', 'ai-post-scheduler')), 403);
 			return;
 		}

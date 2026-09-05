@@ -139,4 +139,25 @@ class Test_AIPS_Content_Links_Repository extends WP_UnitTestCase {
 			'save_post closure must skip revisions — sync_post_links($revision_id, []) would have deleted the canary row.'
 		);
 	}
+
+	public function test_get_outbound_counts() {
+		$source1 = $this->factory->post->create(array('post_title' => 'S1', 'post_status' => 'publish'));
+		$source2 = $this->factory->post->create(array('post_title' => 'S2', 'post_status' => 'publish'));
+		$target1 = $this->factory->post->create(array('post_title' => 'T1', 'post_status' => 'publish'));
+		$target2 = $this->factory->post->create(array('post_title' => 'T2', 'post_status' => 'publish'));
+
+		$this->repo->sync_post_links($source1, array(
+			array('target_id' => $target1, 'anchor_text' => 'A1', 'link_url' => get_permalink($target1), 'post_type' => 'post'),
+			array('target_id' => $target2, 'anchor_text' => 'A2', 'link_url' => get_permalink($target2), 'post_type' => 'post'),
+		));
+
+		$this->repo->sync_post_links($source2, array(
+			array('target_id' => $target1, 'anchor_text' => 'A3', 'link_url' => get_permalink($target1), 'post_type' => 'post'),
+		));
+
+		$counts = $this->repo->get_outbound_counts(array($source1, $source2, 999999));
+		$this->assertSame(2, $counts[$source1]);
+		$this->assertSame(1, $counts[$source2]);
+		$this->assertSame(0, $counts[999999]);
+	}
 }

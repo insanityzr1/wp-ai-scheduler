@@ -270,6 +270,57 @@ class AIPS_Link_Graph_Service {
 	}
 
 	/**
+	 * Compute crawl depth from site root for all reachable posts in a single BFS pass.
+	 *
+	 * @param int|null $root_id Optional root post ID.
+	 * @return array<int, int> Map of post_id => depth.
+	 */
+	public function get_all_graph_depths($root_id = null) {
+		if ($root_id === null) {
+			$root_id = (int) get_option('page_on_front');
+			if ($root_id <= 0) {
+				// Fallback: earliest published post as de facto pillar
+				$root_posts = get_posts(array(
+					'post_type'        => array('post', 'page'),
+					'post_status'      => 'publish',
+					'posts_per_page'   => 1,
+					'orderby'          => 'ID',
+					'order'            => 'ASC',
+					'fields'           => 'ids',
+					'no_found_rows'    => true,
+					'suppress_filters' => true,
+				));
+				$root_id = !empty($root_posts) ? (int) $root_posts[0] : 0;
+			}
+		}
+
+		if ($root_id <= 0) {
+			return array();
+		}
+
+		$adj    = $this->get_adjacency_list();
+		$depths = array($root_id => 0);
+		$queue  = new SplQueue();
+		$queue->enqueue($root_id);
+
+		while (!$queue->isEmpty()) {
+			$curr_id = $queue->dequeue();
+			$curr_d  = $depths[$curr_id];
+
+			if (isset($adj[$curr_id])) {
+				foreach ($adj[$curr_id] as $neighbor) {
+					if (!isset($depths[$neighbor])) {
+						$depths[$neighbor] = $curr_d + 1;
+						$queue->enqueue($neighbor);
+					}
+				}
+			}
+		}
+
+		return $depths;
+	}
+
+	/**
 	 * Calculate graph crawl depth using Breadth-First Search (BFS) from site root.
 	 *
 	 * Level 1: Directly linked from Root/Homepage or designated pillar post.
@@ -288,52 +339,9 @@ class AIPS_Link_Graph_Service {
 			return 0;
 		}
 
-		if ($root_id === null) {
-			$root_id = (int) get_option('page_on_front');
-			if ($root_id <= 0) {
-				// Fallback: earliest published post as de facto pillar
-				$root_posts = get_posts(array(
-					'post_type'        => array('post', 'page'),
-					'post_status'      => 'publish',
-					'posts_per_page'   => 1,
-					'orderby'          => 'ID',
-					'order'            => 'ASC',
-					'fields'           => 'ids',
-					'no_found_rows'    => true,
-					'suppress_filters' => true,
-				));
-				$root_id = !empty($root_posts) ? (int) $root_posts[0] : 0;
-		}
-
-		if ($root_id <= 0 || $post_id === $root_id) {
-			return 0;
-		}
-
-		// Load graph edges
-		$adj = $this->get_adjacency_list();
-
-		// BFS from root
-		$visited = array($root_id => true);
-		$queue   = new SplQueue();
-		$queue->enqueue(array('id' => $root_id, 'depth' => 0));
-
-		while (!$queue->isEmpty()) {
-			$current = $queue->dequeue();
-			$curr_id = $current['id'];
-			$curr_d  = $current['depth'];
-
-			if ($curr_id === $post_id) {
-				return $curr_d;
-			}
-
-			if (isset($adj[$curr_id])) {
-				foreach ($adj[$curr_id] as $neighbor) {
-					if (!isset($visited[$neighbor])) {
-						$visited[$neighbor] = true;
-						$queue->enqueue(array('id' => $neighbor, 'depth' => $curr_d + 1));
-					}
-				}
-			}
+		$depths = $this->get_all_graph_depths($root_id);
+		if (isset($depths[$post_id])) {
+			return $depths[$post_id];
 		}
 
 		return 99; // Unreachable from root

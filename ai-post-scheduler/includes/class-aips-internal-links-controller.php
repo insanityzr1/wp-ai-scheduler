@@ -821,17 +821,28 @@ class AIPS_Internal_Links_Controller {
 			$all_post_ids = array();
 		}
 
-		// Compute metrics for posts and compute summary counts
+		// Compute metrics for posts and compute summary counts.
+		// Post types come from a filter and defaults so their contents are
+		// developer-controlled, but the plugin's SQL convention (per CLAUDE.md)
+		// is $wpdb->prepare with placeholders — keep this consistent.
+		$pt_placeholders     = implode(',', array_fill(0, count($post_types), '%s'));
 		$total_network_posts = (int) $wpdb->get_var(
-			"SELECT COUNT(ID) FROM {$wpdb->posts} WHERE post_status = 'publish' AND post_type IN ('" . implode("','", array_map('esc_sql', $post_types)) . "')"
+			$wpdb->prepare(
+				"SELECT COUNT(ID) FROM {$wpdb->posts} WHERE post_status = 'publish' AND post_type IN ($pt_placeholders)",
+				$post_types
+			)
 		);
 		$total_edges = (int) $wpdb->get_var(
 			"SELECT COUNT(*) FROM {$wpdb->prefix}aips_content_links"
 		);
 
-		$filtered_items = array();
-		$total_orphans  = 0;
-		$total_deep     = 0;
+		// Pass 1: compute metrics and filter. Do NOT build presentation entries
+		// yet — title/permalink/edit-url lookups are deferred so the paginated
+		// slice can prime the post-object cache in one call instead of an N+1
+		// per matched post.
+		$filtered_metrics = array();
+		$total_orphans    = 0;
+		$total_deep       = 0;
 
 		foreach ($all_post_ids as $p_id) {
 			$p_id    = (int) $p_id;
@@ -855,9 +866,24 @@ class AIPS_Internal_Links_Controller {
 				continue;
 			}
 
+			$filtered_metrics[$p_id] = $metrics;
+		}
+
+		$total_items       = count($filtered_metrics);
+		$total_pages       = $total_items > 0 ? (int) ceil($total_items / $per_page) : 1;
+		$offset            = ($page - 1) * $per_page;
+		$paged_metrics     = array_slice($filtered_metrics, $offset, $per_page, true);
+		$paged_ids         = array_keys($paged_metrics);
+
+		if (!empty($paged_ids) && function_exists('_prime_post_caches')) {
+			_prime_post_caches($paged_ids, false, false);
+		}
+
+		$paged_items = array();
+		foreach ($paged_metrics as $p_id => $metrics) {
 			$depth_display = (99 === $metrics['depth_level']) ? '∞' : ('L' . $metrics['depth_level']);
 
-			$filtered_items[] = array(
+			$paged_items[] = array(
 				'id'            => $p_id,
 				'title'         => html_entity_decode(get_the_title($p_id), ENT_QUOTES, 'UTF-8'),
 				'url'           => get_permalink($p_id),
@@ -870,11 +896,6 @@ class AIPS_Internal_Links_Controller {
 				'equity_tier'   => $metrics['equity_tier'],
 			);
 		}
-
-		$total_items = count($filtered_items);
-		$total_pages = $total_items > 0 ? (int) ceil($total_items / $per_page) : 1;
-		$offset      = ($page - 1) * $per_page;
-		$paged_items = array_slice($filtered_items, $offset, $per_page);
 
 		wp_send_json_success(array(
 			'items'      => $paged_items,
@@ -949,7 +970,7 @@ class AIPS_Internal_Links_Controller {
 					continue;
 				}
 
-				$outbound_count = count($this->content_links_repo->get_outbound_links($candidate_id));
+				$outbound_count = $this->content_links_repo->get_outbound_count($candidate_id);
 				$excerpt = !empty($cand_post->post_excerpt) ? $cand_post->post_excerpt : wp_trim_words($cand_post->post_content, 20);
 
 				$candidates[] = array(
@@ -995,7 +1016,7 @@ class AIPS_Internal_Links_Controller {
 			if ($query->have_posts()) {
 				foreach ($query->posts as $f_post) {
 					$f_id = (int) $f_post->ID;
-					$outbound_count = count($this->content_links_repo->get_outbound_links($f_id));
+					$outbound_count = $this->content_links_repo->get_outbound_count($f_id);
 					$excerpt = !empty($f_post->post_excerpt) ? $f_post->post_excerpt : wp_trim_words($f_post->post_content, 20);
 
 					$candidates[] = array(

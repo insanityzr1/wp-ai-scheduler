@@ -1012,6 +1012,14 @@ final class AI_Post_Scheduler {
 
         // Editor Sidebar Meta-Box (Classic Editor & post edit screens)
         new AIPS_Editor_Meta_Box();
+      
+        // Ensure Seeder admin hooks are registered when developer mode is enabled
+        // so the Seeder JS will be enqueued on the Dev Tools diagnostics tab.
+        if ( AIPS_Config::get_instance()->get_option('aips_developer_mode') ) {
+            // Lazy instantiate the Seeder admin class so its admin_enqueue_scripts
+            // hook is available on Diagnostics/Dev Tools pages.
+            new AIPS_Seeder_Admin();
+        }
     }
 
     /**

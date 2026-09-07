@@ -141,7 +141,13 @@
 		 * Tab switching.
 		 */
 		initTabs: function () {
-			$('#aips-content-indexer-tab, .aips-content-indexer-wrap').find('.aips-tab-link').on('click', function (e) {
+			var $indexerContext = $('#aips-content-indexer-tab, .aips-content-indexer-wrap');
+
+			// Hide all inactive subtabs initially and sync aria-hidden
+			$indexerContext.find('.aips-tab-content:not(.active)').hide().attr('aria-hidden', 'true');
+			$indexerContext.find('.aips-tab-content.active').show().attr('aria-hidden', 'false');
+
+			$indexerContext.find('.aips-tab-link').on('click', function (e) {
 				e.preventDefault();
 				var tab = $(this).data('tab');
 				var $nav = $(this).closest('.aips-tab-nav');
@@ -150,12 +156,12 @@
 				$nav.find('.aips-tab-link').removeClass('active');
 				$(this).addClass('active');
 
-				$container.children('.aips-tab-content').hide().removeClass('active');
+				$container.children('.aips-tab-content').hide().removeClass('active').attr('aria-hidden', 'true');
 				var $target = $container.children('#' + tab + '-tab');
 				if (!$target.length) {
 					$target = $('#' + tab + '-tab');
 				}
-				$target.show().addClass('active');
+				$target.show().addClass('active').attr('aria-hidden', 'false');
 
 				if (tab === 'visualizer' && window.AIPS.ContentIndexer.graphData) {
 					window.AIPS.ContentIndexer.renderSvgGraph(window.AIPS.ContentIndexer.graphData);

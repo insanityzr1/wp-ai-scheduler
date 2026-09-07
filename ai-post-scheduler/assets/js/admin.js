@@ -680,32 +680,35 @@
                 var $targetTab = $railMain.find('#' + tabId + '-tab, #' + tabId).first();
                 if ($targetTab.length) {
                     var $parentContainer = $targetTab.parent();
-                    $parentContainer.children('.aips-tab-content').hide().removeClass('active');
-                    $targetTab.show().addClass('active');
-                    $targetTab.find('.aips-tab-content.active').show();
+                    $parentContainer.children('.aips-tab-content').hide().removeClass('active').attr('aria-hidden', 'true');
+                    $targetTab.show().addClass('active').attr('aria-hidden', 'false');
+                    $targetTab.find('.aips-tab-content:not(.active)').hide().attr('aria-hidden', 'true');
+                    $targetTab.find('.aips-tab-content.active').show().attr('aria-hidden', 'false');
                 }
             } else {
                 var $container = $tabNav.parent();
                 var $scopedTabs = $container.children('.aips-tab-content');
 
                 if ($scopedTabs.length) {
-                    $scopedTabs.hide().removeClass('active');
+                    $scopedTabs.hide().removeClass('active').attr('aria-hidden', 'true');
                     var $targetTab = $container.children('#' + tabId + '-tab, #' + tabId);
                     if ($targetTab.length) {
-                        $targetTab.show().addClass('active');
+                        $targetTab.show().addClass('active').attr('aria-hidden', 'false');
                         // Ensure active inner tab within the newly revealed panel is visible
-                        $targetTab.find('.aips-tab-content.active').show();
+                        $targetTab.find('.aips-tab-content:not(.active)').hide().attr('aria-hidden', 'true');
+                        $targetTab.find('.aips-tab-content.active').show().attr('aria-hidden', 'false');
                     }
                 } else {
                     var $scope = $tabNav.closest('.aips-page-container, .aips-modal-content, .aips-modal-body, .wrap');
                     if (!$scope.length) {
                         $scope = $(document);
                     }
-                    $scope.children('.aips-tab-content').hide().removeClass('active');
+                    $scope.children('.aips-tab-content').hide().removeClass('active').attr('aria-hidden', 'true');
                     var $targetTab = $scope.find('#' + tabId + '-tab, #' + tabId).first();
                     if ($targetTab.length) {
-                        $targetTab.show().addClass('active');
-                        $targetTab.find('.aips-tab-content.active').show();
+                        $targetTab.show().addClass('active').attr('aria-hidden', 'false');
+                        $targetTab.find('.aips-tab-content:not(.active)').hide().attr('aria-hidden', 'true');
+                        $targetTab.find('.aips-tab-content.active').show().attr('aria-hidden', 'false');
                     }
                 }
             }

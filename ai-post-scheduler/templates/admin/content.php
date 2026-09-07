@@ -2,11 +2,12 @@
 /**
  * Content Admin Template
  *
- * Container for the Content admin page with three tab panels:
+ * Container for the Content admin page with four tab panels:
  *
- * Tab 1: Generated Posts  - @see templates/admin/tab-generated-posts.php
+ * Tab 1: Generated Posts     - @see templates/admin/tab-generated-posts.php
  * Tab 2: Partial Generations - @see templates/admin/tab-partial-generations.php
  * Tab 3: Pending Review      - @see templates/admin/tab-pending-review.php
+ * Tab 4: Content Indexer     - @see templates/admin/content-indexer.php
  *
  * @package AI_Post_Scheduler
  * @since 2.0.0
@@ -29,69 +30,58 @@ if ('content-indexer' === $active_tab || 'indexer' === $active_tab) {
 } elseif (!in_array($active_tab, $valid_tabs, true)) {
 	$active_tab = 'aips-generated-posts';
 }
+
+$rail_items = array(
+	array(
+		'key'         => 'aips-generated-posts',
+		'label'       => __('Generated Posts', 'ai-post-scheduler'),
+		'icon'        => 'dashicons-admin-post',
+		'description' => __('Published & drafted articles', 'ai-post-scheduler'),
+		'active'      => ($active_tab === 'aips-generated-posts'),
+	),
+	array(
+		'key'         => 'aips-partial-generations',
+		'label'       => __('Partial Generations', 'ai-post-scheduler'),
+		'icon'        => 'dashicons-warning',
+		'description' => __('Incomplete runs & recovery', 'ai-post-scheduler'),
+		'active'      => ($active_tab === 'aips-partial-generations'),
+	),
+	array(
+		'key'         => 'aips-pending-review',
+		'label'       => __('Pending Review', 'ai-post-scheduler'),
+		'icon'        => 'dashicons-visibility',
+		'description' => __('Drafts awaiting human review', 'ai-post-scheduler'),
+		'active'      => ($active_tab === 'aips-pending-review'),
+	),
+	array(
+		'key'         => 'aips-content-indexer',
+		'label'       => __('Content Indexer', 'ai-post-scheduler'),
+		'icon'        => 'dashicons-database',
+		'description' => __('Vectors & semantic embeddings', 'ai-post-scheduler'),
+		'active'      => ($active_tab === 'aips-content-indexer'),
+	),
+);
 ?>
 
 <div class="wrap aips-wrap aips-content-wrap">
 	<div class="aips-page-container">
 		<!-- Page Header -->
-		<div class="aips-page-header">
-			<div class="aips-page-header-top">
-				<div>
-					<h1 class="aips-page-title">
-						<span class="dashicons dashicons-admin-post aips-page-title-icon"></span>
-						<?php esc_html_e('Content', 'ai-post-scheduler'); ?>
-					</h1>
-					<p class="aips-page-description"><?php esc_html_e('View and manage all AI-generated posts including published articles, drafts pending review, and semantic embeddings.', 'ai-post-scheduler'); ?></p>
-				</div>
-			</div>
-		</div>
+		<?php
+		AIPS_Admin_UI_Primitives::render_page_header(array(
+			'title'       => __('Content', 'ai-post-scheduler'),
+			'icon'        => 'dashicons-admin-post',
+			'description' => __('View and manage all AI-generated posts including published articles, drafts pending review, and semantic embeddings.', 'ai-post-scheduler'),
+		));
+		?>
 
 		<!-- Vertical Sidebar Rail Layout -->
 		<div class="aips-rail-layout">
-			<nav class="aips-rail-sidebar" aria-label="<?php esc_attr_e('Content Navigation', 'ai-post-scheduler'); ?>">
-				<ul class="aips-rail-nav">
-					<li>
-						<button type="button" class="aips-rail-item<?php echo $active_tab === 'aips-generated-posts' ? ' active' : ''; ?>" data-tab="aips-generated-posts">
-							<span class="dashicons dashicons-admin-post aips-rail-icon"></span>
-							<span class="aips-rail-text">
-								<span class="aips-rail-title"><?php esc_html_e('Generated Posts', 'ai-post-scheduler'); ?></span>
-								<span class="aips-rail-desc"><?php esc_html_e('Published & drafted articles', 'ai-post-scheduler'); ?></span>
-							</span>
-							<span class="dashicons dashicons-arrow-right-alt2 aips-rail-arrow"></span>
-						</button>
-					</li>
-					<li>
-						<button type="button" class="aips-rail-item<?php echo $active_tab === 'aips-partial-generations' ? ' active' : ''; ?>" data-tab="aips-partial-generations">
-							<span class="dashicons dashicons-warning aips-rail-icon"></span>
-							<span class="aips-rail-text">
-								<span class="aips-rail-title"><?php esc_html_e('Partial Generations', 'ai-post-scheduler'); ?></span>
-								<span class="aips-rail-desc"><?php esc_html_e('Incomplete runs & recovery', 'ai-post-scheduler'); ?></span>
-							</span>
-							<span class="dashicons dashicons-arrow-right-alt2 aips-rail-arrow"></span>
-						</button>
-					</li>
-					<li>
-						<button type="button" class="aips-rail-item<?php echo $active_tab === 'aips-pending-review' ? ' active' : ''; ?>" data-tab="aips-pending-review">
-							<span class="dashicons dashicons-visibility aips-rail-icon"></span>
-							<span class="aips-rail-text">
-								<span class="aips-rail-title"><?php esc_html_e('Pending Review', 'ai-post-scheduler'); ?></span>
-								<span class="aips-rail-desc"><?php esc_html_e('Drafts awaiting human review', 'ai-post-scheduler'); ?></span>
-							</span>
-							<span class="dashicons dashicons-arrow-right-alt2 aips-rail-arrow"></span>
-						</button>
-					</li>
-					<li>
-						<button type="button" class="aips-rail-item<?php echo $active_tab === 'aips-content-indexer' ? ' active' : ''; ?>" data-tab="aips-content-indexer">
-							<span class="dashicons dashicons-database aips-rail-icon"></span>
-							<span class="aips-rail-text">
-								<span class="aips-rail-title"><?php esc_html_e('Content Indexer', 'ai-post-scheduler'); ?></span>
-								<span class="aips-rail-desc"><?php esc_html_e('Vectors & semantic embeddings', 'ai-post-scheduler'); ?></span>
-							</span>
-							<span class="dashicons dashicons-arrow-right-alt2 aips-rail-arrow"></span>
-						</button>
-					</li>
-				</ul>
-			</nav>
+			<?php
+			AIPS_Admin_UI_Primitives::render_rail(array(
+				'aria_label' => __('Content Navigation', 'ai-post-scheduler'),
+				'items'      => $rail_items,
+			));
+			?>
 
 			<main class="aips-rail-main">
 				<!-- Tab 1: Generated Posts -->

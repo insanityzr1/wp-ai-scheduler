@@ -395,14 +395,40 @@ class AIPS_System_Diagnostics_Service {
 	}
 
 	/**
-	 * Rebuild cache subsystems via the invalidation bus.
+	 * Rebuild a specific cache subsystem or all subsystems.
 	 *
-	 * @param string $subsystem Subsystem key or 'all'.
+	 * @param string|array $subsystem Subsystem key(s) or 'all'.
 	 * @return array
 	 */
 	public function rebuild_caches($subsystem = 'all') {
 		$subsystems         = AIPS_Cache_Policy::get_subsystems();
 		$allowed_subsystems = array_keys($subsystems);
+
+		if (is_array($subsystem)) {
+			$selected = array_values(array_intersect($subsystem, $allowed_subsystems));
+			if (empty($selected)) {
+				$selected = $allowed_subsystems;
+			}
+
+			$affected = array();
+			$labels   = array();
+			foreach ($selected as $sub) {
+				$affected = array_merge($affected, AIPS_Cache_Invalidation_Bus::rebuild($sub));
+				$labels[] = isset($subsystems[$sub]['label']) ? (string) $subsystems[$sub]['label'] : $sub;
+			}
+			$affected         = array_values(array_unique($affected));
+			$subsystem_label  = implode(', ', $labels);
+			$affected_display = !empty($affected) ? implode(', ', $affected) : __('none', 'ai-post-scheduler');
+
+			AIPS_Logger::instance()->log('Cache rebuild requested from admin tool.', 'info', array('subsystems' => $selected, 'affected_caches' => $affected));
+
+			return array(
+				'success'    => true,
+				'message'    => sprintf(__('Rebuilt caches for %1$s. Affected caches: %2$s', 'ai-post-scheduler'), $subsystem_label, $affected_display),
+				'subsystems' => $selected,
+				'affected'   => $affected,
+			);
+		}
 
 		if ('all' !== $subsystem && !in_array($subsystem, $allowed_subsystems, true)) {
 			$subsystem = 'all';

@@ -124,6 +124,12 @@ class AIPS_System_Status_Controller {
 	public function ajax_rebuild_caches() {
 		$this->verify_request('aips_rebuild_caches');
 
+		if (isset($_POST['subsystems']) && is_array($_POST['subsystems'])) {
+			$subsystems = array_map('sanitize_key', (array) wp_unslash($_POST['subsystems']));
+			AIPS_Ajax_Response::success($this->diagnostics_service->rebuild_caches($subsystems));
+			return;
+		}
+
 		$subsystem = isset($_POST['subsystem']) ? sanitize_key(wp_unslash($_POST['subsystem'])) : 'all';
 
 		AIPS_Ajax_Response::success($this->diagnostics_service->rebuild_caches($subsystem));

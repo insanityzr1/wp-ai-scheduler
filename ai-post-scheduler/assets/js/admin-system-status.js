@@ -61,6 +61,7 @@
 			$(document).on('click', '.aips-status-op', this.runStatusOperation.bind(this));
 			$(document).on('click', '.aips-rebuild-cache-btn', this.rebuildCaches.bind(this));
 			$(document).on('click', '.aips-toggle-refresh-tasks', this.toggleRefreshTasks.bind(this));
+			$(document).on('click', '.aips-toggle-cache-tasks', this.toggleCacheTasks.bind(this));
 			$(document).on('click', '.aips-refresh-system', this.refreshSystem.bind(this));
 		},
 
@@ -178,24 +179,66 @@
 			});
 		},
 
-
+		/**
+		 * Rebuild the selected cache subsystems.
+		 *
+		 * @param {Event} e Click event.
+		 * @return {void}
+		 */
 		rebuildCaches: function(e) {
 			e.preventDefault();
 			var l10n = window.aipsSystemStatusL10n || {};
 			var $btn = $(e.currentTarget);
-			var subsystem = $('#aips-cache-subsystem').val() || 'all';
+			var $spinner = $btn.siblings('.spinner');
 			var $result = $('.aips-status-op-result');
+			var selectedSubsystems = this.getSelectedCacheSubsystems();
+
+			if (!selectedSubsystems.length) {
+				if (AIPS.Utilities && AIPS.Utilities.showToast) {
+					AIPS.Utilities.showToast(l10n.selectCachesRequired || 'Select at least one cache subsystem to rebuild.', 'warning');
+				}
+				return;
+			}
+
 			$btn.prop('disabled', true);
-			$.post(ajaxurl, { action: 'aips_rebuild_caches', nonce: l10n.nonceRebuildCaches || '', subsystem: subsystem }, function(response) {
-				if (response && response.success) {
-					$result.text((response.data && response.data.message) ? response.data.message : 'Done.').show();
-				} else {
-					$result.text((response && response.data && response.data.message) ? response.data.message : (l10n.requestFailed || 'Request failed.')).show();
+			$spinner.addClass('is-active');
+
+			if (AIPS.Utilities && AIPS.Utilities.showToast) {
+				AIPS.Utilities.showToast(l10n.rebuildingCaches || 'Rebuilding caches…', 'info');
+			}
+
+			$.post(
+				ajaxurl,
+				{
+					action: 'aips_rebuild_caches',
+					nonce: l10n.nonceRebuildCaches || '',
+					subsystems: selectedSubsystems
+				},
+				function(response) {
+					if (response && response.success) {
+						var msg = (response.data && response.data.message) ? response.data.message : (l10n.rebuildDone || 'Caches rebuilt successfully.');
+						$result.text(msg).show();
+						if (AIPS.Utilities && AIPS.Utilities.showToast) {
+							AIPS.Utilities.showToast(msg, 'success');
+						}
+					} else {
+						var errMsg = (response && response.data && response.data.message) ? response.data.message : (l10n.requestFailed || 'Request failed.');
+						$result.text(errMsg).show();
+						if (AIPS.Utilities && AIPS.Utilities.showToast) {
+							AIPS.Utilities.showToast(errMsg, 'error');
+						}
+					}
+					$btn.prop('disabled', false);
+					$spinner.removeClass('is-active');
+				}
+			).fail(function() {
+				var failMsg = l10n.requestFailed || 'Request failed.';
+				$result.text(failMsg).show();
+				if (AIPS.Utilities && AIPS.Utilities.showToast) {
+					AIPS.Utilities.showToast(failMsg, 'error');
 				}
 				$btn.prop('disabled', false);
-			}).fail(function() {
-				$result.text(l10n.requestFailed || 'Request failed.').show();
-				$btn.prop('disabled', false);
+				$spinner.removeClass('is-active');
 			});
 		},
 
@@ -215,12 +258,38 @@
 		},
 
 		/**
+		 * Toggle the Cache Subsystems selection set.
+		 *
+		 * @param {Event} e Click event.
+		 * @return {void}
+		 */
+		toggleCacheTasks: function(e) {
+			e.preventDefault();
+
+			var $tasks = $('.aips-cache-subsystem-task');
+			var allChecked = $tasks.length > 0 && $tasks.filter(':checked').length === $tasks.length;
+
+			$tasks.prop('checked', !allChecked);
+		},
+
+		/**
 		 * Collect the currently selected Refresh System task IDs.
 		 *
 		 * @return {Array}
 		 */
 		getSelectedRefreshTasks: function() {
 			return $('.aips-refresh-task:checked').map(function() {
+				return $(this).val();
+			}).get();
+		},
+
+		/**
+		 * Collect the currently selected Cache subsystem IDs.
+		 *
+		 * @return {Array}
+		 */
+		getSelectedCacheSubsystems: function() {
+			return $('.aips-cache-subsystem-task:checked').map(function() {
 				return $(this).val();
 			}).get();
 		},

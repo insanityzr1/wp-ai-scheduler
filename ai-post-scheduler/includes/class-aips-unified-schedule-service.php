@@ -367,6 +367,26 @@ class AIPS_Unified_Schedule_Service {
 					return $topics;
 				}
 
+				// If author has no approved topics ready, approve newly generated topics for immediate execution
+				$topics_repo = new AIPS_Author_Topics_Repository();
+				$existing_approved = $topics_repo->get_approved_for_generation($id, 1);
+				if (empty($existing_approved) && is_array($topics)) {
+					$logs_repo = new AIPS_Author_Topic_Logs_Repository();
+					$current_user_id = get_current_user_id() ? get_current_user_id() : null;
+					foreach ($topics as $topic_item) {
+						$topic_id = is_array($topic_item) ? (isset($topic_item['id']) ? $topic_item['id'] : null) : (isset($topic_item->id) ? $topic_item->id : null);
+						if ($topic_id) {
+							$topics_repo->update((int) $topic_id, array('status' => 'approved'));
+							$logs_repo->create(array(
+								'author_topic_id' => (int) $topic_id,
+								'action'          => 'approved',
+								'user_id'         => $current_user_id,
+								'notes'           => __('Auto-approved for Blueprint Run Now execution.', 'ai-post-scheduler'),
+							));
+						}
+					}
+				}
+
 				$posts = $this->run_now($id, self::TYPE_AUTHOR_POST, $quantity, $advance_schedule);
 				if (is_wp_error($posts)) {
 					return $posts;

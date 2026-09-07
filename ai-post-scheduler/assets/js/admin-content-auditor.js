@@ -137,7 +137,7 @@
 			if (!topic) return;
 
 			if (confirm(aipsAuditorL10n.confirmGeneratePost || 'Generate post immediately for topic: "' + topic + '"?')) {
-				window.location.href = 'admin.php?page=aips-templates&generate_topic=' + encodeURIComponent(topic);
+				window.location.href = 'admin.php?page=aips-studio&tab=templates&generate_topic=' + encodeURIComponent(topic);
 			}
 		});
 	}

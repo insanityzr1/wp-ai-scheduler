@@ -42,7 +42,7 @@
          * Intercepts action button clicks and form submissions:
          * - Prevents duplicate clicks while an action or AJAX request is already in-flight.
          * - Auto-disables clicked action buttons and adds '.is-busy' visual indicator.
-         * - Auto-restores buttons when AJAX completes via global $(document).ajaxComplete() / ajaxError().
+         * - Safe auto-release with 300s timeout for long-running AI generation jobs.
          */
         initActionLock: function() {
             var self = this;
@@ -56,7 +56,7 @@
                     return false;
                 }
 
-                // If this is an AJAX-handled form, lock it until ajaxComplete
+                // If this is an AJAX-handled form, lock it
                 var $submitBtn = $form.find('input[type="submit"], button[type="submit"]').first();
                 if ($submitBtn.length) {
                     $form.data('aips-submitting', true);
@@ -68,7 +68,7 @@
             $(document).on('click', '.aips-btn-primary, .aips-btn-danger, .aips-btn-secondary, button[type="submit"], input[type="submit"], .aips-action-btn', function(e) {
                 var $btn = $(this);
 
-                // Ignore navigation rail items or modal close buttons
+                // Ignore navigation rail items, tab links, or modal/toast close buttons
                 if ($btn.hasClass('aips-rail-item') || $btn.hasClass('aips-modal-close') || $btn.hasClass('aips-toast-close') || $btn.hasClass('aips-tab-link')) {
                     return;
                 }
@@ -80,14 +80,8 @@
                     return false;
                 }
 
-                // Set in-flight lock
+                // Set in-flight lock with 300s safety timeout
                 self.lockButton($btn);
-            });
-
-            // Global release on AJAX completion
-            $(document).on('ajaxComplete ajaxError', function() {
-                $('form').removeData('aips-submitting');
-                self.releaseAllLockedButtons();
             });
         },
 
@@ -95,19 +89,22 @@
          * Lock a button in-flight.
          *
          * @param {jQuery} $btn
+         * @param {number} [timeout=300000] Fallback timeout in ms (default 5 minutes).
          */
-        lockButton: function($btn) {
+        lockButton: function($btn, timeout) {
             if (!$btn || !$btn.length || $btn.data('aips-in-flight')) {
                 return;
             }
 
+            var fallbackTimeout = typeof timeout === 'number' && timeout > 0 ? timeout : 300000;
+
             $btn.data('aips-in-flight', true);
             $btn.addClass('is-busy');
 
-            // Auto-fallback timer in case an action does not trigger AJAX or fails to complete
+            // Auto-fallback timer for long-running AI generation jobs (up to 5 min)
             var timer = setTimeout(function() {
                 AIPS.Utilities.unlockButton($btn);
-            }, 8000);
+            }, fallbackTimeout);
 
             $btn.data('aips-lock-timer', timer);
         },
@@ -128,6 +125,11 @@
                 $btn.removeData('aips-lock-timer');
             }
 
+            var $form = $btn.closest('form');
+            if ($form.length) {
+                $form.removeData('aips-submitting');
+            }
+
             $btn.removeData('aips-in-flight');
             $btn.removeClass('is-busy');
             $btn.prop('disabled', false);
@@ -141,6 +143,7 @@
             $('.is-busy, [data-aips-in-flight]').each(function() {
                 self.unlockButton($(this));
             });
+            $('form').removeData('aips-submitting');
         },
 
         /**

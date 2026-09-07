@@ -197,7 +197,7 @@ class AIPS_Studio_Controller {
 			case 'templates':
 				AIPS_Admin_Menu_Helper::safe_render(function() {
 					$templates_handler = new AIPS_Templates();
-					include AIPS_PLUGIN_DIR . 'templates/admin/templates.php';
+					$templates_handler->render_page();
 				}, __('Templates', 'ai-post-scheduler'), true);
 				break;
 
@@ -214,7 +214,7 @@ class AIPS_Studio_Controller {
 					$structures_handler = new AIPS_Structures_Controller();
 					$repo = new AIPS_Article_Structure_Repository();
 					$structures = $repo->get_all(false);
-					$section_repo = new AIPS_Prompt_Sections_Repository();
+					$section_repo = new AIPS_Prompt_Section_Repository();
 					$sections = $section_repo->get_all(false);
 					include AIPS_PLUGIN_DIR . 'templates/admin/structures.php';
 				}, __('Article Structures', 'ai-post-scheduler'), true);

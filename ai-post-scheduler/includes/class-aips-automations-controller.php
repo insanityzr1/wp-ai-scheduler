@@ -363,30 +363,46 @@ class AIPS_Automations_Controller {
 	public function render_tab_content($active_tab) {
 		switch ($active_tab) {
 			case 'campaigns':
-				$this->render_campaigns_tab();
+				AIPS_Admin_Menu_Helper::safe_render(function() {
+					$this->render_campaigns_tab();
+				}, __('Campaigns', 'ai-post-scheduler'), true);
 				break;
 			case 'authors':
-				$this->render_authors_tab();
+				AIPS_Admin_Menu_Helper::safe_render(function() {
+					$this->render_authors_tab();
+				}, __('Authors', 'ai-post-scheduler'), true);
 				break;
 			case 'sources':
-				$this->render_sources_tab();
+				AIPS_Admin_Menu_Helper::safe_render(function() {
+					$this->render_sources_tab();
+				}, __('Sources', 'ai-post-scheduler'), true);
 				break;
 			case self::TAB_AUTHOR_TOPICS:
-				$this->render_author_topics_tab();
+				AIPS_Admin_Menu_Helper::safe_render(function() {
+					$this->render_author_topics_tab();
+				}, __("Author's Topics", 'ai-post-scheduler'), true);
 				break;
 			case 'monetization':
 			case 'affiliate-links':
-				$this->render_monetization_tab();
+				AIPS_Admin_Menu_Helper::safe_render(function() {
+					$this->render_monetization_tab();
+				}, __('Monetization', 'ai-post-scheduler'), true);
 				break;
 			case 'internal-links':
-				$this->render_internal_links_tab();
+				AIPS_Admin_Menu_Helper::safe_render(function() {
+					$this->render_internal_links_tab();
+				}, __('Internal Links', 'ai-post-scheduler'), true);
 				break;
 			case 'taxonomy':
-				$this->render_taxonomy_tab();
+				AIPS_Admin_Menu_Helper::safe_render(function() {
+					$this->render_taxonomy_tab();
+				}, __('Taxonomy', 'ai-post-scheduler'), true);
 				break;
 			case 'schedules':
 			default:
-				$this->render_schedules_tab();
+				AIPS_Admin_Menu_Helper::safe_render(function() {
+					$this->render_schedules_tab();
+				}, __('Schedules', 'ai-post-scheduler'), true);
 				break;
 		}
 	}
@@ -473,23 +489,7 @@ class AIPS_Automations_Controller {
 			$aips_internal_links_controller = new AIPS_Internal_Links_Controller();
 		}
 
-		try {
-			$aips_internal_links_controller->render_page();
-		} catch (Throwable $throwable) {
-			if (class_exists('AIPS_Logger')) {
-				AIPS_Logger::log_error('Internal Links tab render exception: ' . $throwable->getMessage(), array(
-					'file'  => $throwable->getFile(),
-					'line'  => $throwable->getLine(),
-					'trace' => $throwable->getTraceAsString(),
-				));
-			} else {
-				error_log('[AIPS] Internal Links tab render exception: ' . $throwable->getMessage());
-			}
-
-			echo '<div class="aips-content-panel"><div class="aips-panel-body"><div class="notice notice-error inline"><p>' .
-				esc_html__('The Internal Links module is currently unavailable. Please check the system log or try reloading the page.', 'ai-post-scheduler') .
-			'</p></div></div></div>';
-		}
+		$aips_internal_links_controller->render_page();
 	}
 
 	/**

@@ -171,23 +171,35 @@ class AIPS_Diagnostics_Controller {
 		switch ($active_tab) {
 			case 'operations-insights':
 			case 'insights':
-				$this->render_operations_insights_tab();
+				AIPS_Admin_Menu_Helper::safe_render(function() {
+					$this->render_operations_insights_tab();
+				}, __('Operations Insights', 'ai-post-scheduler'), true);
 				break;
 			case 'cache-monitor':
-				$this->render_cache_monitor_tab();
+				AIPS_Admin_Menu_Helper::safe_render(function() {
+					$this->render_cache_monitor_tab();
+				}, __('Cache Monitor', 'ai-post-scheduler'), true);
 				break;
 			case 'stress-test':
-				$this->render_stress_test_tab();
+				AIPS_Admin_Menu_Helper::safe_render(function() {
+					$this->render_stress_test_tab();
+				}, __('Stress Test', 'ai-post-scheduler'), true);
 				break;
 			case 'telemetry':
-				$this->render_telemetry_tab();
+				AIPS_Admin_Menu_Helper::safe_render(function() {
+					$this->render_telemetry_tab();
+				}, __('Telemetry', 'ai-post-scheduler'), true);
 				break;
 			case 'dev-tools':
-				$this->render_dev_tools_tab();
+				AIPS_Admin_Menu_Helper::safe_render(function() {
+					$this->render_dev_tools_tab();
+				}, __('Dev Tools', 'ai-post-scheduler'), true);
 				break;
 			case 'status':
 			default:
-				$this->render_status_tab();
+				AIPS_Admin_Menu_Helper::safe_render(function() {
+					$this->render_status_tab();
+				}, __('System Status', 'ai-post-scheduler'), true);
 				break;
 		}
 	}

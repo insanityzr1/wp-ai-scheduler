@@ -195,30 +195,38 @@ class AIPS_Studio_Controller {
 	public function render_section_content(string $section) {
 		switch ($section) {
 			case 'templates':
-				$templates_handler = new AIPS_Templates();
-				include AIPS_PLUGIN_DIR . 'templates/admin/templates.php';
+				AIPS_Admin_Menu_Helper::safe_render(function() {
+					$templates_handler = new AIPS_Templates();
+					include AIPS_PLUGIN_DIR . 'templates/admin/templates.php';
+				}, __('Templates', 'ai-post-scheduler'), true);
 				break;
 
 			case 'voices':
-				$voices_handler = new AIPS_Voices();
-				$voices = $voices_handler->get_all(false);
-				include AIPS_PLUGIN_DIR . 'templates/admin/voices.php';
+				AIPS_Admin_Menu_Helper::safe_render(function() {
+					$voices_handler = new AIPS_Voices();
+					$voices = $voices_handler->get_all(false);
+					include AIPS_PLUGIN_DIR . 'templates/admin/voices.php';
+				}, __('Voices', 'ai-post-scheduler'), true);
 				break;
 
 			case 'structures':
-				$structures_handler = new AIPS_Structures_Controller();
-				$repo = new AIPS_Article_Structure_Repository();
-				$structures = $repo->get_all(false);
-				$section_repo = new AIPS_Prompt_Sections_Repository();
-				$sections = $section_repo->get_all(false);
-				include AIPS_PLUGIN_DIR . 'templates/admin/structures.php';
+				AIPS_Admin_Menu_Helper::safe_render(function() {
+					$structures_handler = new AIPS_Structures_Controller();
+					$repo = new AIPS_Article_Structure_Repository();
+					$structures = $repo->get_all(false);
+					$section_repo = new AIPS_Prompt_Sections_Repository();
+					$sections = $section_repo->get_all(false);
+					include AIPS_PLUGIN_DIR . 'templates/admin/structures.php';
+				}, __('Article Structures', 'ai-post-scheduler'), true);
 				break;
 
 			case 'post-slices':
-				$slices_repo = new AIPS_Post_Slices_Repository();
-				$post_slices = $slices_repo->get_all();
-				$post_slice_counts = $slices_repo->get_counts();
-				include AIPS_PLUGIN_DIR . 'templates/admin/post-slices.php';
+				AIPS_Admin_Menu_Helper::safe_render(function() {
+					$slices_repo = new AIPS_Post_Slices_Repository();
+					$post_slices = $slices_repo->get_all();
+					$post_slice_counts = $slices_repo->get_counts();
+					include AIPS_PLUGIN_DIR . 'templates/admin/post-slices.php';
+				}, __('Post Slices', 'ai-post-scheduler'), true);
 				break;
 		}
 	}

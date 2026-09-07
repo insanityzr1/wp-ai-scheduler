@@ -308,8 +308,10 @@ class AIPS_Admin_Menu {
      * @return void
      */
     public function render_dashboard_page() {
-        $controller = new AIPS_Dashboard_Controller();
-        $controller->render_page();
+        AIPS_Admin_Menu_Helper::safe_render(function() {
+            $controller = new AIPS_Dashboard_Controller();
+            $controller->render_page();
+        }, __('Dashboard', 'ai-post-scheduler'));
     }
 
     /**
@@ -318,8 +320,10 @@ class AIPS_Admin_Menu {
      * @return void
      */
     public function render_automations_page() {
-        $controller = new AIPS_Automations_Controller();
-        $controller->render_page();
+        AIPS_Admin_Menu_Helper::safe_render(function() {
+            $controller = new AIPS_Automations_Controller();
+            $controller->render_page();
+        }, __('Automations', 'ai-post-scheduler'));
     }
 
     /**
@@ -328,8 +332,10 @@ class AIPS_Admin_Menu {
      * @return void
      */
     public function render_studio_page() {
-        $controller = new AIPS_Studio_Controller();
-        $controller->render_page();
+        AIPS_Admin_Menu_Helper::safe_render(function() {
+            $controller = new AIPS_Studio_Controller();
+            $controller->render_page();
+        }, __('Studio', 'ai-post-scheduler'));
     }
 
     /**
@@ -376,16 +382,20 @@ class AIPS_Admin_Menu {
      * @return void
      */
     public function render_campaigns_page() {
-        $controller = new AIPS_Campaigns_Controller();
-        $controller->render_page();
+        AIPS_Admin_Menu_Helper::safe_render(function() {
+            $controller = new AIPS_Campaigns_Controller();
+            $controller->render_page();
+        }, __('Campaigns', 'ai-post-scheduler'));
     }
 
     /**
      * Render the campaign wizard page.
      */
     public function render_campaign_wizard_page() {
-        $controller = new AIPS_Campaigns_Controller();
-        $controller->render_wizard_page();
+        AIPS_Admin_Menu_Helper::safe_render(function() {
+            $controller = new AIPS_Campaigns_Controller();
+            $controller->render_wizard_page();
+        }, __('Campaign Wizard', 'ai-post-scheduler'));
     }
 
 
@@ -393,8 +403,10 @@ class AIPS_Admin_Menu {
      * Render the campaign detail page.
      */
     public function render_campaign_detail_page() {
-        $controller = new AIPS_Campaigns_Controller();
-        $controller->render_detail_page();
+        AIPS_Admin_Menu_Helper::safe_render(function() {
+            $controller = new AIPS_Campaigns_Controller();
+            $controller->render_detail_page();
+        }, __('Campaign Details', 'ai-post-scheduler'));
     }
 
     /**
@@ -405,7 +417,9 @@ class AIPS_Admin_Menu {
      * @return void
      */
     public function render_research_page() {
-        include AIPS_PLUGIN_DIR . 'templates/admin/research.php';
+        AIPS_Admin_Menu_Helper::safe_render(function() {
+            include AIPS_PLUGIN_DIR . 'templates/admin/research.php';
+        }, __('Research', 'ai-post-scheduler'));
     }
 
     /**
@@ -458,8 +472,10 @@ class AIPS_Admin_Menu {
      * @return void
      */
     public function render_generated_posts_page() {
-        $controller = new AIPS_Generated_Posts_Controller();
-        $controller->render_page();
+        AIPS_Admin_Menu_Helper::safe_render(function() {
+            $controller = new AIPS_Generated_Posts_Controller();
+            $controller->render_page();
+        }, __('Content', 'ai-post-scheduler'));
     }
 
     /*
@@ -482,8 +498,10 @@ class AIPS_Admin_Menu {
      * @return void
      */
     public function render_history_page() {
-        $history_handler = new AIPS_History();
-        $history_handler->render_page();
+        AIPS_Admin_Menu_Helper::safe_render(function() {
+            $history_handler = new AIPS_History();
+            $history_handler->render_page();
+        }, __('History', 'ai-post-scheduler'));
     }
 
     /**
@@ -492,8 +510,10 @@ class AIPS_Admin_Menu {
      * @return void
      */
     public function render_diagnostics_page() {
-        $controller = new AIPS_Diagnostics_Controller();
-        $controller->render_page();
+        AIPS_Admin_Menu_Helper::safe_render(function() {
+            $controller = new AIPS_Diagnostics_Controller();
+            $controller->render_page();
+        }, __('Diagnostics', 'ai-post-scheduler'));
     }
 
     public function render_operations_insights_page() {
@@ -529,43 +549,45 @@ class AIPS_Admin_Menu {
      * @return void
      */
     public function render_source_data_page() {
-        $source_id      = isset($_GET['source_id']) ? absint(wp_unslash($_GET['source_id'])) : 0;
-        $paged          = isset($_GET['source_data_paged']) ? absint(wp_unslash($_GET['source_data_paged'])) : 1;
-        $search         = isset($_GET['s']) ? sanitize_text_field(wp_unslash($_GET['s'])) : '';
-        $is_global_view = $source_id <= 0;
-        $per_page       = 20;
+        AIPS_Admin_Menu_Helper::safe_render(function() {
+            $source_id      = isset($_GET['source_id']) ? absint(wp_unslash($_GET['source_id'])) : 0;
+            $paged          = isset($_GET['source_data_paged']) ? absint(wp_unslash($_GET['source_data_paged'])) : 1;
+            $search         = isset($_GET['s']) ? sanitize_text_field(wp_unslash($_GET['s'])) : '';
+            $is_global_view = $source_id <= 0;
+            $per_page       = 20;
 
-        $repo      = new AIPS_Sources_Repository();
-        $data_repo = new AIPS_Sources_Data_Repository();
-        $source    = $source_id ? $repo->get_by_id($source_id) : null;
-        $sources   = $is_global_view ? $repo->get_all(false) : array();
+            $repo      = new AIPS_Sources_Repository();
+            $data_repo = new AIPS_Sources_Data_Repository();
+            $source    = $source_id ? $repo->get_by_id($source_id) : null;
+            $sources   = $is_global_view ? $repo->get_all(false) : array();
 
-        $filters = array(
-            'fetch_status'      => isset($_GET['fetch_status']) ? sanitize_key(wp_unslash($_GET['fetch_status'])) : '',
-            'http_status_class' => isset($_GET['http_status_class']) ? absint(wp_unslash($_GET['http_status_class'])) : 0,
-            'fetched_after'     => isset($_GET['fetched_after']) ? sanitize_text_field(wp_unslash($_GET['fetched_after'])) : '',
-            'fetched_before'    => isset($_GET['fetched_before']) ? sanitize_text_field(wp_unslash($_GET['fetched_before'])) : '',
-            'min_char_count'    => isset($_GET['min_char_count']) ? absint(wp_unslash($_GET['min_char_count'])) : 0,
-            'max_char_count'    => isset($_GET['max_char_count']) ? absint(wp_unslash($_GET['max_char_count'])) : 0,
-            'search_body_text'  => !empty($_GET['search_body_text']),
-            'source_id'         => isset($_GET['filter_source_id']) ? absint(wp_unslash($_GET['filter_source_id'])) : 0,
-        );
-
-        if ($is_global_view) {
-            $source_data = $data_repo->get_paginated($search, $per_page, $paged, $filters);
-        } elseif (!$source) {
-            $source_data = array(
-                'items'        => array(),
-                'total'        => 0,
-                'pages'        => 0,
-                'current_page' => 1,
-                'per_page'     => $per_page,
+            $filters = array(
+                'fetch_status'      => isset($_GET['fetch_status']) ? sanitize_key(wp_unslash($_GET['fetch_status'])) : '',
+                'http_status_class' => isset($_GET['http_status_class']) ? absint(wp_unslash($_GET['http_status_class'])) : 0,
+                'fetched_after'     => isset($_GET['fetched_after']) ? sanitize_text_field(wp_unslash($_GET['fetched_after'])) : '',
+                'fetched_before'    => isset($_GET['fetched_before']) ? sanitize_text_field(wp_unslash($_GET['fetched_before'])) : '',
+                'min_char_count'    => isset($_GET['min_char_count']) ? absint(wp_unslash($_GET['min_char_count'])) : 0,
+                'max_char_count'    => isset($_GET['max_char_count']) ? absint(wp_unslash($_GET['max_char_count'])) : 0,
+                'search_body_text'  => !empty($_GET['search_body_text']),
+                'source_id'         => isset($_GET['filter_source_id']) ? absint(wp_unslash($_GET['filter_source_id'])) : 0,
             );
-        } else {
-            $source_data = $data_repo->get_paginated_by_source_id($source_id, $search, $per_page, $paged, $filters);
-        }
 
-        include AIPS_PLUGIN_DIR . 'templates/admin/source-data.php';
+            if ($is_global_view) {
+                $source_data = $data_repo->get_paginated($search, $per_page, $paged, $filters);
+            } elseif (!$source) {
+                $source_data = array(
+                    'items'        => array(),
+                    'total'        => 0,
+                    'pages'        => 0,
+                    'current_page' => 1,
+                    'per_page'     => $per_page,
+                );
+            } else {
+                $source_data = $data_repo->get_paginated_by_source_id($source_id, $search, $per_page, $paged, $filters);
+            }
+
+            include AIPS_PLUGIN_DIR . 'templates/admin/source-data.php';
+        }, __('Source Data', 'ai-post-scheduler'));
     }
 
     /**
@@ -576,7 +598,9 @@ class AIPS_Admin_Menu {
      * @return void
      */
     public function render_settings_page() {
-        include AIPS_PLUGIN_DIR . 'templates/admin/settings.php';
+        AIPS_Admin_Menu_Helper::safe_render(function() {
+            include AIPS_PLUGIN_DIR . 'templates/admin/settings.php';
+        }, __('Settings', 'ai-post-scheduler'));
     }
 
     /**
@@ -656,13 +680,9 @@ class AIPS_Admin_Menu {
     }
 
     public function render_content_indexer_page() {
-        try {
+        AIPS_Admin_Menu_Helper::safe_render(function() {
             $controller = new AIPS_Content_Indexer_Controller();
             $controller->render_page();
-        } catch (Throwable $throwable) {
-            echo '<div class="notice notice-error"><p>' .
-                esc_html__('The Content Indexer page could not be rendered. Please reload the page or check the plugin configuration.', 'ai-post-scheduler') .
-            '</p></div>';
-        }
+        }, __('Content Indexer', 'ai-post-scheduler'));
     }
 }

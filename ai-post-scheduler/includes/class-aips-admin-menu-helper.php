@@ -171,4 +171,44 @@ class AIPS_Admin_Menu_Helper {
 	public static function get_slug($page) {
 		return isset(self::$page_slugs[$page]) ? self::$page_slugs[$page] : $page;
 	}
+
+	/**
+	 * Safely execute a page or tab render callback with centralized exception catching and error logging.
+	 *
+	 * Prevents uncaught fatal exceptions or raw error messages from leaking into the admin UI,
+	 * logging full trace details to AIPS_Logger and displaying a graceful user-facing fallback container.
+	 *
+	 * @param callable $callback Render callback.
+	 * @param string   $title    User-facing module/page title.
+	 * @param bool     $is_tab   True if rendering an embedded tab canvas, false if rendering a top-level page wrap.
+	 * @return void
+	 */
+	public static function safe_render(callable $callback, string $title = 'Page', bool $is_tab = false) {
+		try {
+			call_user_func($callback);
+		} catch (\Throwable $throwable) {
+			if (class_exists('AIPS_Logger')) {
+				AIPS_Logger::log_error(sprintf('%s render exception: %s', $title, $throwable->getMessage()), array(
+					'file'  => $throwable->getFile(),
+					'line'  => $throwable->getLine(),
+					'trace' => $throwable->getTraceAsString(),
+				));
+			} else {
+				error_log(sprintf('[AIPS] %s render exception: %s in %s:%d', $title, $throwable->getMessage(), $throwable->getFile(), $throwable->getLine()));
+			}
+
+			if ($is_tab) {
+				echo '<div class="aips-content-panel"><div class="aips-panel-body"><div class="notice notice-error inline"><p>' .
+					sprintf(esc_html__('The %s module is currently unavailable. Please check the system log or try reloading the page.', 'ai-post-scheduler'), esc_html($title)) .
+				'</p></div></div></div>';
+			} else {
+				echo '<div class="wrap aips-wrap"><div class="aips-page-container"><div class="aips-content-panel"><div class="aips-panel-body"><div class="aips-empty-state"><span class="dashicons dashicons-warning" style="font-size:36px;width:36px;height:36px;color:#d63638;margin-bottom:12px;"></span><h3>' .
+					sprintf(esc_html__('The %s page is currently unavailable', 'ai-post-scheduler'), esc_html($title)) .
+					'</h3><p class="aips-muted">' .
+					esc_html__('An unexpected error occurred while loading this page. Details have been logged for diagnostics.', 'ai-post-scheduler') .
+				'</p></div></div></div></div></div>';
+			}
+		}
+	}
 }
+

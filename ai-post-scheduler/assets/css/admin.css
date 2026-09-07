@@ -6247,7 +6247,7 @@ li.toplevel_page_ai-post-scheduler li:has(> a[href*="aips-author-topics"]) {
 }
 
 /* ==========================================================================
-   Automations Vertical Sidebar Rail Component Styles
+   Automations & Hub Vertical Sidebar Rail Component Styles
    ========================================================================== */
 
 .aips-rail-layout {
@@ -6268,27 +6268,30 @@ li.toplevel_page_ai-post-scheduler li:has(> a[href*="aips-author-topics"]) {
 }
 
 .aips-rail-nav {
-	list-style: none;
-	margin: 0;
-	padding: 0;
+	list-style: none !important;
+	margin: 0 !important;
+	padding: 0 !important;
 	display: flex;
 	flex-direction: column;
 	gap: 2px;
 }
 
 .aips-rail-nav li {
-	margin: 0;
-	padding: 0;
+	margin: 0 !important;
+	padding: 0 !important;
+	list-style: none !important;
 }
 
+.aips-rail-nav a.aips-rail-item,
+.aips-rail-nav button.aips-rail-item,
 .aips-rail-item {
-	display: flex;
+	display: flex !important;
 	align-items: center;
 	gap: var(--aips-space-3);
 	padding: var(--aips-space-3) var(--aips-space-4);
 	border-radius: var(--aips-radius-base);
-	color: var(--aips-gray-700);
-	text-decoration: none;
+	color: var(--aips-gray-700) !important;
+	text-decoration: none !important;
 	transition: background var(--aips-transition-fast), color var(--aips-transition-fast);
 	position: relative;
 	border: 0;
@@ -6301,17 +6304,29 @@ li.toplevel_page_ai-post-scheduler li:has(> a[href*="aips-author-topics"]) {
 	box-sizing: border-box;
 }
 
-.aips-rail-item:hover {
-	background: var(--aips-gray-50);
-	color: var(--aips-gray-900);
+.aips-rail-nav a.aips-rail-item:hover,
+.aips-rail-nav button.aips-rail-item:hover,
+.aips-rail-item:hover,
+.aips-rail-nav a.aips-rail-item:focus,
+.aips-rail-nav button.aips-rail-item:focus {
+	background: var(--aips-gray-50) !important;
+	color: var(--aips-gray-900) !important;
+	text-decoration: none !important;
+	box-shadow: none !important;
+	outline: none;
 }
 
+.aips-rail-nav a.aips-rail-item.active,
+.aips-rail-nav button.aips-rail-item.active,
 .aips-rail-item.active {
-	background: var(--aips-primary-light);
-	color: var(--aips-primary);
+	background: var(--aips-primary-light) !important;
+	color: var(--aips-primary) !important;
 	font-weight: var(--aips-font-semibold);
+	text-decoration: none !important;
 }
 
+.aips-rail-nav a.aips-rail-item.active::before,
+.aips-rail-nav button.aips-rail-item.active::before,
 .aips-rail-item.active::before {
 	content: '';
 	position: absolute;
@@ -6346,16 +6361,19 @@ li.toplevel_page_ai-post-scheduler li:has(> a[href*="aips-author-topics"]) {
 .aips-rail-title {
 	font-size: var(--aips-text-sm);
 	line-height: var(--aips-leading-tight);
+	color: inherit;
+	text-decoration: none !important;
 }
 
 .aips-rail-desc {
 	font-size: var(--aips-text-2xs);
-	color: var(--aips-gray-400);
+	color: var(--aips-gray-400) !important;
 	margin-top: 2px;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	font-weight: var(--aips-font-normal);
+	text-decoration: none !important;
 }
 
 .aips-rail-arrow {
@@ -6383,22 +6401,13 @@ li.toplevel_page_ai-post-scheduler li:has(> a[href*="aips-author-topics"]) {
 }
 
 /* Responsive adjustment for Rail */
-@media screen and (max-width: 960px) {
+@media screen and (max-width: 782px) {
 	.aips-rail-layout {
 		grid-template-columns: 1fr;
 	}
 	.aips-rail-sidebar {
 		position: static;
-	}
-	.aips-rail-nav {
-		flex-direction: row;
-		flex-wrap: wrap;
-	}
-	.aips-rail-nav li {
-		flex: 1 1 calc(50% - 4px);
-	}
-	.aips-rail-desc {
-		display: none;
+		margin-bottom: var(--aips-space-4);
 	}
 }
 

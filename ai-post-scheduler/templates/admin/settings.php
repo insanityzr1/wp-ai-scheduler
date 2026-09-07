@@ -120,7 +120,7 @@ if (!defined('ABSPATH')) {
 			<main class="aips-rail-main">
 				<div class="aips-content-panel">
 					<div class="aips-panel-body">
-						<form method="post" action="options.php" id="aips-settings-form">
+						<form method="post" action="options.php" id="aips-settings-form" data-aips-async="true">
 							<?php settings_fields('aips_settings'); ?>
 
 							<!-- General Tab -->

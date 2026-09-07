@@ -1256,6 +1256,11 @@
     color: var(--aips-info-dark);
 }
 
+.aips-badge-primary {
+    background: var(--aips-primary-light);
+    color: var(--aips-primary);
+}
+
 .aips-badge-neutral {
     background: var(--aips-gray-100);
     color: var(--aips-gray-700);

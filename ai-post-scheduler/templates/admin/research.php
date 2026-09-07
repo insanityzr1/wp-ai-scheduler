@@ -32,7 +32,7 @@ if (!in_array($active_tab, $valid_tabs, true)) {
             <div class="aips-page-header-top">
                 <div>
                     <h1 class="aips-page-title">
-                        <span class="dashicons dashicons-search" style="font-size:28px;width:28px;height:28px;vertical-align:middle;margin-right:8px;color:#2271b1;"></span>
+                        <span class="dashicons dashicons-search aips-page-title-icon"></span>
                         <?php echo esc_html__('Research', 'ai-post-scheduler'); ?>
                     </h1>
                     <p class="aips-page-description"><?php echo esc_html__('Discover trending topics in your niche using AI-powered research, perform content gap audits, and plan keyword strategy.', 'ai-post-scheduler'); ?></p>

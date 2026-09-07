@@ -50,11 +50,11 @@ $operational_info = array_diff_key($system_info, array_flip($exclude_sections));
 									<?php endif; ?>
 									<?php if (!empty($check['cb_open'])) : ?>
 										<br>
-										<button type="button" class="aips-btn aips-btn-sm aips-btn-secondary aips-reset-circuit-breaker" style="margin-top: 6px;">
+										<button type="button" class="aips-btn aips-btn-sm aips-btn-secondary aips-reset-circuit-breaker">
 											<span class="dashicons dashicons-controls-repeat"></span>
 											<?php esc_html_e('Reset Circuit', 'ai-post-scheduler'); ?>
 										</button>
-										<span class="aips-reset-circuit-result" style="display:none; margin-left: 8px;"></span>
+										<span class="aips-reset-circuit-result"></span>
 									<?php endif; ?>
 								</span>
 								<span class="aips-status-kv-status">

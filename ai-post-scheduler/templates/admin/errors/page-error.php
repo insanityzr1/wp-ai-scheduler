@@ -19,7 +19,7 @@ $title = !empty($title) ? $title : __('Page', 'ai-post-scheduler');
 		<div class="aips-content-panel">
 			<div class="aips-panel-body">
 				<div class="aips-empty-state">
-					<span class="dashicons dashicons-warning" style="font-size:36px;width:36px;height:36px;color:#d63638;margin-bottom:12px;"></span>
+					<span class="dashicons dashicons-warning aips-page-error-icon"></span>
 					<h3><?php echo esc_html(sprintf(__('The %s page is currently unavailable', 'ai-post-scheduler'), $title)); ?></h3>
 					<p class="aips-muted"><?php esc_html_e('An unexpected error occurred while loading this page. Details have been logged for diagnostics.', 'ai-post-scheduler'); ?></p>
 				</div>

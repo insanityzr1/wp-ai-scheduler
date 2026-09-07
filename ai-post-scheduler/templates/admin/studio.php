@@ -26,7 +26,7 @@ $sections = AIPS_Studio_Controller::get_sections();
 				<div class="aips-page-header-top">
 					<div>
 						<h1 class="aips-page-title">
-							<span class="dashicons dashicons-art" style="font-size:28px;width:28px;height:28px;vertical-align:middle;margin-right:8px;color:#2271b1;"></span>
+							<span class="dashicons dashicons-art aips-page-title-icon"></span>
 							<?php esc_html_e('Content Studio', 'ai-post-scheduler'); ?>
 						</h1>
 						<p class="aips-page-description">
@@ -103,7 +103,7 @@ $sections = AIPS_Studio_Controller::get_sections();
 						</div>
 
 						<?php if (!empty($current_sec['action_label'])) : ?>
-							<div class="aips-workspace-actions" style="margin-left: 12px; display: inline-flex; gap: 8px;">
+							<div class="aips-workspace-actions">
 								<button type="button" class="<?php echo esc_attr($current_sec['action_class']); ?>">
 									<span class="dashicons dashicons-plus-alt2"></span>
 									<?php echo esc_html($current_sec['action_label']); ?>

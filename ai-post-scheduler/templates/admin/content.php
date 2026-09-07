@@ -38,7 +38,7 @@ if ('content-indexer' === $active_tab || 'indexer' === $active_tab) {
 			<div class="aips-page-header-top">
 				<div>
 					<h1 class="aips-page-title">
-						<span class="dashicons dashicons-admin-post" style="font-size:28px;width:28px;height:28px;vertical-align:middle;margin-right:8px;color:#2271b1;"></span>
+						<span class="dashicons dashicons-admin-post aips-page-title-icon"></span>
 						<?php esc_html_e('Content', 'ai-post-scheduler'); ?>
 					</h1>
 					<p class="aips-page-description"><?php esc_html_e('View and manage all AI-generated posts including published articles, drafts pending review, and semantic embeddings.', 'ai-post-scheduler'); ?></p>

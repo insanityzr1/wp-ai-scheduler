@@ -6,11 +6,12 @@ if (!defined('ABSPATH')) {
 /**
  * Class AIPS_System_Info_Provider
  *
- * Gathers WordPress, server, PHP extensions, database, filesystem,
- * and AI plugin specifications for the System Info diagnostics tab
- * and generates a formatted Markdown report.
+ * Gathers WordPress environment, server settings, PHP extensions, database schemas,
+ * filesystem permissions, and AI Engine plugin configurations for the System Info
+ * diagnostics tab, and compiles clean Markdown reports for technical support.
  *
  * @package AI_Post_Scheduler
+ * @since   3.7.1
  */
 class AIPS_System_Info_Provider {
 

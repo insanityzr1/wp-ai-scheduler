@@ -10,7 +10,7 @@ if (!defined('ABSPATH')) {
 			<div class="aips-page-header-top">
 				<div>
 					<h1 class="aips-page-title">
-						<span class="dashicons dashicons-admin-settings" style="font-size:28px;width:28px;height:28px;vertical-align:middle;margin-right:8px;color:#2271b1;"></span>
+						<span class="dashicons dashicons-admin-settings aips-page-title-icon"></span>
 						<?php esc_html_e('Settings', 'ai-post-scheduler'); ?>
 					</h1>
 					<p class="aips-page-description"><?php esc_html_e('Configure plugin settings, check system status, and manage AI Engine connection.', 'ai-post-scheduler'); ?></p>

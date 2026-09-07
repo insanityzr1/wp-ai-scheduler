@@ -15,7 +15,7 @@ if (!defined('ABSPATH')) {
 			<div class="aips-page-header-top">
 				<div>
 					<h1 class="aips-page-title">
-						<span class="dashicons dashicons-admin-tools" style="font-size:28px;width:28px;height:28px;vertical-align:middle;margin-right:8px;color:#2271b1;"></span>
+						<span class="dashicons dashicons-admin-tools aips-page-title-icon"></span>
 						<?php esc_html_e('Diagnostics', 'ai-post-scheduler'); ?>
 					</h1>
 					<p class="aips-page-description"><?php esc_html_e('Review system health, generation operations, telemetry, seeding utilities, and developer tools from one place.', 'ai-post-scheduler'); ?></p>

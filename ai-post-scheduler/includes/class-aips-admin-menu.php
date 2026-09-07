@@ -346,7 +346,7 @@ class AIPS_Admin_Menu {
      * @return void
      */
     public function render_voices_page() {
-        wp_safe_redirect(admin_url('admin.php?page=aips-studio&section=voices'));
+        wp_safe_redirect(admin_url('admin.php?page=aips-studio&tab=voices'));
         exit;
     }
 
@@ -358,7 +358,7 @@ class AIPS_Admin_Menu {
      * @return void
      */
     public function render_templates_page() {
-        wp_safe_redirect(admin_url('admin.php?page=aips-studio&section=templates'));
+        wp_safe_redirect(admin_url('admin.php?page=aips-studio&tab=templates'));
         exit;
     }
 
@@ -440,7 +440,7 @@ class AIPS_Admin_Menu {
      * @return void
      */
     public function render_post_slices_page() {
-        wp_safe_redirect(admin_url('admin.php?page=aips-studio&section=slices'));
+        wp_safe_redirect(admin_url('admin.php?page=aips-studio&tab=post-slices'));
         exit;
     }
 
@@ -486,7 +486,7 @@ class AIPS_Admin_Menu {
      * @return void
      */
     public function render_structures_page() {
-        wp_safe_redirect(admin_url('admin.php?page=aips-studio&section=structures'));
+        wp_safe_redirect(admin_url('admin.php?page=aips-studio&tab=structures'));
         exit;
     }
 

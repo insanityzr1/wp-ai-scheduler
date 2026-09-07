@@ -10,13 +10,13 @@ $markdown_report = $provider->get_markdown_report();
 <div class="aips-status-page aips-system-info-page">
 	<!-- System Info Header & Copy Report -->
 	<div class="aips-system-health-panel">
-		<div class="aips-system-health-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+		<div class="aips-system-health-header aips-flex-header">
 			<div>
 				<h2><span class="dashicons dashicons-info"></span> <?php esc_html_e('System Info', 'ai-post-scheduler'); ?></h2>
 				<p><?php esc_html_e('Environment, database, filesystem, and AI integration specifications for this WordPress installation.', 'ai-post-scheduler'); ?></p>
 			</div>
 			<div class="aips-system-info-actions">
-				<textarea id="aips-system-report-raw" style="position: absolute; left: -9999px; top: -9999px;" readonly><?php echo esc_textarea($markdown_report); ?></textarea>
+				<textarea id="aips-system-report-raw" class="aips-clipboard-hidden" readonly><?php echo esc_textarea($markdown_report); ?></textarea>
 				<button type="button" class="aips-btn aips-btn-secondary aips-copy-system-report">
 					<span class="dashicons dashicons-clipboard"></span>
 					<?php esc_html_e('Copy System Report', 'ai-post-scheduler'); ?>

@@ -242,7 +242,7 @@ $ai_provider_unavailable_msg = $ai_provider_available ? '' : $active_ai_provider
 				</button>
 			</div>
 
-			<div style="margin-top: 12px;">
+			<div class="aips-backup-option-wrap">
 				<label class="aips-backup-label">
 					<input type="checkbox" id="aips-backup-db" value="1">
 					<?php esc_html_e('Back up data before reinstalling (data will be restored afterwards)', 'ai-post-scheduler'); ?>

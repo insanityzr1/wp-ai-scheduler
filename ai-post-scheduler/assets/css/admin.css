@@ -6415,3 +6415,135 @@ li.toplevel_page_ai-post-scheduler li:has(> a[href*="aips-author-topics"]) {
 	gap: 8px;
 }
 
+/* Standard Hub Page Header Icon */
+.aips-page-title-icon {
+	font-size: 28px;
+	width: 28px;
+	height: 28px;
+	vertical-align: middle;
+	margin-right: 8px;
+	color: var(--aips-primary, #2271b1);
+}
+
+/* Error Fallback Icon */
+.aips-page-error-icon {
+	font-size: 36px;
+	width: 36px;
+	height: 36px;
+	color: var(--aips-error, #d63638);
+	margin-bottom: 12px;
+}
+
+/* Off-screen textareas for copy/export */
+.aips-clipboard-hidden {
+	position: absolute !important;
+	left: -9999px !important;
+	top: -9999px !important;
+	width: 1px !important;
+	height: 1px !important;
+	opacity: 0 !important;
+}
+
+/* Flex header row */
+.aips-flex-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 12px;
+}
+
+/* Studio Workspace Actions */
+.aips-workspace-actions {
+	margin-left: 12px;
+	display: inline-flex;
+	gap: 8px;
+}
+
+/* Stress Test UI Utilities */
+.aips-stress-history-select {
+	max-width: 210px;
+	height: 36px;
+	font-size: 13px;
+	padding: 0 8px;
+}
+
+.aips-stress-actions-group {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.aips-stress-history-picker {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.aips-stress-history-link {
+	text-decoration: none;
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	height: 36px;
+	line-height: 34px;
+	padding: 0 10px;
+}
+
+.aips-stress-summary-actions {
+	margin-left: auto;
+}
+
+.aips-stress-diff-dialog {
+	max-width: 980px;
+	width: 95vw;
+	max-height: 90vh;
+	display: flex;
+	flex-direction: column;
+}
+
+.aips-stress-diff-body {
+	overflow-y: auto;
+	flex: 1;
+	padding: 16px;
+}
+
+.aips-stress-row-summary {
+	font-size: 11px;
+	color: #64748b;
+}
+
+.aips-stress-single-run-card {
+	margin-bottom: 16px;
+}
+
+.aips-stress-spinner-wrap {
+	text-align: center;
+	padding: 32px;
+}
+
+.aips-stress-spinner-icon {
+	animation: spin 1s infinite linear;
+	font-size: 28px;
+	width: 28px;
+	height: 28px;
+}
+
+.aips-table-full-width {
+	width: 100%;
+}
+
+.aips-backup-option-wrap {
+	margin-top: 12px;
+}
+
+.aips-reset-circuit-breaker {
+	margin-top: 6px;
+}
+
+.aips-reset-circuit-result {
+	display: none;
+	margin-left: 8px;
+}
+

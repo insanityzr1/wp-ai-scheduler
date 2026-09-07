@@ -188,7 +188,7 @@ class AIPS_Admin_Menu_Helper {
 			call_user_func($callback);
 		} catch (\Throwable $throwable) {
 			if (class_exists('AIPS_Logger')) {
-				AIPS_Logger::log_error(sprintf('%s render exception: %s', $title, $throwable->getMessage()), array(
+				AIPS_Logger::instance()->error(sprintf('%s render exception: %s', $title, $throwable->getMessage()), array(
 					'file'  => $throwable->getFile(),
 					'line'  => $throwable->getLine(),
 					'trace' => $throwable->getTraceAsString(),

@@ -6251,6 +6251,14 @@ li.toplevel_page_ai-post-scheduler li:has(> a[href*="aips-author-topics"]) {
 	text-decoration: none;
 	transition: background var(--aips-transition-fast), color var(--aips-transition-fast);
 	position: relative;
+	border: 0;
+	background: none;
+	width: 100%;
+	text-align: left;
+	cursor: pointer;
+	font-family: inherit;
+	font-size: inherit;
+	box-sizing: border-box;
 }
 
 .aips-rail-item:hover {

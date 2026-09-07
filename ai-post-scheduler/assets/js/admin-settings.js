@@ -35,7 +35,7 @@
 				return;
 			}
 
-			var $link = $('#aips-settings-tab-nav .aips-tab-link').filter(function() {
+			var $link = $('#aips-settings-tab-nav .aips-tab-link, #aips-settings-tab-nav .aips-rail-item').filter(function() {
 				return $(this).attr('data-tab') === hash;
 			});
 			if ($link.length) {

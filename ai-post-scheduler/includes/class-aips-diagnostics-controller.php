@@ -47,35 +47,47 @@ class AIPS_Diagnostics_Controller {
 	public function get_tabs() {
 		$tabs = array(
 			'status' => array(
-				'label' => __('System Status', 'ai-post-scheduler'),
+				'label'       => __('System Status', 'ai-post-scheduler'),
+				'icon'        => 'dashicons-dashboard',
+				'description' => __('System health & environment', 'ai-post-scheduler'),
 			),
 		);
 
 		if (self::is_tab_available('telemetry')) {
 			$tabs['telemetry'] = array(
-				'label' => __('Telemetry', 'ai-post-scheduler'),
+				'label'       => __('Telemetry', 'ai-post-scheduler'),
+				'icon'        => 'dashicons-chart-area',
+				'description' => __('Performance metrics & queries', 'ai-post-scheduler'),
 			);
 		}
 
 		if (self::is_tab_available('cache-monitor')) {
 			$tabs['cache-monitor'] = array(
-				'label' => __('Cache Monitor', 'ai-post-scheduler'),
+				'label'       => __('Cache Monitor', 'ai-post-scheduler'),
+				'icon'        => 'dashicons-performance',
+				'description' => __('Object cache & transient stats', 'ai-post-scheduler'),
 			);
 		}
 
 		$tabs['stress-test'] = array(
-			'label' => __('Stress Test', 'ai-post-scheduler'),
+			'label'       => __('Stress Test', 'ai-post-scheduler'),
+			'icon'        => 'dashicons-superhero',
+			'description' => __('AI provider load & reliability', 'ai-post-scheduler'),
 		);
 
 		$tabs['insights'] = array(
-			'label' => __('Insights', 'ai-post-scheduler'),
+			'label'       => __('Insights', 'ai-post-scheduler'),
+			'icon'        => 'dashicons-lightbulb',
+			'description' => __('Generation analytics & trends', 'ai-post-scheduler'),
 		);
 
 		// The Seeder UI has been moved into the Dev Tools tab. Dev Tools is still
 		// gated by developer mode.
 		if (self::is_tab_available('dev-tools')) {
 			$tabs['dev-tools'] = array(
-				'label' => __('Dev Tools', 'ai-post-scheduler'),
+				'label'       => __('Dev Tools', 'ai-post-scheduler'),
+				'icon'        => 'dashicons-admin-tools',
+				'description' => __('Seeder & developer utilities', 'ai-post-scheduler'),
 			);
 		}
 

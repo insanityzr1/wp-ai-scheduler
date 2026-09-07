@@ -25,26 +25,60 @@ if (!in_array($active_tab, $valid_tabs, true)) {
 }
 ?>
 
-<div class="wrap aips-wrap">
+<div class="wrap aips-wrap aips-research-wrap">
     <div class="aips-page-container">
         <!-- Page Header -->
         <div class="aips-page-header">
             <div class="aips-page-header-top">
                 <div>
-                    <h1 class="aips-page-title"><?php echo esc_html__('Research', 'ai-post-scheduler'); ?></h1>
-                    <p class="aips-page-description"><?php echo esc_html__('Discover trending topics in your niche using AI-powered research and automatically schedule content creation.', 'ai-post-scheduler'); ?></p>
+                    <h1 class="aips-page-title">
+                        <span class="dashicons dashicons-search" style="font-size:28px;width:28px;height:28px;vertical-align:middle;margin-right:8px;color:#2271b1;"></span>
+                        <?php echo esc_html__('Research', 'ai-post-scheduler'); ?>
+                    </h1>
+                    <p class="aips-page-description"><?php echo esc_html__('Discover trending topics in your niche using AI-powered research, perform content gap audits, and plan keyword strategy.', 'ai-post-scheduler'); ?></p>
                 </div>
             </div>
         </div>
 
-        <!-- Tab Navigation -->
-        <div class="aips-tab-nav">
-            <a href="#trending" class="aips-tab-link<?php echo $active_tab === 'trending' ? ' active' : ''; ?>" data-tab="trending"><?php echo esc_html__('Trending Topics', 'ai-post-scheduler'); ?></a>
-            <a href="#gap-analysis" class="aips-tab-link<?php echo $active_tab === 'gap-analysis' ? ' active' : ''; ?>" data-tab="gap-analysis"><?php echo esc_html__('Content Auditor', 'ai-post-scheduler'); ?></a>
-            <a href="#planner" class="aips-tab-link<?php echo $active_tab === 'planner' ? ' active' : ''; ?>" data-tab="planner"><?php echo esc_html__('Planner', 'ai-post-scheduler'); ?></a>
-        </div>
+        <!-- Vertical Sidebar Rail Layout -->
+        <div class="aips-rail-layout">
+            <nav class="aips-rail-sidebar" aria-label="<?php esc_attr_e('Research Navigation', 'ai-post-scheduler'); ?>">
+                <ul class="aips-rail-nav">
+                    <li>
+                        <button type="button" class="aips-rail-item<?php echo $active_tab === 'trending' ? ' active' : ''; ?>" data-tab="trending">
+                            <span class="dashicons dashicons-chart-line aips-rail-icon"></span>
+                            <span class="aips-rail-text">
+                                <span class="aips-rail-title"><?php echo esc_html__('Trending Topics', 'ai-post-scheduler'); ?></span>
+                                <span class="aips-rail-desc"><?php echo esc_html__('AI niche trends & discovery', 'ai-post-scheduler'); ?></span>
+                            </span>
+                            <span class="dashicons dashicons-arrow-right-alt2 aips-rail-arrow"></span>
+                        </button>
+                    </li>
+                    <li>
+                        <button type="button" class="aips-rail-item<?php echo $active_tab === 'gap-analysis' ? ' active' : ''; ?>" data-tab="gap-analysis">
+                            <span class="dashicons dashicons-analytics aips-rail-icon"></span>
+                            <span class="aips-rail-text">
+                                <span class="aips-rail-title"><?php echo esc_html__('Content Auditor', 'ai-post-scheduler'); ?></span>
+                                <span class="aips-rail-desc"><?php echo esc_html__('Content gap & SEO audit', 'ai-post-scheduler'); ?></span>
+                            </span>
+                            <span class="dashicons dashicons-arrow-right-alt2 aips-rail-arrow"></span>
+                        </button>
+                    </li>
+                    <li>
+                        <button type="button" class="aips-rail-item<?php echo $active_tab === 'planner' ? ' active' : ''; ?>" data-tab="planner">
+                            <span class="dashicons dashicons-calendar-alt aips-rail-icon"></span>
+                            <span class="aips-rail-text">
+                                <span class="aips-rail-title"><?php echo esc_html__('Keyword Planner', 'ai-post-scheduler'); ?></span>
+                                <span class="aips-rail-desc"><?php echo esc_html__('Topic calendar & keywords', 'ai-post-scheduler'); ?></span>
+                            </span>
+                            <span class="dashicons dashicons-arrow-right-alt2 aips-rail-arrow"></span>
+                        </button>
+                    </li>
+                </ul>
+            </nav>
 
-    <div id="trending-tab" class="aips-tab-content<?php echo $active_tab === 'trending' ? ' active' : ''; ?>" style="<?php echo $active_tab === 'trending' ? '' : 'display:none;'; ?>">
+            <main class="aips-rail-main">
+                <div id="trending-tab" class="aips-tab-content<?php echo $active_tab === 'trending' ? ' active' : ''; ?>" style="<?php echo $active_tab === 'trending' ? '' : 'display:none;'; ?>">
         <!-- Research Stats -->
         <div class="aips-topics-stats">
             <div class="aips-stat-card">
@@ -342,6 +376,8 @@ if (!in_array($active_tab, $valid_tabs, true)) {
     <div id="planner-tab" class="aips-tab-content<?php echo $active_tab === 'planner' ? ' active' : ''; ?>" style="<?php echo $active_tab === 'planner' ? '' : 'display:none;'; ?>">
         <?php include AIPS_PLUGIN_DIR . 'templates/admin/planner.php'; ?>
     </div>
+    </main>
+</div><!-- /.aips-rail-layout -->
 
     <!-- Generate Now — Template Selection Modal -->
     <div id="aips-generate-now-modal" class="aips-modal" style="display: none;">

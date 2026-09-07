@@ -202,7 +202,7 @@
             var hash = window.location.hash;
             if (hash) {
                 var tabId = hash.substring(1); // Remove the # prefix
-                var $tabLink = $('.nav-tab[data-tab], .aips-tab-link[data-tab]').filter(function() {
+                var $tabLink = $('.nav-tab[data-tab], .aips-tab-link[data-tab], .aips-rail-item[data-tab]').filter(function() {
                     return $(this).data('tab') === tabId;
                 });
                 if ($tabLink.length) {
@@ -278,7 +278,7 @@
 
             // Tabs
             $(document).on('click', '.nav-tab', this.switchTab);
-            $(document).on('click', '.aips-tab-link', this.switchAipsTab);
+            $(document).on('click', '.aips-tab-link, .aips-rail-item[data-tab]', this.switchAipsTab);
 
             // Preserve tab hash on form submissions
             $(document).on('submit', '.aips-post-review-filters, form[action*="aips-generated-posts"]', this.preserveTabOnSubmit);
@@ -663,38 +663,59 @@
             }
 
             e.preventDefault();
-            var $tabNav = $tabLink.closest('.aips-tab-nav, .aips-topics-tabs, .aips-page-tabs');
+            var $tabNav = $tabLink.closest('.aips-tab-nav, .aips-topics-tabs, .aips-page-tabs, .aips-rail-nav, .aips-rail-sidebar');
 
             if (!$tabNav.length) {
                 $tabNav = $tabLink.parent();
             }
 
             // Update active state only for the local tab nav
-            $tabNav.find('.aips-tab-link').removeClass('active');
+            $tabNav.find('.aips-tab-link, .aips-rail-item').removeClass('active');
             $tabLink.addClass('active');
 
-            // Find sibling/scoped tab content containers without hiding nested child tabs
-            var $container = $tabNav.parent();
-            var $scopedTabs = $container.children('.aips-tab-content');
-
-            if ($scopedTabs.length) {
-                $scopedTabs.hide().removeClass('active');
-                var $targetTab = $container.children('#' + tabId + '-tab, #' + tabId);
+            // Check if within vertical rail layout
+            var $railLayout = $tabNav.closest('.aips-rail-layout');
+            if ($railLayout.length) {
+                var $railMain = $railLayout.find('.aips-rail-main');
+                var $targetTab = $railMain.find('#' + tabId + '-tab, #' + tabId).first();
                 if ($targetTab.length) {
+                    var $parentContainer = $targetTab.parent();
+                    $parentContainer.children('.aips-tab-content').hide().removeClass('active');
                     $targetTab.show().addClass('active');
-                    // Ensure active inner tab within the newly revealed panel is visible
                     $targetTab.find('.aips-tab-content.active').show();
                 }
             } else {
-                var $scope = $tabNav.closest('.aips-page-container, .aips-modal-content, .aips-modal-body, .wrap');
-                if (!$scope.length) {
-                    $scope = $(document);
+                var $container = $tabNav.parent();
+                var $scopedTabs = $container.children('.aips-tab-content');
+
+                if ($scopedTabs.length) {
+                    $scopedTabs.hide().removeClass('active');
+                    var $targetTab = $container.children('#' + tabId + '-tab, #' + tabId);
+                    if ($targetTab.length) {
+                        $targetTab.show().addClass('active');
+                        // Ensure active inner tab within the newly revealed panel is visible
+                        $targetTab.find('.aips-tab-content.active').show();
+                    }
+                } else {
+                    var $scope = $tabNav.closest('.aips-page-container, .aips-modal-content, .aips-modal-body, .wrap');
+                    if (!$scope.length) {
+                        $scope = $(document);
+                    }
+                    $scope.children('.aips-tab-content').hide().removeClass('active');
+                    var $targetTab = $scope.find('#' + tabId + '-tab, #' + tabId).first();
+                    if ($targetTab.length) {
+                        $targetTab.show().addClass('active');
+                        $targetTab.find('.aips-tab-content.active').show();
+                    }
                 }
-                $scope.children('.aips-tab-content').hide().removeClass('active');
-                var $targetTab = $scope.find('#' + tabId + '-tab, #' + tabId).first();
-                if ($targetTab.length) {
-                    $targetTab.show().addClass('active');
-                    $targetTab.find('.aips-tab-content.active').show();
+            }
+
+            // If URL hash is used on the page, update it smoothly
+            if (window.location.hash || $tabLink.is('.aips-hash-tab')) {
+                if (history.replaceState) {
+                    history.replaceState(null, null, '#' + tabId);
+                } else {
+                    window.location.hash = tabId;
                 }
             }
 

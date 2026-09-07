@@ -26,7 +26,7 @@ $actions     = isset($args['actions']) && is_array($args['actions']) ? $args['ac
 		<div>
 			<h1 class="aips-page-title">
 				<?php if (!empty($icon)) : ?>
-					<span class="dashicons <?php echo esc_attr($icon); ?> aips-page-title-icon" style="font-size:28px;width:28px;height:28px;vertical-align:middle;margin-right:8px;color:<?php echo esc_attr($icon_color); ?>;"></span>
+					<span class="dashicons <?php echo esc_attr($icon); ?> aips-page-title-icon" aria-hidden="true"<?php echo (!empty($args['icon_color']) && $args['icon_color'] !== '#2271b1') ? ' style="color:' . esc_attr($args['icon_color']) . ';"' : ''; ?>></span>
 				<?php endif; ?>
 				<?php echo esc_html($title); ?>
 				<?php foreach ($badges as $badge) : ?>
@@ -56,14 +56,14 @@ $actions     = isset($args['actions']) && is_array($args['actions']) ? $args['ac
 					<?php if ('link' === $action_type && !empty($action['url'])) : ?>
 						<a href="<?php echo esc_url($action['url']); ?>" class="<?php echo esc_attr($action_class); ?>"<?php echo $action_id ? ' id="' . esc_attr($action_id) . '"' : ''; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?><?php echo $data_attr_str; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>>
 							<?php if ($action_icon) : ?>
-								<span class="dashicons <?php echo esc_attr($action_icon); ?>"></span>
+								<span class="dashicons <?php echo esc_attr($action_icon); ?>" aria-hidden="true"></span>
 							<?php endif; ?>
 							<?php echo esc_html($action_label); ?>
 						</a>
 					<?php else : ?>
 						<button type="button" class="<?php echo esc_attr($action_class); ?>"<?php echo $action_id ? ' id="' . esc_attr($action_id) . '"' : ''; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?><?php echo $data_attr_str; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>>
 							<?php if ($action_icon) : ?>
-								<span class="dashicons <?php echo esc_attr($action_icon); ?>"></span>
+								<span class="dashicons <?php echo esc_attr($action_icon); ?>" aria-hidden="true"></span>
 							<?php endif; ?>
 							<?php echo esc_html($action_label); ?>
 						</button>

@@ -22,19 +22,13 @@ $sections = AIPS_Studio_Controller::get_sections();
 
 		<?php if (empty($active_section)) : ?>
 			<!-- STUDIO LAUNCHPAD VIEW -->
-			<div class="aips-page-header">
-				<div class="aips-page-header-top">
-					<div>
-						<h1 class="aips-page-title">
-							<span class="dashicons dashicons-art aips-page-title-icon"></span>
-							<?php esc_html_e('Content Studio', 'ai-post-scheduler'); ?>
-						</h1>
-						<p class="aips-page-description">
-							<?php esc_html_e('Design and fine-tune your generative AI building blocks — templates, brand voices, article structures, and modular content slices.', 'ai-post-scheduler'); ?>
-						</p>
-					</div>
-				</div>
-			</div>
+			<?php
+			AIPS_Admin_UI_Primitives::render_page_header(array(
+				'title'       => __('Content Studio', 'ai-post-scheduler'),
+				'icon'        => 'dashicons-art',
+				'description' => __('Design and fine-tune your generative AI building blocks — templates, brand voices, article structures, and modular content slices.', 'ai-post-scheduler'),
+			));
+			?>
 
 			<div class="aips-launchpad-grid">
 				<?php foreach ($sections as $sec_key => $sec_data) : ?>
@@ -45,7 +39,7 @@ $sections = AIPS_Studio_Controller::get_sections();
 					<div class="aips-launchpad-card aips-card-<?php echo esc_attr($sec_key); ?>">
 						<div class="aips-card-header">
 							<div class="aips-card-icon-wrap">
-								<span class="dashicons <?php echo esc_attr($sec_data['icon']); ?>"></span>
+								<span class="dashicons <?php echo esc_attr($sec_data['icon']); ?>" aria-hidden="true"></span>
 							</div>
 							<div class="aips-card-title-group">
 								<h2 class="aips-card-title"><?php echo esc_html($sec_data['label']); ?></h2>
@@ -67,7 +61,7 @@ $sections = AIPS_Studio_Controller::get_sections();
 						<div class="aips-card-footer">
 							<a href="<?php echo esc_url($sec_url); ?>" class="aips-btn aips-btn-primary aips-card-btn-open">
 								<span><?php echo sprintf(esc_html__('Manage %s', 'ai-post-scheduler'), esc_html($sec_data['label'])); ?></span>
-								<span class="dashicons dashicons-arrow-right-alt2"></span>
+								<span class="dashicons dashicons-arrow-right-alt2" aria-hidden="true"></span>
 							</a>
 						</div>
 					</div>
@@ -81,7 +75,7 @@ $sections = AIPS_Studio_Controller::get_sections();
 				<div class="aips-workspace-header-top">
 					<div class="aips-breadcrumb-trail">
 						<a href="<?php echo esc_url($studio_controller->get_section_url('')); ?>" class="aips-breadcrumb-root">
-							<span class="dashicons dashicons-art"></span>
+							<span class="dashicons dashicons-art" aria-hidden="true"></span>
 							<?php esc_html_e('Studio', 'ai-post-scheduler'); ?>
 						</a>
 						<span class="aips-breadcrumb-sep">/</span>
@@ -92,11 +86,11 @@ $sections = AIPS_Studio_Controller::get_sections();
 					<div class="aips-workspace-controls">
 						<div class="aips-switcher-pills">
 							<a href="<?php echo esc_url($studio_controller->get_section_url('')); ?>" class="aips-pill-btn" title="<?php esc_attr_e('Launchpad Overview', 'ai-post-scheduler'); ?>">
-								<span class="dashicons dashicons-grid-view"></span>
+								<span class="dashicons dashicons-grid-view" aria-hidden="true"></span>
 							</a>
 							<?php foreach ($sections as $k => $s) : ?>
 								<a href="<?php echo esc_url($studio_controller->get_section_url($k)); ?>" class="aips-pill-btn<?php echo $k === $active_section ? ' active' : ''; ?>">
-									<span class="dashicons <?php echo esc_attr($s['icon']); ?>"></span>
+									<span class="dashicons <?php echo esc_attr($s['icon']); ?>" aria-hidden="true"></span>
 									<span class="aips-pill-label"><?php echo esc_html($s['label']); ?></span>
 								</a>
 							<?php endforeach; ?>
@@ -105,12 +99,12 @@ $sections = AIPS_Studio_Controller::get_sections();
 						<?php if (!empty($current_sec['action_label'])) : ?>
 							<div class="aips-workspace-actions">
 								<button type="button" class="<?php echo esc_attr($current_sec['action_class']); ?>">
-									<span class="dashicons dashicons-plus-alt2"></span>
+									<span class="dashicons dashicons-plus-alt2" aria-hidden="true"></span>
 									<?php echo esc_html($current_sec['action_label']); ?>
 								</button>
 								<?php if ('structures' === $active_section) : ?>
 									<button type="button" class="aips-btn aips-btn-secondary aips-add-section-btn">
-										<span class="dashicons dashicons-plus-alt2"></span>
+										<span class="dashicons dashicons-plus-alt2" aria-hidden="true"></span>
 										<?php esc_html_e('Add Section', 'ai-post-scheduler'); ?>
 									</button>
 								<?php endif; ?>

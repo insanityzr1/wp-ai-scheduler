@@ -224,7 +224,7 @@ class AIPS_Admin_Menu {
      */
     public function fix_author_topics_parent_file($parent_file) {
         $page = isset($_GET['page']) ? sanitize_key(wp_unslash($_GET['page'])) : '';
-        if ($page === 'aips-author-topics' || $page === AIPS_Campaigns_Controller::DETAIL_PAGE_SLUG || $this->is_diagnostics_child_page($page) || $this->is_automations_child_page($page)) {
+        if ($page === 'aips-author-topics' || $page === AIPS_Campaigns_Controller::DETAIL_PAGE_SLUG || $this->is_diagnostics_child_page($page) || $this->is_automations_child_page($page) || $this->is_studio_child_page($page)) {
             return 'ai-post-scheduler';
         }
         return $parent_file;
@@ -234,7 +234,7 @@ class AIPS_Admin_Menu {
      * Highlight consolidated submenu items for hidden child pages.
      *
      * Hidden pages registered with a null parent do not automatically activate a submenu
-     * item in WordPress. This filter maps Diagnostics and Automations child pages to
+     * item in WordPress. This filter maps Diagnostics, Automations, and Studio child pages to
      * their corresponding visible submenu entries.
      *
      * @param string $submenu_file The current submenu file slug.
@@ -247,6 +247,9 @@ class AIPS_Admin_Menu {
         }
         if ($this->is_automations_child_page($page)) {
             return 'aips-automations';
+        }
+        if ($this->is_studio_child_page($page)) {
+            return 'aips-studio';
         }
         return $submenu_file;
     }
@@ -284,7 +287,6 @@ class AIPS_Admin_Menu {
             array(
                 'aips-schedule',
                 'aips-campaigns',
-                'aips-templates',
                 'aips-authors',
                 'aips-sources',
                 'aips-source-data',
@@ -294,6 +296,25 @@ class AIPS_Admin_Menu {
                 'aips-author-topics',
                 AIPS_Campaigns_Controller::PAGE_SLUG,
                 AIPS_Campaigns_Controller::DETAIL_PAGE_SLUG,
+            ),
+            true
+        );
+    }
+
+    /**
+     * Determine whether a hidden page belongs under Studio.
+     *
+     * @param string $page Current admin page slug.
+     * @return bool
+     */
+    private function is_studio_child_page($page) {
+        return in_array(
+            $page,
+            array(
+                'aips-templates',
+                'aips-voices',
+                'aips-structures',
+                'aips-post-slices',
             ),
             true
         );

@@ -108,6 +108,8 @@ class Test_AIPS_Admin_UI_Primitives extends WP_UnitTestCase {
 
 		$this->assertStringContainsString('First Tab', $output);
 		$this->assertStringContainsString('active', $output);
+		$this->assertStringContainsString('aria-current="page"', $output);
+		$this->assertStringContainsString('aria-hidden="true"', $output);
 		$this->assertStringContainsString('Second Tab', $output);
 		$this->assertStringContainsString('dashicons-schedule', $output);
 		$this->assertStringContainsString('Tab description', $output);
@@ -140,7 +142,7 @@ class Test_AIPS_Admin_UI_Primitives extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Test card rendering with header and body callback.
+	 * Test card rendering with header, actions, and body callback.
 	 */
 	public function test_render_card() {
 		ob_start();
@@ -149,6 +151,13 @@ class Test_AIPS_Admin_UI_Primitives extends WP_UnitTestCase {
 			'title'       => 'Test Card Panel',
 			'icon'        => 'dashicons-info',
 			'description' => 'Card subtitle explanation',
+			'actions'     => array(
+				array(
+					'label'      => 'Edit',
+					'aria_label' => 'Edit this card',
+					'data_attrs' => array('target' => 'modal'),
+				),
+			),
 		), function() {
 			echo '<p class="test-body-content">Inside card body</p>';
 		});
@@ -157,6 +166,8 @@ class Test_AIPS_Admin_UI_Primitives extends WP_UnitTestCase {
 		$this->assertStringContainsString('test-card-id', $output);
 		$this->assertStringContainsString('Test Card Panel', $output);
 		$this->assertStringContainsString('dashicons-info', $output);
+		$this->assertStringContainsString('aria-label="Edit this card"', $output);
+		$this->assertStringContainsString('data-target="modal"', $output);
 		$this->assertStringContainsString('Inside card body', $output);
 	}
 
@@ -178,6 +189,8 @@ class Test_AIPS_Admin_UI_Primitives extends WP_UnitTestCase {
 		$this->assertStringContainsString('Get started by clicking create below.', $output);
 		$this->assertStringContainsString('Add First Record', $output);
 		$this->assertStringContainsString('admin.php?page=aips-studio', $output);
+		$this->assertStringContainsString('aips-empty-state-icon-dashicon', $output);
+		$this->assertStringContainsString('aria-hidden="true"', $output);
 	}
 
 	/**
@@ -198,5 +211,17 @@ class Test_AIPS_Admin_UI_Primitives extends WP_UnitTestCase {
 		$this->assertStringContainsString('Database query timed out.', $output);
 		$this->assertStringContainsString('Try Again', $output);
 		$this->assertStringContainsString('Exception at line 42', $output);
+		$this->assertStringContainsString('aips-error-fallback', $output);
+	}
+
+	/**
+	 * Test missing partial safety handling.
+	 */
+	public function test_missing_partial_safety() {
+		ob_start();
+		AIPS_Admin_UI_Primitives::include_partial('non-existent-partial.php');
+		$output = ob_get_clean();
+
+		$this->assertStringContainsString('aips-error-fallback', $output);
 	}
 }

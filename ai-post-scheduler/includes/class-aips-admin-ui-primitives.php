@@ -42,6 +42,26 @@ class AIPS_Admin_UI_Primitives {
 	}
 
 	/**
+	 * Safely include a partial template with arguments and optional callback.
+	 *
+	 * @param string        $partial_name Partial filename without directory.
+	 * @param array         $args         Component configuration.
+	 * @param callable|null $content_callback Optional callback.
+	 * @return void
+	 */
+	public static function include_partial($partial_name, $args = array(), $content_callback = null) {
+		$partial = self::get_partials_dir() . $partial_name;
+		if (file_exists($partial)) {
+			include $partial;
+		} else {
+			if (class_exists('AIPS_Logger')) {
+				AIPS_Logger::log('UI Primitive partial not found: ' . $partial_name, 'warning');
+			}
+			echo '<div class="notice notice-error aips-error-fallback"><p>' . sprintf(esc_html__('UI component %s could not be loaded.', 'ai-post-scheduler'), esc_html($partial_name)) . '</p></div>';
+		}
+	}
+
+	/**
 	 * Render a complete Hub Shell (Wrap + Header + Rail Navigation + Main Stage).
 	 *
 	 * @param array<string, mixed> $args Shell configuration parameters:
@@ -54,10 +74,7 @@ class AIPS_Admin_UI_Primitives {
 	 * @return void
 	 */
 	public static function render_hub_shell($args = array(), $content_callback = null) {
-		$partial = self::get_partials_dir() . 'admin-hub-shell.php';
-		if (file_exists($partial)) {
-			include $partial;
-		}
+		self::include_partial('admin-hub-shell.php', (array) $args, $content_callback);
 	}
 
 	/**
@@ -73,10 +90,7 @@ class AIPS_Admin_UI_Primitives {
 	 * @return void
 	 */
 	public static function render_page_header($args = array()) {
-		$partial = self::get_partials_dir() . 'admin-page-header.php';
-		if (file_exists($partial)) {
-			include $partial;
-		}
+		self::include_partial('admin-page-header.php', (array) $args);
 	}
 
 	/**
@@ -97,10 +111,7 @@ class AIPS_Admin_UI_Primitives {
 	 * @return void
 	 */
 	public static function render_rail($args = array()) {
-		$partial = self::get_partials_dir() . 'admin-rail.php';
-		if (file_exists($partial)) {
-			include $partial;
-		}
+		self::include_partial('admin-rail.php', (array) $args);
 	}
 
 	/**
@@ -114,10 +125,7 @@ class AIPS_Admin_UI_Primitives {
 	 * @return void
 	 */
 	public static function render_action_toolbar($args = array()) {
-		$partial = self::get_partials_dir() . 'admin-action-toolbar.php';
-		if (file_exists($partial)) {
-			include $partial;
-		}
+		self::include_partial('admin-action-toolbar.php', (array) $args);
 	}
 
 	/**
@@ -138,10 +146,7 @@ class AIPS_Admin_UI_Primitives {
 	 * @return void
 	 */
 	public static function render_card($args = array(), $body_callback = null) {
-		$partial = self::get_partials_dir() . 'admin-card.php';
-		if (file_exists($partial)) {
-			include $partial;
-		}
+		self::include_partial('admin-card.php', (array) $args, $body_callback);
 	}
 
 	/**
@@ -160,10 +165,7 @@ class AIPS_Admin_UI_Primitives {
 	 * @return void
 	 */
 	public static function render_empty_state($args = array()) {
-		$partial = self::get_partials_dir() . 'admin-empty-state.php';
-		if (file_exists($partial)) {
-			include $partial;
-		}
+		self::include_partial('admin-empty-state.php', (array) $args);
 	}
 
 	/**
@@ -196,7 +198,7 @@ class AIPS_Admin_UI_Primitives {
 
 		$html = '<span class="aips-badge ' . esc_attr($badge_class . $class) . '">';
 		if (!empty($icon)) {
-			$html .= '<span class="dashicons ' . esc_attr($icon) . '"></span> ';
+			$html .= '<span class="dashicons ' . esc_attr($icon) . '" aria-hidden="true"></span> ';
 		}
 		$html .= esc_html($label);
 		$html .= '</span>';
@@ -216,9 +218,6 @@ class AIPS_Admin_UI_Primitives {
 	 * @return void
 	 */
 	public static function render_error_fallback($args = array()) {
-		$partial = self::get_partials_dir() . 'admin-error-fallback.php';
-		if (file_exists($partial)) {
-			include $partial;
-		}
+		self::include_partial('admin-error-fallback.php', (array) $args);
 	}
 }

@@ -276,7 +276,7 @@
             reposition();
 
             var resizeTimer;
-            $(window).on('resize.aips-toast', function() {
+            $(window).off('resize.aips-toast').on('resize.aips-toast', function() {
                 clearTimeout(resizeTimer);
                 resizeTimer = setTimeout(reposition, 100);
             });
@@ -1004,6 +1004,8 @@
                         var safeText = $('<div>').text(text).html();
                         $btn.html('<span class="dashicons dashicons-update aips-spin" aria-hidden="true"></span> ' + safeText);
                     }
+                } else if (!$btn.find('.aips-spin').length) {
+                    $btn.prepend('<span class="dashicons dashicons-update aips-spin" aria-hidden="true"></span> ');
                 }
 
                 var $form = $btn.closest('form');

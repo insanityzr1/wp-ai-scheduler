@@ -2464,6 +2464,15 @@ input[type="submit"].is-busy {
     display: inline-block;
 }
 
+.aips-btn.is-busy,
+button.is-busy,
+input[type="submit"].is-busy,
+.is-busy {
+    cursor: wait !important;
+    opacity: 0.75 !important;
+    pointer-events: none !important;
+}
+
 .aips-modal-large {
     max-width: 900px;
     max-height: 90vh;

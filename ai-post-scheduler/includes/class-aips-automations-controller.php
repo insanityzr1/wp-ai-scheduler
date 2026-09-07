@@ -476,9 +476,18 @@ class AIPS_Automations_Controller {
 		try {
 			$aips_internal_links_controller->render_page();
 		} catch (Throwable $throwable) {
+			if (class_exists('AIPS_Logger')) {
+				AIPS_Logger::log_error('Internal Links tab render exception: ' . $throwable->getMessage(), array(
+					'file'  => $throwable->getFile(),
+					'line'  => $throwable->getLine(),
+					'trace' => $throwable->getTraceAsString(),
+				));
+			} else {
+				error_log('[AIPS] Internal Links tab render exception: ' . $throwable->getMessage());
+			}
+
 			echo '<div class="aips-content-panel"><div class="aips-panel-body"><div class="notice notice-error inline"><p>' .
-				esc_html__('The Internal Links page could not be rendered: ', 'ai-post-scheduler') .
-				esc_html($throwable->getMessage()) .
+				esc_html__('The Internal Links module is currently unavailable. Please check the system log or try reloading the page.', 'ai-post-scheduler') .
 			'</p></div></div></div>';
 		}
 	}

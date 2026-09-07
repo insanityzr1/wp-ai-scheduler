@@ -4699,93 +4699,60 @@ li.toplevel_page_ai-post-scheduler li:has(> a[href*="aips-author-topics"]) {
 }
 
 .aips-refresh-task-selector {
-    margin: 0 0 12px;
-    padding: 12px 14px;
+    margin: 0 0 16px;
+    padding: 14px 16px;
     background: var(--aips-white);
     border: 1px solid var(--aips-gray-200);
     border-radius: var(--aips-radius-md);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .aips-refresh-task-selector-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
-    margin-bottom: 10px;
+    gap: 12px;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--aips-gray-100);
     flex-wrap: wrap;
 }
 
-.aips-refresh-task-selector-header .aips-status-op-group-label {
-    flex: 0 0 auto;
+.aips-refresh-task-selector-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.aips-status-op-group-title {
+    font-size: 13px;
+    font-weight: var(--aips-font-semibold);
+    color: var(--aips-gray-800);
 }
 
 .aips-refresh-task-list {
     flex-direction: row;
     flex-wrap: wrap;
-    gap: 10px 16px;
+    gap: 8px 16px;
 }
 
 .aips-refresh-task-list .aips-checkbox-label {
     min-width: 220px;
 }
 
-/* Refresh System: 3/9 split — large action button beside the task checkboxes */
-.aips-refresh-system-layout {
-    display: grid;
-    grid-template-columns: 3fr 9fr;
-    gap: 14px;
-    align-items: stretch;
-    margin-bottom: 12px;
-}
-
-.aips-refresh-system-layout .aips-refresh-task-selector {
-    margin: 0;
-}
-
 .aips-refresh-system-action {
     display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 6px;
-}
-
-.aips-refresh-system-lg {
-    display: flex;
-    flex-direction: column;
     align-items: center;
-    justify-content: center;
     gap: 8px;
-    height: 100%;
-    min-height: 96px;
-    padding: 16px;
-    font-size: var(--aips-text-base);
-    font-weight: var(--aips-font-semibold);
-    line-height: 1.2;
-}
-
-.aips-refresh-system-lg .dashicons {
-    font-size: 30px;
-    width: 30px;
-    height: 30px;
 }
 
 .aips-refresh-system-action .spinner {
-    align-self: center;
     margin: 0;
-}
-
-@media (max-width: 782px) {
-    .aips-refresh-system-layout {
-        grid-template-columns: 1fr;
-    }
-
-    .aips-refresh-system-lg {
-        min-height: 0;
-    }
+    float: none;
 }
 
 .aips-refresh-system-results {
-    margin: 0 0 12px;
+    margin: 0 0 16px;
     padding: 10px 14px;
     background: var(--aips-white);
     border: 1px solid var(--aips-gray-200);
@@ -4822,18 +4789,22 @@ li.toplevel_page_ai-post-scheduler li:has(> a[href*="aips-author-topics"]) {
 .aips-status-op-group {
     display: flex;
     align-items: baseline;
-    gap: 10px;
-    margin-bottom: 8px;
+    gap: 12px;
+    margin-bottom: 10px;
     flex-wrap: wrap;
 }
 
+.aips-status-op-group:last-child {
+    margin-bottom: 0;
+}
+
 .aips-status-op-group-label {
-    flex: 0 0 110px;
+    flex: 0 0 145px;
+    min-width: 145px;
     font-size: 12px;
     font-weight: var(--aips-font-semibold);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--aips-gray-500);
+    color: var(--aips-gray-600);
+    white-space: nowrap;
 }
 
 /* Diagnostics grid: masonry-style columns so short cards fill the gap left by

@@ -1,3 +1,22 @@
+## [3.6.7] - 2026-09-07
+
+### Added
+- **8 Core Hub Navigation:** Streamlined top-level menu down to 8 core hubs (Dashboard, Automations, Studio, Research, Content, History, Settings, Diagnostics).
+- **Studio Launchpad:** Workspace grid with quick actions, live counts, and drill-down navigation for Templates, Voices, Structures, and Post Slices.
+- **Automations Vertical Rail:** Left-aligned vertical navigation rail with active state indicators and seamless tab switching.
+- **Content Hub Integration:** Integrated Content Indexer as a tab alongside Generated Posts, Partial Generations, and Pending Review.
+
+### Changed
+- **Grouped Blueprint Schedules:** Consolidated persona topic-generation and post-generation schedules into single Blueprint rows with stages, resolving row count inflation.
+
+### Fixed
+- **Terminal Outcome Metrics:** Success and failure rates now compute over terminal outcomes via `AIPS_Outcome_Rate`, with accurate post attribution and zero-value tile handling.
+- **Accessibility & Contrast (WCAG 2.2 SC 1.4.3):** Dimmed text, muted labels, and telemetry empty-state contrast raised to AA standards ($\ge 4.5:1$ on composited backgrounds).
+- **History Grouping:** Fixed double-firing click events on history group expand/collapse.
+
+### Removed
+- **Schedule Calendar:** Fully removed Schedule Calendar views, controllers, assets, endpoints, and tests in favor of the consolidated schedule view and upcoming runs panel.
+
 ## [3.6.6] - 2026-09-04
 
 ### Added

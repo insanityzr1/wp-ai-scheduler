@@ -662,6 +662,16 @@
                 return;
             }
 
+            var href = $tabLink.attr('href');
+            var isRegularUrl = href && href !== '#' && href.indexOf('#') !== 0 && !href.startsWith('javascript:');
+
+            // If this is a regular navigation URL and no matching in-page container exists in DOM,
+            // allow native browser navigation (e.g. Automations and Diagnostics server-rendered tabs).
+            var $targetInDom = $('#' + tabId + '-tab, #' + tabId + ', [data-tab-content="' + tabId + '"]').first();
+            if (!$targetInDom.length && isRegularUrl) {
+                return;
+            }
+
             e.preventDefault();
             var $tabNav = $tabLink.closest('.aips-tab-nav, .aips-topics-tabs, .aips-page-tabs, .aips-rail-nav, .aips-rail-sidebar');
 

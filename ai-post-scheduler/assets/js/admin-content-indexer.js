@@ -141,15 +141,21 @@
 		 * Tab switching.
 		 */
 		initTabs: function () {
-			$('.aips-tab-link').on('click', function (e) {
+			$('#aips-content-indexer-tab, .aips-content-indexer-wrap').find('.aips-tab-link').on('click', function (e) {
 				e.preventDefault();
 				var tab = $(this).data('tab');
+				var $nav = $(this).closest('.aips-tab-nav');
+				var $container = $nav.parent();
 
-				$('.aips-tab-link').removeClass('active');
-				$('.aips-tab-content').removeClass('active');
-
+				$nav.find('.aips-tab-link').removeClass('active');
 				$(this).addClass('active');
-				$('#' + tab + '-tab').addClass('active');
+
+				$container.children('.aips-tab-content').hide().removeClass('active');
+				var $target = $container.children('#' + tab + '-tab');
+				if (!$target.length) {
+					$target = $('#' + tab + '-tab');
+				}
+				$target.show().addClass('active');
 
 				if (tab === 'visualizer' && window.AIPS.ContentIndexer.graphData) {
 					window.AIPS.ContentIndexer.renderSvgGraph(window.AIPS.ContentIndexer.graphData);

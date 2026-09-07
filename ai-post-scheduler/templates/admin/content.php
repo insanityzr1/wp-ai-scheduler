@@ -62,12 +62,10 @@ if (!defined('ABSPATH')) {
 
 		<!-- Tab 4: Content Indexer -->
 		<div id="aips-content-indexer-tab" class="aips-tab-content" style="display:none;" role="tabpanel" aria-hidden="true">
-			<div class="aips-content-panel">
-				<?php
-				$indexer_controller = new AIPS_Content_Indexer_Controller();
-				$indexer_controller->render_page();
-				?>
-			</div>
+			<?php
+			$indexer_controller = new AIPS_Content_Indexer_Controller();
+			$indexer_controller->render_page();
+			?>
 		</div>
 	</div>
 </div>

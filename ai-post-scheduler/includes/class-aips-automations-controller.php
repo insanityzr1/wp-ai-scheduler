@@ -469,21 +469,18 @@ class AIPS_Automations_Controller {
 	private function render_internal_links_tab() {
 		global $aips_internal_links_controller;
 
-		if ($aips_internal_links_controller instanceof AIPS_Internal_Links_Controller) {
-			try {
-				$aips_internal_links_controller->render_page();
-				return;
-			} catch (Throwable $throwable) {
-				echo '<div class="notice notice-error"><p>' .
-					esc_html__('The Internal Links page could not be rendered. Please reload the page or check the plugin configuration.', 'ai-post-scheduler') .
-				'</p></div>';
-				return;
-			}
+		if (!($aips_internal_links_controller instanceof AIPS_Internal_Links_Controller)) {
+			$aips_internal_links_controller = new AIPS_Internal_Links_Controller();
 		}
 
-		echo '<div class="notice notice-error"><p>' .
-			esc_html__('The Internal Links controller is not available, so the Internal Links page could not be loaded.', 'ai-post-scheduler') .
-		'</p></div>';
+		try {
+			$aips_internal_links_controller->render_page();
+		} catch (Throwable $throwable) {
+			echo '<div class="aips-content-panel"><div class="aips-panel-body"><div class="notice notice-error inline"><p>' .
+				esc_html__('The Internal Links page could not be rendered: ', 'ai-post-scheduler') .
+				esc_html($throwable->getMessage()) .
+			'</p></div></div></div>';
+		}
 	}
 
 	/**

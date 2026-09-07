@@ -669,21 +669,33 @@
                 $tabNav = $tabLink.parent();
             }
 
-            var $scope = $tabNav.closest('.aips-page-container, .aips-modal-content, .aips-modal-body');
-
-            if (!$scope.length) {
-                $scope = $(document);
-            }
-
             // Update active state only for the local tab nav
             $tabNav.find('.aips-tab-link').removeClass('active');
             $tabLink.addClass('active');
 
-            // Show corresponding tab content only within local scope
-            $scope.find('.aips-tab-content').hide();
-            var $targetTab = $scope.find('#' + tabId + '-tab').first();
-            if ($targetTab.length) {
-                $targetTab.show();
+            // Find sibling/scoped tab content containers without hiding nested child tabs
+            var $container = $tabNav.parent();
+            var $scopedTabs = $container.children('.aips-tab-content');
+
+            if ($scopedTabs.length) {
+                $scopedTabs.hide().removeClass('active');
+                var $targetTab = $container.children('#' + tabId + '-tab, #' + tabId);
+                if ($targetTab.length) {
+                    $targetTab.show().addClass('active');
+                    // Ensure active inner tab within the newly revealed panel is visible
+                    $targetTab.find('.aips-tab-content.active').show();
+                }
+            } else {
+                var $scope = $tabNav.closest('.aips-page-container, .aips-modal-content, .aips-modal-body, .wrap');
+                if (!$scope.length) {
+                    $scope = $(document);
+                }
+                $scope.children('.aips-tab-content').hide().removeClass('active');
+                var $targetTab = $scope.find('#' + tabId + '-tab, #' + tabId).first();
+                if ($targetTab.length) {
+                    $targetTab.show().addClass('active');
+                    $targetTab.find('.aips-tab-content.active').show();
+                }
             }
 
             // Notify other modules of the tab switch.

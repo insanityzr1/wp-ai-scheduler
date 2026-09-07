@@ -23,7 +23,9 @@
 		 */
 		init: function() {
 			this.bindEvents();
-			this.loadTaxonomyItems('categories');
+			var initialTab = $('.aips-topics-tabs .aips-tab-link.active').data('tab') || 'categories';
+			this.currentTab = initialTab;
+			this.loadTaxonomyItems(initialTab);
 		},
 
 		/**
@@ -37,6 +39,7 @@
 			$(document).on('click', '.aips-remove-post', this.removeSelectedPost.bind(this));
 			$(document).on('click', '.aips-search-result', this.selectSearchResult.bind(this));
 			$(document).on('click', '.aips-tab-link', this.switchTab.bind(this));
+			$(document).on('click', '.aips-switch-to-taxonomy-tab', this.onSwitchToTabClick.bind(this));
 			$(document).on('click', '.aips-select-all-taxonomy', this.toggleSelectAll.bind(this));
 			$(document).on('change', '.aips-taxonomy-checkbox', this.syncSelectAllState.bind(this));
 			$(document).on('click', '.aips-bulk-action-execute', this.executeBulkAction.bind(this));
@@ -312,7 +315,13 @@
 			}.bind(this));
 
 			if (!rowsHtml) {
-				rowsHtml = '<tr><td colspan="5" style="text-align: center;">No items found.</td></tr>';
+				var emptyMsg = 'No items found.';
+				if (this.currentTab === 'categories' && parseInt($('#tags-count').text(), 10) > 0) {
+					emptyMsg = 'No categories found. <a href="#" class="aips-switch-to-taxonomy-tab" data-target-tab="tags" style="font-weight:600; text-decoration:underline;">Switch to Tags (' + esc($('#tags-count').text()) + ')</a> to view generated tag suggestions.';
+				} else if (this.currentTab === 'tags' && parseInt($('#categories-count').text(), 10) > 0) {
+					emptyMsg = 'No tags found. <a href="#" class="aips-switch-to-taxonomy-tab" data-target-tab="categories" style="font-weight:600; text-decoration:underline;">Switch to Categories (' + esc($('#categories-count').text()) + ')</a> to view generated category suggestions.';
+				}
+				rowsHtml = '<tr><td colspan="5" style="text-align: center; padding: 24px;">' + emptyMsg + '</td></tr>';
 			}
 
 			var tableHtml = AIPS.Templates.renderRaw('aips-tmpl-taxonomy-table', {
@@ -326,6 +335,19 @@
 
 			$('#aips-taxonomy-content').html(tableHtml);
 			this.updateVisibleResultCount();
+		},
+
+		/**
+		 * Handle click on inline switch-tab link.
+		 *
+		 * @param {Event} e Click event.
+		 */
+		onSwitchToTabClick: function(e) {
+			e.preventDefault();
+			var targetTab = $(e.currentTarget).data('target-tab');
+			if (targetTab) {
+				$('.aips-topics-tabs .aips-tab-link[data-tab="' + targetTab + '"]').trigger('click');
+			}
 		},
 
 		/**

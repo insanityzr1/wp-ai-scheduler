@@ -15,8 +15,10 @@ if (!defined('ABSPATH')) {
 
 $repository = new AIPS_Taxonomy_Repository();
 $status_counts = $repository->get_status_counts();
-$total_items = $status_counts['categories']['pending'] + $status_counts['categories']['approved'] + $status_counts['categories']['rejected'] +
-	$status_counts['tags']['pending'] + $status_counts['tags']['approved'] + $status_counts['tags']['rejected'];
+$categories_total = $status_counts['categories']['pending'] + $status_counts['categories']['approved'] + $status_counts['categories']['rejected'];
+$tags_total = $status_counts['tags']['pending'] + $status_counts['tags']['approved'] + $status_counts['tags']['rejected'];
+$total_items = $categories_total + $tags_total;
+$initial_tab = ($categories_total === 0 && $tags_total > 0) ? 'tags' : 'categories';
 ?>
 
 		<!-- Taxonomy Stats -->
@@ -43,13 +45,13 @@ $total_items = $status_counts['categories']['pending'] + $status_counts['categor
 		<div class="aips-content-panel" id="aips-taxonomy-panel">
 			<!-- Tabs -->
 			<div class="aips-topics-tabs aips-page-tabs">
-				<button class="aips-tab-link active" data-tab="categories">
+				<button class="aips-tab-link<?php echo 'categories' === $initial_tab ? ' active' : ''; ?>" data-tab="categories">
 					<?php esc_html_e('Categories', 'ai-post-scheduler'); ?>
-					<span class="aips-tab-count" id="categories-count"><?php echo esc_html($status_counts['categories']['pending'] + $status_counts['categories']['approved'] + $status_counts['categories']['rejected']); ?></span>
+					<span class="aips-tab-count" id="categories-count"><?php echo esc_html($categories_total); ?></span>
 				</button>
-				<button class="aips-tab-link" data-tab="tags">
+				<button class="aips-tab-link<?php echo 'tags' === $initial_tab ? ' active' : ''; ?>" data-tab="tags">
 					<?php esc_html_e('Tags', 'ai-post-scheduler'); ?>
-					<span class="aips-tab-count" id="tags-count"><?php echo esc_html($status_counts['tags']['pending'] + $status_counts['tags']['approved'] + $status_counts['tags']['rejected']); ?></span>
+					<span class="aips-tab-count" id="tags-count"><?php echo esc_html($tags_total); ?></span>
 				</button>
 			</div>
 

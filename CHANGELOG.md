@@ -1,3 +1,13 @@
+## [3.7.2] - 2026-09-07
+
+### Added
+- **Admin UI Primitives:** Introduced `AIPS_Admin_UI_Primitives` class with reusable partial templates for Hub Shells, Page Headers, Vertical Rails, Action Toolbars, Content Panels, Badges, Empty States, and Error Fallbacks.
+
+### Fixed
+- **Content Indexer Subtabs:** Fixed initial tab stacking where all 4 nested subtabs rendered simultaneously on load.
+- **Server-rendered Rail Navigation:** Fixed click interception in `switchAipsTab` allowing native URL navigation for server-rendered multi-tab pages (Automations, Diagnostics).
+- **CSS & Asset Cache:** Bumped plugin version to bust admin asset cache.
+
 ## [3.6.7] - 2026-09-07
 
 ### Added

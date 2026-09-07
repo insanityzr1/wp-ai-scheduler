@@ -142,7 +142,7 @@ class AIPS_Admin_Assets {
 			$this->enqueue_dev_tools_assets();
 		}
 
-		if (self::PAGE_STATUS === $page || $this->hook_contains($hook, self::PAGE_STATUS) || $this->is_diagnostics_tab($page, 'status')) {
+		if (self::PAGE_STATUS === $page || $this->hook_contains($hook, self::PAGE_STATUS) || $this->is_diagnostics_tab($page, 'status') || $this->is_diagnostics_tab($page, 'system-info') || $this->is_diagnostics_tab($page, 'health') || $this->is_diagnostics_tab($page, 'operations')) {
 			$this->enqueue_status_1_assets();
 			$this->enqueue_status_2_assets();
 		}

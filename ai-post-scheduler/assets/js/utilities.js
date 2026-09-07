@@ -30,11 +30,117 @@
         /**
          * Placeholder initialisation hook for the Utilities namespace.
          *
-         * Called on `document.ready`. Currently a no-op; reserved for any
-         * future setup that must run once the DOM is ready.
+         * Called on `document.ready`. Initializes global action lock.
          */
         init: function() {
-            // Nothing needed on init currently; reserved for future use.
+            this.initActionLock();
+        },
+
+        /**
+         * Global in-flight click & AJAX multi-submit protection.
+         *
+         * Intercepts action button clicks and form submissions:
+         * - Prevents duplicate clicks while an action or AJAX request is already in-flight.
+         * - Auto-disables clicked action buttons and adds '.is-busy' visual indicator.
+         * - Auto-restores buttons when AJAX completes via global $(document).ajaxComplete() / ajaxError().
+         */
+        initActionLock: function() {
+            var self = this;
+
+            // Intercept form submissions across all AIPS forms to prevent multi-submit
+            $(document).on('submit', 'form', function(e) {
+                var $form = $(this);
+                if ($form.data('aips-submitting')) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    return false;
+                }
+
+                // If this is an AJAX-handled form, lock it until ajaxComplete
+                var $submitBtn = $form.find('input[type="submit"], button[type="submit"]').first();
+                if ($submitBtn.length) {
+                    $form.data('aips-submitting', true);
+                    self.lockButton($submitBtn);
+                }
+            });
+
+            // Intercept direct action button clicks
+            $(document).on('click', '.aips-btn-primary, .aips-btn-danger, .aips-btn-secondary, button[type="submit"], input[type="submit"], .aips-action-btn', function(e) {
+                var $btn = $(this);
+
+                // Ignore navigation rail items or modal close buttons
+                if ($btn.hasClass('aips-rail-item') || $btn.hasClass('aips-modal-close') || $btn.hasClass('aips-toast-close') || $btn.hasClass('aips-tab-link')) {
+                    return;
+                }
+
+                // If already in-flight or disabled, stop immediately
+                if ($btn.data('aips-in-flight') || $btn.hasClass('is-busy')) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    return false;
+                }
+
+                // Set in-flight lock
+                self.lockButton($btn);
+            });
+
+            // Global release on AJAX completion
+            $(document).on('ajaxComplete ajaxError', function() {
+                $('form').removeData('aips-submitting');
+                self.releaseAllLockedButtons();
+            });
+        },
+
+        /**
+         * Lock a button in-flight.
+         *
+         * @param {jQuery} $btn
+         */
+        lockButton: function($btn) {
+            if (!$btn || !$btn.length || $btn.data('aips-in-flight')) {
+                return;
+            }
+
+            $btn.data('aips-in-flight', true);
+            $btn.addClass('is-busy');
+
+            // Auto-fallback timer in case an action does not trigger AJAX or fails to complete
+            var timer = setTimeout(function() {
+                AIPS.Utilities.unlockButton($btn);
+            }, 8000);
+
+            $btn.data('aips-lock-timer', timer);
+        },
+
+        /**
+         * Unlock a specific button.
+         *
+         * @param {jQuery} $btn
+         */
+        unlockButton: function($btn) {
+            if (!$btn || !$btn.length) {
+                return;
+            }
+
+            var timer = $btn.data('aips-lock-timer');
+            if (timer) {
+                clearTimeout(timer);
+                $btn.removeData('aips-lock-timer');
+            }
+
+            $btn.removeData('aips-in-flight');
+            $btn.removeClass('is-busy');
+            $btn.prop('disabled', false);
+        },
+
+        /**
+         * Release all currently locked action buttons.
+         */
+        releaseAllLockedButtons: function() {
+            var self = this;
+            $('.is-busy, [data-aips-in-flight]').each(function() {
+                self.unlockButton($(this));
+            });
         },
 
         /**

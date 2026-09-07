@@ -1297,6 +1297,15 @@
     outline-offset: 2px;
 }
 
+.aips-btn.is-busy,
+.is-busy,
+button.is-busy,
+input[type="submit"].is-busy {
+    opacity: 0.65 !important;
+    cursor: wait !important;
+    pointer-events: none !important;
+}
+
 .aips-btn:focus-visible {
     outline: 2px solid var(--aips-primary);
     outline-offset: 2px;
@@ -6387,3 +6396,22 @@ li.toplevel_page_ai-post-scheduler li:has(> a[href*="aips-author-topics"]) {
 		display: none;
 	}
 }
+
+/* Stress Test & Diagnostics Hub Utilities */
+.aips-stress-col-checkbox {
+	width: 38px;
+	text-align: center;
+	vertical-align: middle;
+}
+
+.aips-stress-col-checkbox input[type="checkbox"] {
+	margin: 0;
+	cursor: pointer;
+}
+
+.aips-system-info-actions {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+

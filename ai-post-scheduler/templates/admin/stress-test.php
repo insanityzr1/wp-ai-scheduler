@@ -49,10 +49,14 @@ foreach ($cases as $case) {
 							<span class="dashicons dashicons-forms"></span>
 							<?php esc_html_e('Compare', 'ai-post-scheduler'); ?>
 						</button>
+						<a href="<?php echo esc_url(add_query_arg(array('page' => 'aips-diagnostics', 'tab' => 'stress-test', 'view' => 'history'), admin_url('admin.php'))); ?>" class="aips-btn aips-btn-ghost" style="text-decoration:none; display:inline-flex; align-items:center; gap:4px; height:36px; line-height:34px; padding:0 10px;">
+							<span class="dashicons dashicons-backup"></span>
+							<?php esc_html_e('Full History', 'ai-post-scheduler'); ?>
+						</a>
 					</div>
 					<button type="button" class="aips-btn aips-btn-primary" id="aips-stress-run-all">
 						<span class="dashicons dashicons-controls-play"></span>
-						<?php esc_html_e('Run All', 'ai-post-scheduler'); ?>
+						<?php esc_html_e('Run Selected', 'ai-post-scheduler'); ?>
 					</button>
 					<button type="button" class="aips-btn aips-btn-secondary" id="aips-stress-reset">
 						<span class="dashicons dashicons-update"></span>
@@ -144,6 +148,9 @@ foreach ($cases as $case) {
 			<table class="aips-table aips-stress-table">
 				<thead>
 					<tr>
+						<th class="aips-stress-col-checkbox" style="width:38px;text-align:center;">
+							<input type="checkbox" id="aips-stress-toggle-all" class="aips-stress-toggle-all" checked title="<?php esc_attr_e('Toggle All', 'ai-post-scheduler'); ?>">
+						</th>
 						<th class="aips-stress-col-status"><span class="screen-reader-text"><?php esc_html_e('Status', 'ai-post-scheduler'); ?></span></th>
 						<th><?php esc_html_e('Test Case', 'ai-post-scheduler'); ?></th>
 						<th class="aips-stress-col-result"><?php esc_html_e('Result', 'ai-post-scheduler'); ?></th>
@@ -154,6 +161,9 @@ foreach ($cases as $case) {
 				<tbody>
 					<?php foreach ($cases as $case) : ?>
 						<tr class="aips-stress-row" data-case="<?php echo esc_attr($case['id']); ?>" data-status="idle">
+							<td class="aips-stress-col-checkbox" style="width:38px;text-align:center;">
+								<input type="checkbox" class="aips-stress-case-checkbox" value="<?php echo esc_attr($case['id']); ?>" checked>
+							</td>
 							<td class="aips-stress-col-status">
 								<span class="aips-stress-indicator" aria-hidden="true"></span>
 							</td>
@@ -182,7 +192,7 @@ foreach ($cases as $case) {
 							</td>
 						</tr>
 						<tr class="aips-stress-details-row" id="aips-stress-details-<?php echo esc_attr($case['id']); ?>" hidden>
-							<td colspan="5">
+							<td colspan="6">
 								<div class="aips-stress-details"></div>
 							</td>
 						</tr>

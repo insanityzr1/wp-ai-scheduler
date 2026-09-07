@@ -20,7 +20,10 @@ class AIPS_Diagnostics_Controller {
 	/**
 	 * Default Diagnostics tab key.
 	 */
-	private const DEFAULT_TAB = 'status';
+	/**
+	 * Default Diagnostics tab key.
+	 */
+	private const DEFAULT_TAB = 'system-info';
 
 	/**
 	 * Render the Diagnostics page.
@@ -42,14 +45,24 @@ class AIPS_Diagnostics_Controller {
 	/**
 	 * Get available Diagnostics tabs.
 	 *
-	 * @return array<string, array{label:string}>
+	 * @return array<string, array{label:string, icon:string, description:string}>
 	 */
 	public function get_tabs() {
 		$tabs = array(
-			'status' => array(
-				'label'       => __('System Status', 'ai-post-scheduler'),
+			'system-info' => array(
+				'label'       => __('System Info', 'ai-post-scheduler'),
+				'icon'        => 'dashicons-info',
+				'description' => __('Environment & server specifications', 'ai-post-scheduler'),
+			),
+			'health' => array(
+				'label'       => __('System Health & Tools', 'ai-post-scheduler'),
+				'icon'        => 'dashicons-admin-tools',
+				'description' => __('Maintenance, recovery & cache rebuild', 'ai-post-scheduler'),
+			),
+			'operations' => array(
+				'label'       => __('Operational Status', 'ai-post-scheduler'),
 				'icon'        => 'dashicons-dashboard',
-				'description' => __('System health & environment', 'ai-post-scheduler'),
+				'description' => __('Scheduler, queue & pipeline metrics', 'ai-post-scheduler'),
 			),
 		);
 
@@ -103,9 +116,11 @@ class AIPS_Diagnostics_Controller {
 		$active_tab = filter_input(INPUT_GET, 'tab', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
 		$active_tab = $active_tab ? sanitize_key($active_tab) : self::DEFAULT_TAB;
 
-		// Backward compatibility for previous Diagnostics tab key.
+		// Backward compatibility for previous Diagnostics tab keys.
 		if ('operations-insights' === $active_tab) {
 			$active_tab = 'insights';
+		} elseif ('status' === $active_tab) {
+			$active_tab = 'system-info';
 		}
 
 		if (!self::is_tab_available($active_tab)) {
@@ -124,7 +139,7 @@ class AIPS_Diagnostics_Controller {
 	public static function is_tab_available($tab) {
 		// Keep in step with get_tabs(): a tab listed there but missing here is
 		// rejected by get_active_tab_key() and silently falls back to the default.
-		if (in_array($tab, array('status', 'insights', 'cache-monitor', 'stress-test'), true)) {
+		if (in_array($tab, array('system-info', 'health', 'operations', 'status', 'insights', 'cache-monitor', 'stress-test'), true)) {
 			return true;
 		}
 
@@ -169,6 +184,21 @@ class AIPS_Diagnostics_Controller {
 	 */
 	public function render_tab_content($active_tab) {
 		switch ($active_tab) {
+			case 'system-info':
+				AIPS_Admin_Menu_Helper::safe_render(function() {
+					include AIPS_PLUGIN_DIR . 'templates/admin/system-info.php';
+				}, __('System Info', 'ai-post-scheduler'), true);
+				break;
+			case 'health':
+				AIPS_Admin_Menu_Helper::safe_render(function() {
+					include AIPS_PLUGIN_DIR . 'templates/admin/system-health.php';
+				}, __('System Health & Tools', 'ai-post-scheduler'), true);
+				break;
+			case 'operations':
+				AIPS_Admin_Menu_Helper::safe_render(function() {
+					include AIPS_PLUGIN_DIR . 'templates/admin/operational-status.php';
+				}, __('Operational Status', 'ai-post-scheduler'), true);
+				break;
 			case 'operations-insights':
 			case 'insights':
 				AIPS_Admin_Menu_Helper::safe_render(function() {
@@ -198,8 +228,8 @@ class AIPS_Diagnostics_Controller {
 			case 'status':
 			default:
 				AIPS_Admin_Menu_Helper::safe_render(function() {
-					$this->render_status_tab();
-				}, __('System Status', 'ai-post-scheduler'), true);
+					include AIPS_PLUGIN_DIR . 'templates/admin/system-info.php';
+				}, __('System Info', 'ai-post-scheduler'), true);
 				break;
 		}
 	}

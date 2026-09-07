@@ -63,6 +63,58 @@
 			$(document).on('click', '.aips-toggle-refresh-tasks', this.toggleRefreshTasks.bind(this));
 			$(document).on('click', '.aips-toggle-cache-tasks', this.toggleCacheTasks.bind(this));
 			$(document).on('click', '.aips-refresh-system', this.refreshSystem.bind(this));
+			$(document).on('click', '.aips-copy-system-report', this.copySystemReport.bind(this));
+		},
+
+		/**
+		 * Copy the Markdown-formatted system report to clipboard.
+		 *
+		 * @param {Event} e Click event.
+		 * @return {void}
+		 */
+		copySystemReport: function(e) {
+			e.preventDefault();
+			var self = this;
+			var reportText = $('#aips-system-report-raw').val() || '';
+
+			if (!reportText) {
+				return;
+			}
+
+			if (navigator.clipboard && navigator.clipboard.writeText) {
+				navigator.clipboard.writeText(reportText).then(function() {
+					if (AIPS.Utilities && AIPS.Utilities.showToast) {
+						AIPS.Utilities.showToast('System report copied to clipboard!', 'success');
+					}
+				}).catch(function() {
+					self.fallbackCopy(reportText);
+				});
+			} else {
+				this.fallbackCopy(reportText);
+			}
+		},
+
+		/**
+		 * Fallback clipboard copy using temporary textarea element.
+		 *
+		 * @param {string} text Text to copy.
+		 * @return {void}
+		 */
+		fallbackCopy: function(text) {
+			var $temp = $('<textarea>');
+			$('body').append($temp);
+			$temp.val(text).select();
+			try {
+				document.execCommand('copy');
+				if (AIPS.Utilities && AIPS.Utilities.showToast) {
+					AIPS.Utilities.showToast('System report copied to clipboard!', 'success');
+				}
+			} catch (err) {
+				if (AIPS.Utilities && AIPS.Utilities.showToast) {
+					AIPS.Utilities.showToast('Failed to copy report.', 'error');
+				}
+			}
+			$temp.remove();
 		},
 
 		/**

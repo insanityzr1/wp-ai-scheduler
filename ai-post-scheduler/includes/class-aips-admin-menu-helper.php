@@ -198,15 +198,9 @@ class AIPS_Admin_Menu_Helper {
 			}
 
 			if ($is_tab) {
-				echo '<div class="aips-content-panel"><div class="aips-panel-body"><div class="notice notice-error inline"><p>' .
-					sprintf(esc_html__('The %s module is currently unavailable. Please check the system log or try reloading the page.', 'ai-post-scheduler'), esc_html($title)) .
-				'</p></div></div></div>';
+				include AIPS_PLUGIN_DIR . 'templates/admin/errors/tab-error.php';
 			} else {
-				echo '<div class="wrap aips-wrap"><div class="aips-page-container"><div class="aips-content-panel"><div class="aips-panel-body"><div class="aips-empty-state"><span class="dashicons dashicons-warning" style="font-size:36px;width:36px;height:36px;color:#d63638;margin-bottom:12px;"></span><h3>' .
-					sprintf(esc_html__('The %s page is currently unavailable', 'ai-post-scheduler'), esc_html($title)) .
-					'</h3><p class="aips-muted">' .
-					esc_html__('An unexpected error occurred while loading this page. Details have been logged for diagnostics.', 'ai-post-scheduler') .
-				'</p></div></div></div></div></div>';
+				include AIPS_PLUGIN_DIR . 'templates/admin/errors/page-error.php';
 			}
 		}
 	}

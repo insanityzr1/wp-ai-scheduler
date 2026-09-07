@@ -679,6 +679,9 @@
 	}
 
 	function escapeHtml(str) {
+		if (window.AIPS && window.AIPS.Utilities && typeof window.AIPS.Utilities.escapeHtml === 'function') {
+			return window.AIPS.Utilities.escapeHtml(str);
+		}
 		if (!str) return '';
 		return String(str)
 			.replace(/&/g, '&amp;')

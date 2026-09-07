@@ -478,6 +478,8 @@ if (!defined('ABSPATH')) {
 										'template_schedule' => __('Template', 'ai-post-scheduler'),
 										'author_topic_gen'  => __('Topic Gen', 'ai-post-scheduler'),
 										'author_post_gen'   => __('Post Gen', 'ai-post-scheduler'),
+										'blueprint'         => __('Blueprint', 'ai-post-scheduler'),
+										'author_workflow'   => __('Blueprint', 'ai-post-scheduler'),
 									);
 									$type_label = isset($type_labels[$type_key]) ? $type_labels[$type_key] : esc_html__('Schedule', 'ai-post-scheduler');
 									?>

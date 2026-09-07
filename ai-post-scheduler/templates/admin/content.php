@@ -17,7 +17,6 @@ if (!defined('ABSPATH')) {
 }
 
 /** @var AIPS_Generated_Posts_Controller $controller */
-?>
 
 $active_tab = isset($_GET['tab']) ? sanitize_key(wp_unslash($_GET['tab'])) : 'aips-generated-posts';
 $valid_tabs = array('aips-generated-posts', 'aips-partial-generations', 'aips-pending-review', 'aips-content-indexer');

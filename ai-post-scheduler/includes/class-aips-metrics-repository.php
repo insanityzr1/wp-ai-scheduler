@@ -435,10 +435,10 @@ class AIPS_Metrics_Repository {
 			$this->wpdb->prepare(
 				"SELECT
 					COUNT(*) AS total,
-					SUM(CASE WHEN status = 'completed'  THEN 1 ELSE 0 END) AS completed,
-					SUM(CASE WHEN status = 'failed'     THEN 1 ELSE 0 END) AS failed,
-					SUM(CASE WHEN status = 'partial'    THEN 1 ELSE 0 END) AS partial,
-					SUM(CASE WHEN status = 'terminated' THEN 1 ELSE 0 END) AS terminated
+					SUM(CASE WHEN status = 'completed'  THEN 1 ELSE 0 END) AS `completed`,
+					SUM(CASE WHEN status = 'failed'     THEN 1 ELSE 0 END) AS `failed`,
+					SUM(CASE WHEN status = 'partial'    THEN 1 ELSE 0 END) AS `partial`,
+					SUM(CASE WHEN status = 'terminated' THEN 1 ELSE 0 END) AS `terminated`
 				FROM {$this->table_history}
 				WHERE created_at >= %d",
 				$cutoff
@@ -653,8 +653,8 @@ class AIPS_Metrics_Repository {
 			$this->wpdb->prepare(
 				"SELECT
 					COUNT(*) AS total,
-					SUM(CASE WHEN status = 'completed'  THEN 1 ELSE 0 END) AS completed,
-					SUM(CASE WHEN status = 'terminated' THEN 1 ELSE 0 END) AS terminated
+					SUM(CASE WHEN status = 'completed'  THEN 1 ELSE 0 END) AS `completed`,
+					SUM(CASE WHEN status = 'terminated' THEN 1 ELSE 0 END) AS `terminated`
 				FROM {$this->table_history}
 				WHERE creation_method = %s
 				  AND created_at >= %d",

@@ -582,7 +582,7 @@ if (!function_exists('aips_datetime_from_db_value')) {
 			<button type="button" class="aips-modal-close" aria-label="<?php esc_attr_e('Close modal', 'ai-post-scheduler'); ?>">&times;</button>
 		</div>
 		<div class="aips-modal-body">
-			<form id="aips-schedule-form">
+			<form id="aips-schedule-form" data-aips-async="true">
 				<input type="hidden" name="schedule_id" id="schedule_id" value="">
 				<div class="aips-form-row">
 					<label for="schedule_title"><?php esc_html_e('Title (Optional)', 'ai-post-scheduler'); ?></label>

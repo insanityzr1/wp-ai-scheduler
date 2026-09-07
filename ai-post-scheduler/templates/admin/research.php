@@ -97,7 +97,7 @@ if (!in_array($active_tab, $valid_tabs, true)) {
                 <h2 class="aips-panel-title"><?php esc_html_e('New Research', 'ai-post-scheduler'); ?></h2>
             </div>
             <div class="aips-panel-body">
-            <form id="aips-research-form" method="post">
+            <form id="aips-research-form" method="post" data-aips-async="true">
                 <?php wp_nonce_field('aips_ajax_nonce', 'aips_nonce'); ?>
                 
                 <table class="form-table">
@@ -162,7 +162,7 @@ if (!in_array($active_tab, $valid_tabs, true)) {
             <p class="description" style="margin-bottom: 12px;">
                 <?php esc_html_e('Use pre-fetched content from your Trusted Sources to ground AI topic suggestions in real reference material.', 'ai-post-scheduler'); ?>
             </p>
-            <form id="aips-research-from-sources-form" method="post">
+            <form id="aips-research-from-sources-form" method="post" data-aips-async="true">
                 <input
                     type="hidden"
                     id="aips-source-research-nonce"
@@ -313,7 +313,7 @@ if (!in_array($active_tab, $valid_tabs, true)) {
                 <h2 class="aips-panel-title"><?php esc_html_e('Schedule Selected Topics', 'ai-post-scheduler'); ?></h2>
             </div>
             <div class="aips-panel-body">
-                <form id="bulk-schedule-form">
+                <form id="bulk-schedule-form" data-aips-async="true">
                     <table class="form-table">
                         <tr>
                             <th scope="row">

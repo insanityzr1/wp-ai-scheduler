@@ -6251,29 +6251,32 @@ li.toplevel_page_ai-post-scheduler li:has(> a[href*="aips-author-topics"]) {
    ========================================================================== */
 
 .aips-rail-layout {
-	display: grid;
-	grid-template-columns: 260px minmax(0, 1fr);
-	gap: var(--aips-space-5);
-	align-items: start;
+	display: grid !important;
+	grid-template-columns: 260px minmax(0, 1fr) !important;
+	gap: var(--aips-space-5) !important;
+	align-items: start !important;
 }
 
 .aips-rail-sidebar {
-	background: var(--aips-white);
-	border: 1px solid var(--aips-gray-200);
-	border-radius: var(--aips-radius-md);
-	box-shadow: var(--aips-shadow-sm);
-	padding: var(--aips-space-2);
+	background: var(--aips-white) !important;
+	border: 1px solid var(--aips-gray-200) !important;
+	border-radius: var(--aips-radius-md) !important;
+	box-shadow: var(--aips-shadow-sm) !important;
+	padding: var(--aips-space-2) !important;
 	position: sticky;
 	top: 40px;
+	width: 260px;
+	min-width: 260px;
+	box-sizing: border-box;
 }
 
 .aips-rail-nav {
 	list-style: none !important;
 	margin: 0 !important;
 	padding: 0 !important;
-	display: flex;
-	flex-direction: column;
-	gap: 2px;
+	display: flex !important;
+	flex-direction: column !important;
+	gap: 2px !important;
 }
 
 .aips-rail-nav li {
@@ -6284,49 +6287,58 @@ li.toplevel_page_ai-post-scheduler li:has(> a[href*="aips-author-topics"]) {
 
 .aips-rail-nav a.aips-rail-item,
 .aips-rail-nav button.aips-rail-item,
+a.aips-rail-item,
+button.aips-rail-item,
 .aips-rail-item {
 	display: flex !important;
-	align-items: center;
-	gap: var(--aips-space-3);
-	padding: var(--aips-space-3) var(--aips-space-4);
-	border-radius: var(--aips-radius-base);
+	align-items: center !important;
+	gap: var(--aips-space-3) !important;
+	padding: var(--aips-space-3) var(--aips-space-4) !important;
+	border-radius: var(--aips-radius-base) !important;
 	color: var(--aips-gray-700) !important;
 	text-decoration: none !important;
-	transition: background var(--aips-transition-fast), color var(--aips-transition-fast);
-	position: relative;
-	border: 0;
-	background: none;
-	width: 100%;
-	text-align: left;
-	cursor: pointer;
-	font-family: inherit;
-	font-size: inherit;
-	box-sizing: border-box;
+	transition: background var(--aips-transition-fast), color var(--aips-transition-fast) !important;
+	position: relative !important;
+	border: 0 !important;
+	background: none !important;
+	width: 100% !important;
+	text-align: left !important;
+	cursor: pointer !important;
+	font-family: inherit !important;
+	font-size: inherit !important;
+	box-sizing: border-box !important;
 }
 
 .aips-rail-nav a.aips-rail-item:hover,
 .aips-rail-nav button.aips-rail-item:hover,
-.aips-rail-item:hover,
 .aips-rail-nav a.aips-rail-item:focus,
-.aips-rail-nav button.aips-rail-item:focus {
+.aips-rail-nav button.aips-rail-item:focus,
+a.aips-rail-item:hover,
+a.aips-rail-item:focus,
+.aips-rail-item:hover,
+.aips-rail-item:focus {
 	background: var(--aips-gray-50) !important;
 	color: var(--aips-gray-900) !important;
 	text-decoration: none !important;
 	box-shadow: none !important;
-	outline: none;
+	outline: none !important;
 }
 
 .aips-rail-nav a.aips-rail-item.active,
 .aips-rail-nav button.aips-rail-item.active,
+a.aips-rail-item.active,
+button.aips-rail-item.active,
 .aips-rail-item.active {
 	background: var(--aips-primary-light) !important;
 	color: var(--aips-primary) !important;
-	font-weight: var(--aips-font-semibold);
+	font-weight: var(--aips-font-semibold) !important;
 	text-decoration: none !important;
 }
 
 .aips-rail-nav a.aips-rail-item.active::before,
 .aips-rail-nav button.aips-rail-item.active::before,
+a.aips-rail-item.active::before,
+button.aips-rail-item.active::before,
 .aips-rail-item.active::before {
 	content: '';
 	position: absolute;

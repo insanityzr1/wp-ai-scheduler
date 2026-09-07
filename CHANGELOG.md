@@ -1,3 +1,9 @@
+## [3.7.3] - 2026-09-07
+
+### Fixed
+- **Rail Sidebar Styles & Layout:** Fortified CSS specificity and width constraints on `.aips-rail-layout`, `.aips-rail-sidebar`, and `.aips-rail-item` across both anchor links and button triggers to eliminate unstyled link fallbacks and prevent responsive collapse on desktop viewports.
+- **Asset Versioning:** Bumped version to 3.7.3 to invalidate cached admin stylesheets.
+
 ## [3.7.2] - 2026-09-07
 
 ### Added

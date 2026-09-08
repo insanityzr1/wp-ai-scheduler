@@ -65,7 +65,7 @@ class AIPS_Diagnostics_Controller {
 					array('label' => __('Telemetry Stream', 'ai-post-scheduler'), 'value' => __('Active', 'ai-post-scheduler'), 'type' => 'info', 'icon' => 'dashicons-performance'),
 				);
 			}
-		} catch (Exception $e) {
+		} catch (\Throwable $e) {
 			// Fail-safe: empty summary items
 		}
 

@@ -57,33 +57,42 @@ class AIPS_Automations_Controller {
 
 		try {
 			if ('schedules' === $active_tab && class_exists('AIPS_Schedule_Repository')) {
-				$schedules  = (new AIPS_Schedule_Repository())->get_all();
-				$active_cnt = count(array_filter($schedules, function($s) { return !empty($s['active']); }));
+				$schedules  = AIPS_Schedule_Repository::instance()->get_all();
+				$active_cnt = count(array_filter($schedules, function($s) {
+					if (is_object($s)) {
+						return !empty($s->is_active);
+					}
+					return is_array($s) && !empty($s['is_active']);
+				}));
 				$summary_items = array(
 					array('label' => __('Active Pipelines', 'ai-post-scheduler'), 'value' => $active_cnt, 'type' => 'success', 'icon' => 'dashicons-yes-alt'),
 					array('label' => __('Total Schedules', 'ai-post-scheduler'), 'value' => count($schedules), 'type' => 'neutral', 'icon' => 'dashicons-clock'),
 				);
-			} elseif ('campaigns' === $active_tab && class_exists('AIPS_Campaign_Repository')) {
-				$campaigns  = (new AIPS_Campaign_Repository())->get_all();
-				$active_cnt = count(array_filter($campaigns, function($c) { return isset($c['status']) && 'active' === $c['status']; }));
+			} elseif ('campaigns' === $active_tab && class_exists('AIPS_Campaigns_Repository')) {
+				$stats = AIPS_Campaigns_Repository::instance()->get_summary_stats();
 				$summary_items = array(
-					array('label' => __('Active Campaigns', 'ai-post-scheduler'), 'value' => $active_cnt, 'type' => 'success', 'icon' => 'dashicons-calendar-alt'),
-					array('label' => __('Total Batches', 'ai-post-scheduler'), 'value' => count($campaigns), 'type' => 'neutral'),
+					array('label' => __('Active Campaigns', 'ai-post-scheduler'), 'value' => $stats['active'], 'type' => 'success', 'icon' => 'dashicons-calendar-alt'),
+					array('label' => __('Total Batches', 'ai-post-scheduler'), 'value' => $stats['total'], 'type' => 'neutral'),
 				);
-			} elseif ('authors' === $active_tab && class_exists('AIPS_Author_Repository')) {
-				$authors       = (new AIPS_Author_Repository())->get_all();
+			} elseif ('authors' === $active_tab && class_exists('AIPS_Authors_Repository')) {
+				$authors       = (new AIPS_Authors_Repository())->get_all();
 				$summary_items = array(
 					array('label' => __('Author Personas', 'ai-post-scheduler'), 'value' => count($authors), 'type' => 'neutral', 'icon' => 'dashicons-admin-users'),
 				);
 			} elseif ('sources' === $active_tab && class_exists('AIPS_Sources_Repository')) {
 				$sources    = (new AIPS_Sources_Repository())->get_all(false);
-				$active_cnt = count(array_filter($sources, function($s) { return !empty($s['active']); }));
+				$active_cnt = count(array_filter($sources, function($s) {
+					if (is_object($s)) {
+						return !empty($s->is_active);
+					}
+					return is_array($s) && !empty($s['is_active']);
+				}));
 				$summary_items = array(
 					array('label' => __('Active Feeds', 'ai-post-scheduler'), 'value' => $active_cnt, 'type' => 'success', 'icon' => 'dashicons-rss'),
 					array('label' => __('Total Sources', 'ai-post-scheduler'), 'value' => count($sources), 'type' => 'neutral'),
 				);
 			}
-		} catch (Exception $e) {
+		} catch (\Throwable $e) {
 			// Fail-safe: empty summary items
 		}
 

@@ -124,4 +124,23 @@ class Test_AIPS_Admin_Page_Context extends WP_UnitTestCase {
 		$this->assertCount(1, $args['summary_items']);
 		$this->assertEquals(5, $args['summary_items'][0]['value']);
 	}
+
+	/**
+	 * Test Automations controller page context resolution across tabs.
+	 */
+	public function test_automations_controller_get_page_context() {
+		$controller = new AIPS_Automations_Controller();
+
+		$tabs = array('schedules', 'campaigns', 'authors', 'sources', 'monetization', 'internal-links', 'taxonomy');
+
+		foreach ($tabs as $tab) {
+			$ctx = $controller->get_page_context($tab);
+			$this->assertInstanceOf(AIPS_Admin_Page_Context::class, $ctx);
+			$this->assertEquals(AIPS_Admin_Page_Context::HUB_AUTOMATIONS, $ctx->hub_key);
+			$this->assertEquals($tab, $ctx->section_key);
+			$this->assertIsArray($ctx->summary_items);
+			$this->assertIsArray($ctx->actions);
+		}
+	}
 }
+

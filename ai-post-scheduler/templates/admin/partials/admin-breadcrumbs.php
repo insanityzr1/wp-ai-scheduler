@@ -52,13 +52,13 @@ $total = count($crumbs);
 						<?php if (!empty($icon)) : ?>
 							<span class="dashicons <?php echo esc_attr($icon); ?> aips-breadcrumb-icon" aria-hidden="true"></span>
 						<?php endif; ?>
-						<?php echo esc_html($label); ?>
+						<span><?php echo esc_html($label); ?></span>
 					</span>
 				<?php endif; ?>
+				<?php if (!$is_last) : ?>
+					<span class="aips-breadcrumb-sep" aria-hidden="true">/</span>
+				<?php endif; ?>
 			</li>
-			<?php if (!$is_last) : ?>
-				<li class="aips-breadcrumb-sep" aria-hidden="true">/</li>
-			<?php endif; ?>
 		<?php endforeach; ?>
 	</ol>
 </nav>

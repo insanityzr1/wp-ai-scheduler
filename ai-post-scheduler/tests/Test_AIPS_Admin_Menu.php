@@ -292,4 +292,39 @@ class Test_AIPS_Admin_Menu extends WP_UnitTestCase {
 		$this->assertFileExists(AIPS_PLUGIN_DIR . 'templates/admin/automations.php');
 	}
 
+	/**
+	 * Test that redirect_to_hub preserves query parameters like search, filters, and pagination.
+	 */
+	public function test_redirect_to_hub_preserves_query_parameters() {
+		$_GET['s']             = 'seo keywords';
+		$_GET['paged']         = '3';
+		$_GET['filter_status'] = 'active';
+		$_GET['page']          = 'aips-voices';
+
+		$redirect_target = '';
+		$filter_callback = function($location) use (&$redirect_target) {
+			$redirect_target = $location;
+			throw new Exception('Redirect intercepted: ' . $location);
+		};
+
+		add_filter('wp_redirect', $filter_callback);
+
+		try {
+			$this->admin_menu->redirect_to_hub('aips-studio', 'voices');
+		} catch (Exception $e) {
+			// Expected exception to prevent exit.
+		} finally {
+			remove_filter('wp_redirect', $filter_callback);
+		}
+
+		$this->assertNotEmpty($redirect_target, 'Redirect target URL should not be empty.');
+		$this->assertStringContainsString('page=aips-studio', $redirect_target);
+		$this->assertStringContainsString('tab=voices', $redirect_target);
+		$this->assertStringContainsString('s=seo+keywords', $redirect_target);
+		$this->assertStringContainsString('paged=3', $redirect_target);
+		$this->assertStringContainsString('filter_status=active', $redirect_target);
+
+		unset($_GET['s'], $_GET['paged'], $_GET['filter_status'], $_GET['page']);
+	}
+
 }

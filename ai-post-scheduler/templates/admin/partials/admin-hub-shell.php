@@ -40,7 +40,7 @@ $callback    = isset($args['content_callback']) && is_callable($args['content_ca
 					if (is_callable($callback)) {
 						call_user_func($callback);
 					} else {
-						echo $content; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+						echo wp_kses_post($content);
 					}
 					?>
 				</main>
@@ -51,7 +51,7 @@ $callback    = isset($args['content_callback']) && is_callable($args['content_ca
 				if (is_callable($callback)) {
 					call_user_func($callback);
 				} else {
-					echo $content; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+					echo wp_kses_post($content);
 				}
 				?>
 			</div>

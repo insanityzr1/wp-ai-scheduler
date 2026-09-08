@@ -224,4 +224,38 @@ class Test_AIPS_Admin_UI_Primitives extends WP_UnitTestCase {
 
 		$this->assertStringContainsString('aips-error-fallback', $output);
 	}
+
+	/**
+	 * Test that raw HTML strings passed into card body and footer are sanitized with wp_kses_post.
+	 */
+	public function test_render_card_sanitizes_raw_html_body_and_footer_strings() {
+		ob_start();
+		AIPS_Admin_UI_Primitives::render_card(array(
+			'id'     => 'test-xss-card',
+			'title'  => 'Security Test Card',
+			'body'   => '<p>Safe paragraph</p><script>alert("xss-body")</script><img src="x" onerror="alert(1)">',
+			'footer' => '<span>Safe Footer</span><script>alert("xss-footer")</script>',
+		));
+		$output = ob_get_clean();
+
+		$this->assertStringContainsString('<p>Safe paragraph</p>', $output);
+		$this->assertStringContainsString('<span>Safe Footer</span>', $output);
+		$this->assertStringNotContainsString('<script>alert("xss-body")</script>', $output);
+		$this->assertStringNotContainsString('<script>alert("xss-footer")</script>', $output);
+		$this->assertStringNotContainsString('onerror=', $output);
+	}
+
+	/**
+	 * Test that raw HTML string passed into hub shell content is sanitized with wp_kses_post.
+	 */
+	public function test_render_hub_shell_sanitizes_raw_html_content_string() {
+		ob_start();
+		AIPS_Admin_UI_Primitives::render_hub_shell(array(
+			'content' => '<div class="hub-main-safe">Safe Content</div><script>alert("xss-shell")</script>',
+		));
+		$output = ob_get_clean();
+
+		$this->assertStringContainsString('<div class="hub-main-safe">Safe Content</div>', $output);
+		$this->assertStringNotContainsString('<script>alert("xss-shell")</script>', $output);
+	}
 }

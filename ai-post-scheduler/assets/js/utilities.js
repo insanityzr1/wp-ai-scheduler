@@ -46,6 +46,15 @@
         initActionLock: function() {
             var self = this;
 
+            // Blanket block any click on busy or in-flight controls
+            $(document).on('click', '.is-busy, [data-aips-in-flight], [disabled]', function(e) {
+                if ($(this).data('aips-in-flight') || $(this).hasClass('is-busy')) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    return false;
+                }
+            });
+
             // Handle explicitly marked async forms
             $(document).on('submit', 'form[data-aips-async]', function(e) {
                 var $form = $(this);
@@ -65,13 +74,20 @@
             // Handle declarative locked buttons
             $(document).on('click', '[data-aips-lock]', function(e) {
                 var $btn = $(this);
-                if ($btn.data('aips-in-flight') || $btn.hasClass('is-busy')) {
+                if ($btn.data('aips-in-flight') || $btn.hasClass('is-busy') || $btn.prop('disabled')) {
                     e.preventDefault();
                     e.stopImmediatePropagation();
                     return false;
                 }
+
+                var href = $btn.attr('href');
+                if ($btn.is('a') && (!href || href === '#' || href.indexOf('javascript:') === 0 || $btn.data('aips-prevent-default') || $btn.data('aips-async'))) {
+                    e.preventDefault();
+                }
+
                 var loadingText = $btn.data('aips-loading-text') || '';
-                self.lockButton($btn, 30000, loadingText);
+                var timeout = parseInt($btn.data('aips-timeout'), 10) || 30000;
+                self.lockButton($btn, timeout, loadingText);
             });
         },
 

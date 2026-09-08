@@ -95,14 +95,14 @@ $has_header = !empty($card_title) || !empty($card_actions) || !empty($card_badge
 		if (is_callable($callback)) {
 			call_user_func($callback);
 		} else {
-			echo $card_body; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+			echo wp_kses_post($card_body);
 		}
 		?>
 	</div>
 
 	<?php if (!empty($card_footer)) : ?>
 		<div class="aips-panel-footer">
-			<?php echo $card_footer; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+			<?php echo wp_kses_post($card_footer); ?>
 		</div>
 	<?php endif; ?>
 </div>

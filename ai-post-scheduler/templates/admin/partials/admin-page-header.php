@@ -33,24 +33,7 @@ $actions       = isset($args['actions']) && is_array($args['actions']) ? $args['
 				<?php endif; ?>
 
 				<?php if (!empty($breadcrumbs) && is_array($breadcrumbs)) : ?>
-					<nav class="aips-title-breadcrumb-trail" aria-label="<?php esc_attr_e('Page Location', 'ai-post-scheduler'); ?>">
-						<?php
-						$b_total = count($breadcrumbs);
-						foreach ($breadcrumbs as $b_idx => $b_crumb) :
-							$b_is_last = ($b_idx === $b_total - 1);
-							$b_label   = isset($b_crumb['label']) ? $b_crumb['label'] : '';
-							$b_url     = isset($b_crumb['url']) ? $b_crumb['url'] : '';
-						?>
-							<?php if (!empty($b_url) && !$b_is_last) : ?>
-								<a href="<?php echo esc_url($b_url); ?>" class="aips-title-breadcrumb-link"><?php echo esc_html($b_label); ?></a>
-							<?php else : ?>
-								<span class="aips-title-breadcrumb-current"><?php echo esc_html($b_label); ?></span>
-							<?php endif; ?>
-							<?php if (!$b_is_last) : ?>
-								<span class="aips-page-context-separator" aria-hidden="true">/</span>
-							<?php endif; ?>
-						<?php endforeach; ?>
-					</nav>
+					<?php AIPS_Admin_UI_Primitives::render_breadcrumbs($breadcrumbs); ?>
 				<?php else : ?>
 					<span><?php echo esc_html($title); ?></span>
 					<?php if (!empty($context_title) && $context_title !== $title) : ?>

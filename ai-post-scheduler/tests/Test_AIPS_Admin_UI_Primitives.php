@@ -265,20 +265,19 @@ class Test_AIPS_Admin_UI_Primitives extends WP_UnitTestCase {
 	public function test_render_breadcrumbs() {
 		ob_start();
 		AIPS_Admin_UI_Primitives::render_breadcrumbs(array(
-			array('label' => 'Automations', 'url' => 'admin.php?page=aips-automations', 'icon' => 'dashicons-rest-api'),
+			array('label' => 'Automations', 'url' => 'admin.php?page=aips-automations'),
 			array('label' => 'Schedules', 'url' => 'admin.php?page=aips-automations&tab=schedules'),
 			array('label' => 'Edit Rule'),
 		));
 		$output = ob_get_clean();
 
-		$this->assertStringContainsString('aips-breadcrumb-nav', $output);
-		$this->assertStringContainsString('aips-breadcrumb-root', $output);
-		$this->assertStringContainsString('aips-breadcrumb-current', $output);
-		$this->assertStringContainsString('aria-current="page"', $output);
+		$this->assertStringContainsString('aips-title-breadcrumb-trail', $output);
+		$this->assertStringContainsString('aips-title-breadcrumb-link', $output);
+		$this->assertStringContainsString('aips-title-breadcrumb-current', $output);
+		$this->assertStringContainsString('aips-page-context-separator', $output);
 		$this->assertStringContainsString('Automations', $output);
 		$this->assertStringContainsString('Schedules', $output);
 		$this->assertStringContainsString('Edit Rule', $output);
-		$this->assertStringContainsString('dashicons-rest-api', $output);
 	}
 
 	/**
@@ -295,8 +294,10 @@ class Test_AIPS_Admin_UI_Primitives extends WP_UnitTestCase {
 		AIPS_Admin_UI_Primitives::render_page_header($ctx);
 		$output = ob_get_clean();
 
-		$this->assertStringContainsString('aips-breadcrumb-nav', $output);
-		$this->assertStringContainsString('aips-page-context-label', $output);
+		$this->assertStringContainsString('aips-title-breadcrumb-trail', $output);
+		$this->assertStringContainsString('aips-title-breadcrumb-link', $output);
+		$this->assertStringContainsString('aips-title-breadcrumb-current', $output);
+		$this->assertStringContainsString('Automations', $output);
 		$this->assertStringContainsString('Schedules', $output);
 		$this->assertStringContainsString('aips-page-summary-strip', $output);
 		$this->assertStringContainsString('aips-summary-chip-success', $output);

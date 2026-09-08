@@ -15,10 +15,6 @@ $page_context = AIPS_Admin_Page_Context::resolve('ai-post-scheduler');
 	<div class="aips-page-container" id="aips-dashboard-panel">
 		<div class="aips-dashboard-spinner-overlay"><span class="spinner is-active"></span></div>
 
-		<?php if (!empty($page_context->breadcrumbs)) : ?>
-			<?php AIPS_Admin_UI_Primitives::render_breadcrumbs($page_context->breadcrumbs); ?>
-		<?php endif; ?>
-
 		<!-- Page Header -->
 		<div class="aips-page-header">
 			<div class="aips-page-header-top">

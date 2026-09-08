@@ -25,21 +25,40 @@ $summary_items = isset($args['summary_items']) && is_array($args['summary_items'
 $actions       = isset($args['actions']) && is_array($args['actions']) ? $args['actions'] : array();
 ?>
 <div class="aips-page-header">
-	<?php if (!empty($breadcrumbs)) : ?>
-		<?php AIPS_Admin_UI_Primitives::render_breadcrumbs($breadcrumbs); ?>
-	<?php endif; ?>
-
 	<div class="aips-page-header-top">
 		<div class="aips-page-header-info">
 			<h1 class="aips-page-title">
 				<?php if (!empty($icon)) : ?>
 					<span class="dashicons <?php echo esc_attr($icon); ?> aips-page-title-icon" aria-hidden="true"<?php echo (!empty($args['icon_color']) && $args['icon_color'] !== '#2271b1') ? ' style="color:' . esc_attr($args['icon_color']) . ';"' : ''; ?>></span>
 				<?php endif; ?>
-				<span><?php echo esc_html($title); ?></span>
-				<?php if (!empty($context_title) && $context_title !== $title) : ?>
-					<span class="aips-page-context-separator" aria-hidden="true">/</span>
-					<span class="aips-page-context-label"><?php echo esc_html($context_title); ?></span>
+
+				<?php if (!empty($breadcrumbs) && is_array($breadcrumbs)) : ?>
+					<nav class="aips-title-breadcrumb-trail" aria-label="<?php esc_attr_e('Page Location', 'ai-post-scheduler'); ?>">
+						<?php
+						$b_total = count($breadcrumbs);
+						foreach ($breadcrumbs as $b_idx => $b_crumb) :
+							$b_is_last = ($b_idx === $b_total - 1);
+							$b_label   = isset($b_crumb['label']) ? $b_crumb['label'] : '';
+							$b_url     = isset($b_crumb['url']) ? $b_crumb['url'] : '';
+						?>
+							<?php if (!empty($b_url) && !$b_is_last) : ?>
+								<a href="<?php echo esc_url($b_url); ?>" class="aips-title-breadcrumb-link"><?php echo esc_html($b_label); ?></a>
+							<?php else : ?>
+								<span class="aips-title-breadcrumb-current"><?php echo esc_html($b_label); ?></span>
+							<?php endif; ?>
+							<?php if (!$b_is_last) : ?>
+								<span class="aips-page-context-separator" aria-hidden="true">/</span>
+							<?php endif; ?>
+						<?php endforeach; ?>
+					</nav>
+				<?php else : ?>
+					<span><?php echo esc_html($title); ?></span>
+					<?php if (!empty($context_title) && $context_title !== $title) : ?>
+						<span class="aips-page-context-separator" aria-hidden="true">/</span>
+						<span class="aips-page-context-label"><?php echo esc_html($context_title); ?></span>
+					<?php endif; ?>
 				<?php endif; ?>
+
 				<?php foreach ($badges as $badge) : ?>
 					<?php echo AIPS_Admin_UI_Primitives::render_status_badge($badge); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 				<?php endforeach; ?>

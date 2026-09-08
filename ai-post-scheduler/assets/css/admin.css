@@ -7007,7 +7007,34 @@ ol.aips-breadcrumb-trail,
 	display: flex;
 	align-items: center;
 	flex-wrap: wrap;
-	gap: 8px;
+	gap: 6px;
+}
+
+.aips-title-breadcrumb-trail {
+	display: inline-flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 4px;
+	font-size: inherit;
+	line-height: inherit;
+}
+
+.aips-title-breadcrumb-link {
+	color: var(--aips-primary, #2271b1);
+	text-decoration: none;
+	font-weight: var(--aips-font-medium, 500);
+	transition: color var(--aips-transition-fast, 0.15s ease);
+}
+
+.aips-title-breadcrumb-link:hover,
+.aips-title-breadcrumb-link:focus {
+	color: var(--aips-primary-hover, #135e96);
+	text-decoration: underline;
+}
+
+.aips-title-breadcrumb-current {
+	color: var(--aips-gray-900, #1d2327);
+	font-weight: var(--aips-font-bold, 700);
 }
 
 .aips-page-title-icon {

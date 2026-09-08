@@ -6468,7 +6468,7 @@ a.aips-card-btn-open:focus {
 
 .aips-rail-layout {
 	display: grid !important;
-	grid-template-columns: 260px minmax(0, 1fr) !important;
+	grid-template-columns: 280px minmax(0, 1fr) !important;
 	gap: var(--aips-space-5) !important;
 	align-items: start !important;
 }
@@ -6481,8 +6481,8 @@ a.aips-card-btn-open:focus {
 	padding: var(--aips-space-2) !important;
 	position: sticky;
 	top: 40px;
-	width: 260px;
-	min-width: 260px;
+	width: 280px;
+	min-width: 280px;
 	box-sizing: border-box;
 }
 
@@ -6595,11 +6595,11 @@ button.aips-rail-item.active::before,
 
 .aips-rail-desc {
 	font-size: var(--aips-text-2xs);
+	line-height: 1.35;
 	color: var(--aips-gray-400) !important;
 	margin-top: 2px;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
+	white-space: normal;
+	word-break: break-word;
 	font-weight: var(--aips-font-normal);
 	text-decoration: none !important;
 }

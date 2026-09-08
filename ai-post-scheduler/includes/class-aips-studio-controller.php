@@ -105,7 +105,7 @@ class AIPS_Studio_Controller {
 	public function get_page_context($active_section, $stats = array()) {
 		$summary_items = array();
 
-		if (empty($active_section)) {
+		if (empty($active_section) || 'launchpad' === $active_section) {
 			// Launchpad summary
 			$t_total = isset($stats['templates']['total']) ? (int) $stats['templates']['total'] : 0;
 			$v_total = isset($stats['voices']['total']) ? (int) $stats['voices']['total'] : 0;
@@ -129,14 +129,108 @@ class AIPS_Studio_Controller {
 			}
 		}
 
+		$tab_actions = $this->get_tab_actions($active_section);
+
 		return AIPS_Admin_Page_Context::resolve(
 			self::PAGE_SLUG,
-			$active_section,
+			('launchpad' === $active_section) ? null : $active_section,
 			null,
 			array(
 				'summary_items' => $summary_items,
+				'actions'       => $tab_actions,
 			)
 		);
+	}
+
+	/**
+	 * Get Studio rail tabs with localized labels, icons, and descriptions.
+	 *
+	 * @param string $active_section Active section key.
+	 * @return array<string, array{label:string, icon:string, description:string}>
+	 */
+	public function get_tabs($active_section = '') {
+		return array(
+			'launchpad' => array(
+				'label'       => __('Launchpad', 'ai-post-scheduler'),
+				'icon'        => 'dashicons-grid-view',
+				'description' => __('Studio overview & quick links', 'ai-post-scheduler'),
+			),
+			'templates' => array(
+				'label'       => __('Templates', 'ai-post-scheduler'),
+				'icon'        => 'dashicons-media-document',
+				'description' => __('AI post generation templates', 'ai-post-scheduler'),
+			),
+			'voices' => array(
+				'label'       => __('Voices', 'ai-post-scheduler'),
+				'icon'        => 'dashicons-megaphone',
+				'description' => __('Brand voice personas & rules', 'ai-post-scheduler'),
+			),
+			'structures' => array(
+				'label'       => __('Article Structures', 'ai-post-scheduler'),
+				'icon'        => 'dashicons-editor-ol',
+				'description' => __('Article frameworks & outlines', 'ai-post-scheduler'),
+			),
+			'post-slices' => array(
+				'label'       => __('Post Slices', 'ai-post-scheduler'),
+				'icon'        => 'dashicons-layout',
+				'description' => __('Modular content blocks & CTAs', 'ai-post-scheduler'),
+			),
+		);
+	}
+
+	/**
+	 * Get header actions for the active Studio section.
+	 *
+	 * @param string $active_section Active section key.
+	 * @return array<int, array<string, mixed>>
+	 */
+	public function get_tab_actions($active_section) {
+		switch ($active_section) {
+			case 'templates':
+				return array(
+					array(
+						'type'  => 'button',
+						'class' => 'aips-btn aips-btn-primary aips-add-template-btn',
+						'icon'  => 'dashicons-plus-alt',
+						'label' => __('Add Template', 'ai-post-scheduler'),
+					),
+				);
+			case 'voices':
+				return array(
+					array(
+						'type'  => 'button',
+						'class' => 'aips-btn aips-btn-primary aips-add-voice-btn',
+						'icon'  => 'dashicons-plus-alt',
+						'label' => __('Add Voice', 'ai-post-scheduler'),
+					),
+				);
+			case 'structures':
+				return array(
+					array(
+						'type'  => 'button',
+						'class' => 'aips-btn aips-btn-primary aips-add-structure-btn',
+						'icon'  => 'dashicons-plus-alt',
+						'label' => __('Add Structure', 'ai-post-scheduler'),
+					),
+					array(
+						'type'  => 'button',
+						'class' => 'aips-btn aips-btn-secondary aips-add-section-btn',
+						'icon'  => 'dashicons-plus-alt2',
+						'label' => __('Add Section', 'ai-post-scheduler'),
+					),
+				);
+			case 'post-slices':
+				return array(
+					array(
+						'type'  => 'button',
+						'class' => 'aips-btn aips-btn-primary aips-add-slice-btn',
+						'icon'  => 'dashicons-plus-alt',
+						'label' => __('Add Slice', 'ai-post-scheduler'),
+					),
+				);
+			default:
+				return array();
+		}
 	}
 
 	/**

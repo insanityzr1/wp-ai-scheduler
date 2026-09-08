@@ -142,5 +142,22 @@ class Test_AIPS_Admin_Page_Context extends WP_UnitTestCase {
 			$this->assertIsArray($ctx->actions);
 		}
 	}
+
+	/**
+	 * Test Studio controller page context resolution across tabs.
+	 */
+	public function test_studio_controller_get_page_context() {
+		$controller = new AIPS_Studio_Controller();
+
+		$sections = array('', 'launchpad', 'templates', 'voices', 'structures', 'post-slices');
+
+		foreach ($sections as $sec) {
+			$ctx = $controller->get_page_context($sec);
+			$this->assertInstanceOf(AIPS_Admin_Page_Context::class, $ctx);
+			$this->assertEquals(AIPS_Admin_Page_Context::HUB_STUDIO, $ctx->hub_key);
+			$this->assertIsArray($ctx->summary_items);
+			$this->assertIsArray($ctx->actions);
+		}
+	}
 }
 

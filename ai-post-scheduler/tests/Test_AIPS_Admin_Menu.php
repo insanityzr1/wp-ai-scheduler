@@ -107,6 +107,18 @@ class Test_AIPS_Admin_Menu extends WP_UnitTestCase {
 		$result = $this->admin_menu->fix_author_topics_submenu_file('some-other-file');
 		$this->assertEquals('aips-studio', $result);
 
+		$_GET['page'] = 'aips-operations-insights';
+		$result = $this->admin_menu->fix_author_topics_submenu_file('some-other-file');
+		$this->assertEquals('aips-diagnostics', $result);
+
+		$_GET['page'] = 'aips-status';
+		$result = $this->admin_menu->fix_author_topics_submenu_file('some-other-file');
+		$this->assertEquals('aips-diagnostics', $result);
+
+		$_GET['page'] = 'aips-telemetry';
+		$result = $this->admin_menu->fix_author_topics_submenu_file('some-other-file');
+		$this->assertEquals('aips-diagnostics', $result);
+
 		$_GET['page'] = 'some-other-page';
 		$result = $this->admin_menu->fix_author_topics_submenu_file('some-other-file');
 		$this->assertEquals('some-other-file', $result);

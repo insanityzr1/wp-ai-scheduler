@@ -87,11 +87,56 @@ class AIPS_Studio_Controller {
 			wp_die(esc_html__('You do not have permission to access this page.', 'ai-post-scheduler'));
 		}
 
-		$active_section = self::get_active_section_key();
-		$stats = $this->get_studio_stats();
+		$active_section    = self::get_active_section_key();
+		$stats             = $this->get_studio_stats();
+		$page_context      = $this->get_page_context($active_section, $stats);
 		$studio_controller = $this;
 
 		include AIPS_PLUGIN_DIR . 'templates/admin/studio.php';
+	}
+
+	/**
+	 * Build page context model for the current Studio view.
+	 *
+	 * @param string $active_section Active section key or empty for launchpad.
+	 * @param array  $stats          Aggregated statistics.
+	 * @return AIPS_Admin_Page_Context
+	 */
+	public function get_page_context($active_section, $stats = array()) {
+		$summary_items = array();
+
+		if (empty($active_section)) {
+			// Launchpad summary
+			$t_total = isset($stats['templates']['total']) ? (int) $stats['templates']['total'] : 0;
+			$v_total = isset($stats['voices']['total']) ? (int) $stats['voices']['total'] : 0;
+			$s_total = isset($stats['structures']['total']) ? (int) $stats['structures']['total'] : 0;
+			$p_total = isset($stats['post-slices']['total']) ? (int) $stats['post-slices']['total'] : 0;
+
+			$summary_items = array(
+				array('label' => __('Templates', 'ai-post-scheduler'), 'value' => $t_total, 'type' => 'neutral', 'icon' => 'dashicons-media-document'),
+				array('label' => __('Voices', 'ai-post-scheduler'), 'value' => $v_total, 'type' => 'neutral', 'icon' => 'dashicons-megaphone'),
+				array('label' => __('Structures', 'ai-post-scheduler'), 'value' => $s_total, 'type' => 'neutral', 'icon' => 'dashicons-editor-ol'),
+				array('label' => __('Slices', 'ai-post-scheduler'), 'value' => $p_total, 'type' => 'neutral', 'icon' => 'dashicons-grid-view'),
+			);
+		} else {
+			// Focused section summary
+			$sec_stat = isset($stats[$active_section]) ? $stats[$active_section] : array('total' => 0, 'active' => 0);
+			$summary_items = array(
+				array('label' => __('Total Items', 'ai-post-scheduler'), 'value' => $sec_stat['total'], 'type' => 'neutral'),
+			);
+			if ($sec_stat['active'] > 0) {
+				$summary_items[] = array('label' => __('Active', 'ai-post-scheduler'), 'value' => $sec_stat['active'], 'type' => 'success', 'icon' => 'dashicons-yes-alt');
+			}
+		}
+
+		return AIPS_Admin_Page_Context::resolve(
+			self::PAGE_SLUG,
+			$active_section,
+			null,
+			array(
+				'summary_items' => $summary_items,
+			)
+		);
 	}
 
 	/**

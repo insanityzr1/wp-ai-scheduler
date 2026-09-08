@@ -23,17 +23,24 @@ $valid_tabs = array('trending', 'planner', 'gap-analysis');
 if (!in_array($active_tab, $valid_tabs, true)) {
     $active_tab = 'trending';
 }
+$summary_items = array();
+if ('trending' === $active_tab && !empty($stats['total_topics'])) {
+	$summary_items[] = array('label' => __('Tracked Topics', 'ai-post-scheduler'), 'value' => (int) $stats['total_topics'], 'type' => 'neutral', 'icon' => 'dashicons-chart-line');
+}
+
+$page_context = AIPS_Admin_Page_Context::resolve(
+	'aips-research',
+	$active_tab,
+	null,
+	array('summary_items' => $summary_items)
+);
 ?>
 
 <div class="wrap aips-wrap aips-research-wrap">
     <div class="aips-page-container">
         <!-- Page Header -->
         <?php
-        AIPS_Admin_UI_Primitives::render_page_header(array(
-            'title'       => __('Research', 'ai-post-scheduler'),
-            'icon'        => 'dashicons-search',
-            'description' => __('Discover trending topics in your niche using AI-powered research, perform content gap audits, and plan keyword strategy.', 'ai-post-scheduler'),
-        ));
+        AIPS_Admin_UI_Primitives::render_page_header($page_context);
 
         $rail_items = array(
             array(

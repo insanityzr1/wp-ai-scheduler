@@ -261,18 +261,10 @@ class AIPS_Admin_Menu {
      * @return bool
      */
     private function is_diagnostics_child_page($page) {
-        return in_array(
-            $page,
-            array(
-                'aips-operations-insights',
-                'aips-status',
-                'aips-telemetry',
-                'aips-dev-tools',
-                'aips-cache-monitor',
-                AIPS_Stress_Test_Controller::PAGE_SLUG,
-            ),
-            true
-        );
+        if (class_exists('AIPS_Admin_Page_Context') && AIPS_Admin_Page_Context::is_child_page($page, AIPS_Admin_Page_Context::HUB_DIAGNOSTICS)) {
+            return true;
+        }
+        return $page === AIPS_Stress_Test_Controller::PAGE_SLUG;
     }
 
     /**
@@ -282,23 +274,10 @@ class AIPS_Admin_Menu {
      * @return bool
      */
     private function is_automations_child_page($page) {
-        return in_array(
-            $page,
-            array(
-                'aips-schedule',
-                'aips-campaigns',
-                'aips-authors',
-                'aips-sources',
-                'aips-source-data',
-                'aips-taxonomy',
-                'aips-internal-links',
-                'aips-affiliate-links',
-                'aips-author-topics',
-                AIPS_Campaigns_Controller::PAGE_SLUG,
-                AIPS_Campaigns_Controller::DETAIL_PAGE_SLUG,
-            ),
-            true
-        );
+        if (class_exists('AIPS_Admin_Page_Context') && AIPS_Admin_Page_Context::is_child_page($page, AIPS_Admin_Page_Context::HUB_AUTOMATIONS)) {
+            return true;
+        }
+        return in_array($page, array(AIPS_Campaigns_Controller::PAGE_SLUG, AIPS_Campaigns_Controller::DETAIL_PAGE_SLUG), true);
     }
 
     /**
@@ -308,16 +287,10 @@ class AIPS_Admin_Menu {
      * @return bool
      */
     private function is_studio_child_page($page) {
-        return in_array(
-            $page,
-            array(
-                'aips-templates',
-                'aips-voices',
-                'aips-structures',
-                'aips-post-slices',
-            ),
-            true
-        );
+        if (class_exists('AIPS_Admin_Page_Context') && AIPS_Admin_Page_Context::is_child_page($page, AIPS_Admin_Page_Context::HUB_STUDIO)) {
+            return true;
+        }
+        return false;
     }
 
     /**

@@ -67,16 +67,15 @@ $settings_rail_items = array(
 		'description' => __('Debug & dev tools', 'ai-post-scheduler'),
 	),
 );
+$active_settings_tab = isset($_GET['tab']) ? sanitize_key(wp_unslash($_GET['tab'])) : 'settings-general';
+$page_context = AIPS_Admin_Page_Context::resolve(
+	'aips-settings',
+	$active_settings_tab
+);
 ?>
 <div class="wrap aips-wrap aips-settings-wrap">
 	<div class="aips-page-container">
-		<?php
-		AIPS_Admin_UI_Primitives::render_page_header(array(
-			'title'       => __('Settings', 'ai-post-scheduler'),
-			'icon'        => 'dashicons-admin-settings',
-			'description' => __('Configure plugin settings, check system status, and manage AI Engine connection.', 'ai-post-scheduler'),
-		));
-		?>
+		<?php AIPS_Admin_UI_Primitives::render_page_header($page_context); ?>
 
 		<!-- Vertical Sidebar Rail Layout -->
 		<div class="aips-rail-layout">

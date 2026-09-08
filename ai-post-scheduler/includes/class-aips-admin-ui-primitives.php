@@ -64,32 +64,48 @@ class AIPS_Admin_UI_Primitives {
 	/**
 	 * Render a complete Hub Shell (Wrap + Header + Rail Navigation + Main Stage).
 	 *
-	 * @param array<string, mixed> $args Shell configuration parameters:
+	 * @param array<string, mixed>|AIPS_Admin_Page_Context $args Shell configuration parameters:
 	 *  - 'wrap_class': (string) CSS class for the outermost wrap. Default 'wrap aips-wrap'.
-	 *  - 'header': (array) Parameters passed to `render_page_header()`.
+	 *  - 'header': (array|AIPS_Admin_Page_Context) Parameters passed to `render_page_header()`.
 	 *  - 'rail': (array) Parameters passed to `render_rail()`.
 	 *  - 'content': (string) Raw HTML or template output for the main content stage.
 	 *  - 'content_callback': (callable|null) Optional callback to render main stage content.
-	 * @param callable|null        $content_callback Optional callback if not provided in $args.
+	 * @param callable|null                                $content_callback Optional callback if not provided in $args.
 	 * @return void
 	 */
 	public static function render_hub_shell($args = array(), $content_callback = null) {
-		self::include_partial('admin-hub-shell.php', (array) $args, $content_callback);
+		self::include_partial('admin-hub-shell.php', $args, $content_callback);
 	}
 
 	/**
-	 * Render a standardized Admin Page Header.
+	 * Render a Breadcrumb Navigation Trail.
 	 *
-	 * @param array<string, mixed> $args Header configuration:
-	 *  - 'title': (string) Page title (e.g. 'Content', 'Studio', 'Automations').
+	 * @param array<int, array{label:string, url?:string, icon?:string}> $breadcrumbs Array of breadcrumb items.
+	 * @return void
+	 */
+	public static function render_breadcrumbs($breadcrumbs = array()) {
+		self::include_partial('admin-breadcrumbs.php', (array) $breadcrumbs);
+	}
+
+	/**
+	 * Render a standardized Admin Page Header with Contextual Breadcrumbs, Summary Chips, and Actions.
+	 *
+	 * @param array<string, mixed>|AIPS_Admin_Page_Context $args Header configuration:
+	 *  - 'title': (string) Page / Hub title (e.g. 'Content', 'Studio', 'Automations').
+	 *  - 'context_title': (string) Optional active section/tab/view title (e.g. 'Schedules').
 	 *  - 'icon': (string) Dashicon slug (e.g. 'dashicons-admin-post').
 	 *  - 'icon_color': (string) Optional icon color style/token.
 	 *  - 'description': (string) Short descriptive subtitle.
+	 *  - 'breadcrumbs': (array) Optional array of breadcrumb items.
+	 *  - 'summary_items': (array) Optional array of micro-metric summary chips.
 	 *  - 'badges': (array) Optional array of badge definitions for status/counts.
 	 *  - 'actions': (array) Array of action button arrays (label, icon, url/id, class, type, data_attrs).
 	 * @return void
 	 */
 	public static function render_page_header($args = array()) {
+		if ($args instanceof AIPS_Admin_Page_Context) {
+			$args = $args->to_header_args();
+		}
 		self::include_partial('admin-page-header.php', (array) $args);
 	}
 

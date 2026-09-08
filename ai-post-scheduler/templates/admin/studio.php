@@ -23,11 +23,15 @@ $sections = AIPS_Studio_Controller::get_sections();
 		<?php if (empty($active_section)) : ?>
 			<!-- STUDIO LAUNCHPAD VIEW -->
 			<?php
-			AIPS_Admin_UI_Primitives::render_page_header(array(
-				'title'       => __('Content Studio', 'ai-post-scheduler'),
-				'icon'        => 'dashicons-art',
-				'description' => __('Design and fine-tune your generative AI building blocks — templates, brand voices, article structures, and modular content slices.', 'ai-post-scheduler'),
-			));
+			if (isset($page_context) && $page_context instanceof AIPS_Admin_Page_Context) {
+				AIPS_Admin_UI_Primitives::render_page_header($page_context);
+			} else {
+				AIPS_Admin_UI_Primitives::render_page_header(array(
+					'title'       => __('Content Studio', 'ai-post-scheduler'),
+					'icon'        => 'dashicons-art',
+					'description' => __('Design and fine-tune your generative AI building blocks — templates, brand voices, article structures, and modular content slices.', 'ai-post-scheduler'),
+				));
+			}
 			?>
 
 			<div class="aips-launchpad-grid">
@@ -71,22 +75,20 @@ $sections = AIPS_Studio_Controller::get_sections();
 		<?php else : ?>
 			<!-- FOCUSED SECTION WORKSPACE VIEW -->
 			<?php $current_sec = $sections[$active_section]; ?>
+			<?php
+			if (isset($page_context) && $page_context instanceof AIPS_Admin_Page_Context) {
+				AIPS_Admin_UI_Primitives::render_page_header($page_context);
+			}
+			?>
+
 			<div class="aips-workspace-header">
 				<div class="aips-workspace-header-top">
-					<div class="aips-breadcrumb-trail">
-						<a href="<?php echo esc_url($studio_controller->get_section_url('')); ?>" class="aips-breadcrumb-root">
-							<span class="dashicons dashicons-art" aria-hidden="true"></span>
-							<?php esc_html_e('Studio', 'ai-post-scheduler'); ?>
-						</a>
-						<span class="aips-breadcrumb-sep">/</span>
-						<span class="aips-breadcrumb-current"><?php echo esc_html($current_sec['label']); ?></span>
-					</div>
-
 					<!-- Section Quick Switcher & Actions -->
 					<div class="aips-workspace-controls">
 						<div class="aips-switcher-pills">
 							<a href="<?php echo esc_url($studio_controller->get_section_url('')); ?>" class="aips-pill-btn" title="<?php esc_attr_e('Launchpad Overview', 'ai-post-scheduler'); ?>">
 								<span class="dashicons dashicons-grid-view" aria-hidden="true"></span>
+								<span class="aips-pill-label"><?php esc_html_e('Launchpad', 'ai-post-scheduler'); ?></span>
 							</a>
 							<?php foreach ($sections as $k => $s) : ?>
 								<a href="<?php echo esc_url($studio_controller->get_section_url($k)); ?>" class="aips-pill-btn<?php echo $k === $active_section ? ' active' : ''; ?>">

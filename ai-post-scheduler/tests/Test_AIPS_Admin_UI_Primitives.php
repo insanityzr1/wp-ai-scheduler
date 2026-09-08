@@ -258,4 +258,49 @@ class Test_AIPS_Admin_UI_Primitives extends WP_UnitTestCase {
 		$this->assertStringContainsString('<div class="hub-main-safe">Safe Content</div>', $output);
 		$this->assertStringNotContainsString('<script>alert("xss-shell")</script>', $output);
 	}
+
+	/**
+	 * Test breadcrumbs primitive rendering.
+	 */
+	public function test_render_breadcrumbs() {
+		ob_start();
+		AIPS_Admin_UI_Primitives::render_breadcrumbs(array(
+			array('label' => 'Automations', 'url' => 'admin.php?page=aips-automations', 'icon' => 'dashicons-rest-api'),
+			array('label' => 'Schedules', 'url' => 'admin.php?page=aips-automations&tab=schedules'),
+			array('label' => 'Edit Rule'),
+		));
+		$output = ob_get_clean();
+
+		$this->assertStringContainsString('aips-breadcrumb-nav', $output);
+		$this->assertStringContainsString('aips-breadcrumb-root', $output);
+		$this->assertStringContainsString('aips-breadcrumb-current', $output);
+		$this->assertStringContainsString('aria-current="page"', $output);
+		$this->assertStringContainsString('Automations', $output);
+		$this->assertStringContainsString('Schedules', $output);
+		$this->assertStringContainsString('Edit Rule', $output);
+		$this->assertStringContainsString('dashicons-rest-api', $output);
+	}
+
+	/**
+	 * Test page header rendering with contextual title, breadcrumbs, and summary chips.
+	 */
+	public function test_render_page_header_with_context_and_summary_strip() {
+		$ctx = AIPS_Admin_Page_Context::resolve('aips-automations', 'schedules', null, array(
+			'summary_items' => array(
+				array('label' => 'Active Pipelines', 'value' => 7, 'type' => 'success'),
+			),
+		));
+
+		ob_start();
+		AIPS_Admin_UI_Primitives::render_page_header($ctx);
+		$output = ob_get_clean();
+
+		$this->assertStringContainsString('aips-breadcrumb-nav', $output);
+		$this->assertStringContainsString('aips-page-context-label', $output);
+		$this->assertStringContainsString('Schedules', $output);
+		$this->assertStringContainsString('aips-page-summary-strip', $output);
+		$this->assertStringContainsString('aips-summary-chip-success', $output);
+		$this->assertStringContainsString('Active Pipelines', $output);
+		$this->assertStringContainsString('7', $output);
+	}
 }

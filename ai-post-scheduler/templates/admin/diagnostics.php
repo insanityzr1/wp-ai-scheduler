@@ -29,11 +29,15 @@ foreach ($tabs as $tab_key => $tab) {
 <div class="wrap aips-wrap aips-diagnostics-wrap">
 	<div class="aips-page-container">
 		<?php
-		AIPS_Admin_UI_Primitives::render_page_header(array(
-			'title'       => __('Diagnostics', 'ai-post-scheduler'),
-			'icon'        => 'dashicons-admin-tools',
-			'description' => __('Review system health, generation operations, telemetry, seeding utilities, and developer tools from one place.', 'ai-post-scheduler'),
-		));
+		if (isset($page_context) && $page_context instanceof AIPS_Admin_Page_Context) {
+			AIPS_Admin_UI_Primitives::render_page_header($page_context);
+		} else {
+			AIPS_Admin_UI_Primitives::render_page_header(array(
+				'title'       => __('Diagnostics', 'ai-post-scheduler'),
+				'icon'        => 'dashicons-admin-tools',
+				'description' => __('Review system health, generation operations, telemetry, seeding utilities, and developer tools from one place.', 'ai-post-scheduler'),
+			));
+		}
 		?>
 
 		<!-- Vertical Sidebar Rail Layout -->

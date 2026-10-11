@@ -262,7 +262,7 @@ class AIPS_Author_Topics_List_Table extends AIPS_List_Table {
 		if ('all' === $status_filter) {
 			$topics = $this->topics_repository->get_by_author($this->author_id);
 		} else {
-			$topics = $this->topics_repository->get_by_author_and_status($this->author_id, $status_filter);
+			$topics = $this->topics_repository->get_by_author($this->author_id, $status_filter);
 		}
 
 		// Filter by search query if present

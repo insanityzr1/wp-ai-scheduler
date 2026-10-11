@@ -271,8 +271,8 @@ class AIPS_Author_Topics_List_Table extends AIPS_List_Table {
 			$term = strtolower($search);
 			$filtered = array();
 			foreach ($topics as $topic) {
-				$title = strtolower($topic->topic ?? '');
-				$prompt = strtolower($topic->prompt ?? '');
+				$title = strtolower($topic->topic_title ?? '');
+				$prompt = strtolower($topic->topic_prompt ?? '');
 				if (strpos($title, $term) !== false || strpos($prompt, $term) !== false) {
 					$filtered[] = $topic;
 				}
@@ -286,11 +286,11 @@ class AIPS_Author_Topics_List_Table extends AIPS_List_Table {
 
 		usort($topics, function($a, $b) use ($orderby, $order) {
 			if ('topic' === $orderby) {
-				$res = strcasecmp($a->topic ?? '', $b->topic ?? '');
+				$res = strcasecmp($a->topic_title ?? '', $b->topic_title ?? '');
 			} elseif ('status' === $orderby) {
 				$res = strcmp($a->status ?? '', $b->status ?? '');
 			} else {
-				$res = strcmp($a->created_at ?? '', $b->created_at ?? '');
+				$res = (int) ($a->generated_at ?? 0) <=> (int) ($b->generated_at ?? 0);
 			}
 			return ('desc' === $order) ? -$res : $res;
 		});
@@ -319,7 +319,7 @@ class AIPS_Author_Topics_List_Table extends AIPS_List_Table {
 		return sprintf(
 			'<input type="checkbox" name="topic_ids[]" value="%d" class="aips-topic-checkbox" aria-label="%s" />',
 			absint($item->id),
-			esc_attr(sprintf(__('Select %s', 'ai-post-scheduler'), $item->topic))
+			esc_attr(sprintf(__('Select %s', 'ai-post-scheduler'), $item->topic_title))
 		);
 	}
 
@@ -331,8 +331,8 @@ class AIPS_Author_Topics_List_Table extends AIPS_List_Table {
 	 */
 	protected function column_topic($item) {
 		$topic_id = (int) $item->id;
-		$title    = esc_html($item->topic ?? '');
-		$prompt   = !empty($item->prompt) ? esc_html($item->prompt) : '';
+		$title    = esc_html($item->topic_title ?? '');
+		$prompt   = !empty($item->topic_prompt) ? esc_html($item->topic_prompt) : '';
 
 		$html  = '<div class="topic-title-cell" data-topic-id="' . $topic_id . '">';
 		$html .= '<div class="cell-primary" style="display:flex;align-items:center;gap:6px;">';
@@ -342,7 +342,7 @@ class AIPS_Author_Topics_List_Table extends AIPS_List_Table {
 
 		// Editable container (hidden by default, revealed when editing)
 		$html .= '<div class="aips-topic-edit-form" id="topic-edit-' . $topic_id . '">';
-		$html .= '<input type="text" class="aips-form-input aips-topic-edit-input" value="' . esc_attr($item->topic ?? '') . '" />';
+		$html .= '<input type="text" class="aips-form-input aips-topic-edit-input" value="' . esc_attr($item->topic_title ?? '') . '" />';
 		$html .= '<button type="button" class="aips-btn aips-btn-sm aips-btn-primary aips-save-topic" data-topic-id="' . $topic_id . '">' . esc_html__('Save', 'ai-post-scheduler') . '</button> ';
 		$html .= '<button type="button" class="aips-btn aips-btn-sm aips-btn-ghost aips-cancel-edit-topic" data-topic-id="' . $topic_id . '">' . esc_html__('Cancel', 'ai-post-scheduler') . '</button>';
 		$html .= '</div>';
@@ -407,8 +407,8 @@ class AIPS_Author_Topics_List_Table extends AIPS_List_Table {
 	 * @return string
 	 */
 	protected function column_created_at($item) {
-		if (!empty($item->created_at)) {
-			$date = date_i18n(get_option('date_format'), strtotime($item->created_at));
+		if (!empty($item->generated_at)) {
+			$date = date_i18n(get_option('date_format'), (int) $item->generated_at);
 			return '<span class="cell-meta">' . esc_html($date) . '</span>';
 		}
 		return '<span class="cell-meta">—</span>';
@@ -453,7 +453,7 @@ class AIPS_Author_Topics_List_Table extends AIPS_List_Table {
 	 */
 	public function single_row_details($item) {
 		$structure_id = (int) ($item->article_structure_id ?? 0);
-		$prompt       = !empty($item->prompt) ? $item->prompt : '';
+		$prompt       = !empty($item->topic_prompt) ? $item->topic_prompt : '';
 
 		$html  = '<div class="aips-drawer-grid" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:16px;padding:12px 16px;">';
 
@@ -473,8 +473,8 @@ class AIPS_Author_Topics_List_Table extends AIPS_List_Table {
 		if ($structure_id > 0 && isset($this->structure_names[$structure_id])) {
 			$html .= '<div style="font-size:12px;color:var(--aips-gray-600);margin-bottom:4px;"><strong style="color:var(--aips-gray-700);">' . esc_html__('Structure:', 'ai-post-scheduler') . '</strong> ' . esc_html($this->structure_names[$structure_id]) . '</div>';
 		}
-		if (!empty($item->created_at)) {
-			$html .= '<div style="font-size:12px;color:var(--aips-gray-600);"><strong style="color:var(--aips-gray-700);">' . esc_html__('Created:', 'ai-post-scheduler') . '</strong> ' . esc_html($item->created_at) . '</div>';
+		if (!empty($item->generated_at)) {
+			$html .= '<div style="font-size:12px;color:var(--aips-gray-600);"><strong style="color:var(--aips-gray-700);">' . esc_html__('Created:', 'ai-post-scheduler') . '</strong> ' . esc_html(date_i18n(get_option('date_format') . ' ' . get_option('time_format'), (int) $item->generated_at)) . '</div>';
 		}
 		$html .= '</div>';
 

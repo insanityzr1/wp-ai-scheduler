@@ -15,6 +15,9 @@ class AIPS_History {
      * Maximum number of items shown in timeline sidebar.
      */
     private const TIMELINE_MAX_ITEMS = 30;
+
+    /** Upper bound for the History per-page Screen Option. */
+    private const MAX_PER_PAGE = 100;
     
     /**
      * @var AIPS_History_Repository Repository for database operations
@@ -532,6 +535,9 @@ class AIPS_History {
     /**
      * Get items per page for History from user meta Screen Options, falling back to 50.
      *
+     * Capped at MAX_PER_PAGE: with collapsing, each entry can expand to a full group of
+     * rows, so an unbounded page size would hydrate and render a very large page.
+     *
      * @param int $default Default fallback.
      * @return int
      */
@@ -540,7 +546,7 @@ class AIPS_History {
         if ($user_id) {
             $user_option = get_user_meta($user_id, 'aips_history_per_page', true);
             if (!empty($user_option) && (int) $user_option > 0) {
-                return (int) $user_option;
+                return min((int) $user_option, self::MAX_PER_PAGE);
             }
         }
         return $default;
@@ -2058,27 +2064,22 @@ class AIPS_History {
         // entry plan the repository paginates with.
         $max_rows = $max_rows >= 2 ? $max_rows : AIPS_History_Repository::GROUP_MAX_ROWS;
 
-        $grouped = array();
-        $count   = count( $items );
-        $i       = 0;
+        // Entry sizes come from the repository planner, so rendered groups always match
+        // the entries that pagination counted.
+        $keys = array();
+        foreach ( $items as $item ) {
+            $keys[] = AIPS_History_Repository::normalize_method_key( isset( $item->creation_method ) ? $item->creation_method : null );
+        }
+        $sizes = AIPS_History_Repository::plan_entry_sizes( $keys, $max_rows );
+
+        $grouped     = array();
+        $i           = 0;
         $group_index = 1;
 
-        while ( $i < $count ) {
+        foreach ( $sizes as $run_length ) {
             $current_item   = $items[ $i ];
-            $current_method = ! empty( $current_item->creation_method ) ? (string) $current_item->creation_method : 'post_generation';
-
-            // Look ahead for identical consecutive methods
-            $j = $i + 1;
-            while ( $j < $count ) {
-                $next_method = ! empty( $items[ $j ]->creation_method ) ? (string) $items[ $j ]->creation_method : 'post_generation';
-                if ( $next_method !== $current_method ) {
-                    break;
-                }
-                $j++;
-            }
-
-            $j          = min( $j, $i + $max_rows );
-            $run_length = $j - $i;
+            $current_method = $keys[ $i ];
+            $j              = $i + $run_length;
 
             if ( $run_length >= 2 ) {
                 $slice      = array_slice( $items, $i, $run_length );

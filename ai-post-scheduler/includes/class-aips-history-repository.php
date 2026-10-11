@@ -24,13 +24,12 @@ if (!trait_exists('AIPS_Cacheable_Repository')) {
  * Encapsulates all database operations related to generation history.
  */
 class AIPS_History_Repository implements AIPS_History_Repository_Interface {
+    use AIPS_Cacheable_Repository;
 
     /**
      * Default maximum rows collapsed into a single History group.
      */
     const GROUP_MAX_ROWS = 50;
-
-    use AIPS_Cacheable_Repository;
 
     /**
      * @var self|null Singleton instance.
@@ -479,12 +478,18 @@ class AIPS_History_Repository implements AIPS_History_Repository_Interface {
      *     @type int    $template_id Filter by template ID. Default 0.
      *     @type string $orderby     Column to order by. Default 'created_at'.
      *     @type string $order       Order direction (ASC/DESC). Default 'DESC'.
+     *     @type bool   $collapse    Paginate by display entries instead of rows: adjacent rows with the
+     *                               same creation method form one entry (a group), so a page holds
+     *                               `per_page` entries. Default false (row-based LIMIT/OFFSET).
+     *     @type int    $group_max_rows Maximum rows per collapsed group (min 2). Default GROUP_MAX_ROWS.
      * }
      * @return array {
-     *     @type array $items        Array of history items.
-     *     @type int   $total        Total number of items.
-     *     @type int   $pages        Total number of pages.
-     *     @type int   $current_page Current page number.
+     *     @type array $items         Array of history items (every row on the page).
+     *     @type int   $total         Total number of rows matching the filters.
+     *     @type int   $pages         Total number of pages (entry-based when collapsing).
+     *     @type int   $current_page  Current page number.
+     *     @type int   $total_entries Total display entries. Only present when collapsing.
+     *     @type int   $group_max_rows Normalised group cap used. Only present when collapsing.
      * }
      */
     public function get_history($args = array()) {
@@ -511,6 +516,7 @@ class AIPS_History_Repository implements AIPS_History_Repository_Interface {
         $args = wp_parse_args($args, $defaults);
         $args['per_page'] = max(1, (int) $args['per_page']);
         $args['page'] = max(1, (int) $args['page']);
+        $args['group_max_rows'] = max(2, (int) $args['group_max_rows']);
 
         $offset = ($args['page'] - 1) * $args['per_page'];
 
@@ -665,6 +671,19 @@ class AIPS_History_Repository implements AIPS_History_Repository_Interface {
     }
 
     /**
+     * Normalise a creation method to the key used for grouping.
+     *
+     * Mirrors the SQL expression COALESCE(NULLIF(creation_method, ''), 'post_generation').
+     *
+     * @param mixed $method Raw creation_method value.
+     * @return string
+     */
+    public static function normalize_method_key($method) {
+        $method = (string) $method;
+        return $method === '' ? 'post_generation' : $method;
+    }
+
+    /**
      * Split an ordered list of creation-method keys into collapsed-entry sizes.
      *
      * Adjacent rows sharing a key form a run. Runs are chunked into groups of at
@@ -738,25 +757,26 @@ class AIPS_History_Repository implements AIPS_History_Repository_Interface {
         $rows = $this->wpdb->get_results($sql, ARRAY_N);
         $rows = is_array($rows) ? $rows : array();
 
-        $keys = array();
+        // Split into parallel id/key lists and free the row objects early: this scan
+        // covers every matching row, so avoid holding both representations.
+        $ids_all = array();
+        $keys    = array();
         foreach ($rows as $row) {
-            $keys[] = (string) $row[1];
+            $ids_all[] = (int) $row[0];
+            $keys[]    = (string) $row[1];
         }
+        unset($rows);
 
         $sizes     = self::plan_entry_sizes($keys, (int) $args['group_max_rows']);
+        unset($keys);
         $per_page  = (int) $args['per_page'];
         $first     = ((int) $args['page'] - 1) * $per_page;
         $row_start = (int) array_sum(array_slice($sizes, 0, $first));
         $row_count = (int) array_sum(array_slice($sizes, $first, $per_page));
 
-        $ids = array();
-        foreach (array_slice($rows, $row_start, $row_count) as $row) {
-            $ids[] = (int) $row[0];
-        }
-
         return array(
-            'ids' => $ids,
-            'total_rows' => count($rows),
+            'ids' => array_slice($ids_all, $row_start, $row_count),
+            'total_rows' => count($ids_all),
             'total_entries' => count($sizes),
         );
     }

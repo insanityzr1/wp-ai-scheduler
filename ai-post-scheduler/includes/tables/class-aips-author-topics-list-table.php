@@ -107,14 +107,38 @@ class AIPS_Author_Topics_List_Table extends AIPS_List_Table {
 	 * @return array<string, string>
 	 */
 	public function get_columns() {
+		$columns = $this->get_all_columns();
+
+		// Status is implied by the tab everywhere except the mixed "All" view.
+		if ('all' !== $this->get_current_view()) {
+			unset($columns['status']);
+		}
+
+		return $columns;
+	}
+
+	/**
+	 * Every column the table can show (used for Screen Options toggles).
+	 *
+	 * @return array<string, string>
+	 */
+	public function get_all_columns() {
 		return array(
 			'cb'         => '<input type="checkbox" id="aips-topics-select-all" class="aips-select-all-topics" />',
 			'topic'      => esc_html__('Topic Title', 'ai-post-scheduler'),
-			'structure'  => esc_html__('Article Structure', 'ai-post-scheduler'),
 			'status'     => esc_html__('Status', 'ai-post-scheduler'),
 			'created_at' => esc_html__('Date Added', 'ai-post-scheduler'),
 			'actions'    => esc_html__('Actions', 'ai-post-scheduler'),
 		);
+	}
+
+	/**
+	 * Get the active status tab.
+	 *
+	 * @return string pending|approved|rejected|posts_generated|all
+	 */
+	protected function get_current_view() {
+		return isset($_GET['topic_status']) ? sanitize_key(wp_unslash($_GET['topic_status'])) : 'pending';
 	}
 
 	/**
@@ -123,11 +147,16 @@ class AIPS_Author_Topics_List_Table extends AIPS_List_Table {
 	 * @return array<string, array{string, bool}>
 	 */
 	protected function get_sortable_columns() {
-		return array(
+		$sortable = array(
 			'topic'      => array('topic', false),
-			'status'     => array('status', false),
 			'created_at' => array('created_at', false),
 		);
+
+		if ('all' === $this->get_current_view()) {
+			$sortable['status'] = array('status', false);
+		}
+
+		return $sortable;
 	}
 
 	/**
@@ -262,7 +291,7 @@ class AIPS_Author_Topics_List_Table extends AIPS_List_Table {
 		if ('all' === $status_filter) {
 			$topics = $this->topics_repository->get_by_author($this->author_id);
 		} else {
-			$topics = $this->topics_repository->get_by_author($this->author_id, $status_filter);
+			$topics = $this->topics_repository->get_by_author_bucket($this->author_id, $status_filter);
 		}
 
 		// Filter by search query if present
@@ -348,13 +377,23 @@ class AIPS_Author_Topics_List_Table extends AIPS_List_Table {
 		$html .= '</div>';
 
 		// WordPress native row actions
-		$actions = array(
-			'approve'       => sprintf('<a href="#" class="aips-approve-topic" data-topic-id="%d">%s</a>', $topic_id, esc_html__('Approve', 'ai-post-scheduler')),
-			'reject'        => sprintf('<a href="#" class="aips-reject-topic" data-topic-id="%d">%s</a>', $topic_id, esc_html__('Reject', 'ai-post-scheduler')),
-			'generate_post' => sprintf('<a href="#" class="aips-generate-post-now" data-topic-id="%d">%s</a>', $topic_id, esc_html__('Generate Post', 'ai-post-scheduler')),
-			'edit'          => sprintf('<a href="#" class="aips-edit-topic" data-topic-id="%d">%s</a>', $topic_id, esc_html__('Quick Edit', 'ai-post-scheduler')),
-			'delete'        => sprintf('<a href="#" class="aips-delete-topic aips-link-danger" data-topic-id="%d">%s</a>', $topic_id, esc_html__('Delete', 'ai-post-scheduler')),
-		);
+		$status  = $item->status ?? 'pending';
+		$actions = array();
+
+		// Pending topics already expose Approve/Reject as buttons; only rejected
+		// topics get an Approve link, and only non-rejected topics get Reject.
+		if ('rejected' === $status) {
+			$actions['approve'] = sprintf('<a href="#" class="aips-approve-topic" data-topic-id="%d">%s</a>', $topic_id, esc_html__('Approve', 'ai-post-scheduler'));
+		} elseif ('pending' !== $status) {
+			$actions['reject'] = sprintf('<a href="#" class="aips-reject-topic" data-topic-id="%d">%s</a>', $topic_id, esc_html__('Reject', 'ai-post-scheduler'));
+		}
+
+		// Generation only works from approved topics.
+		if ('approved' === $status) {
+			$actions['generate_post'] = sprintf('<a href="#" class="aips-generate-post-now" data-topic-id="%d">%s</a>', $topic_id, esc_html__('Generate Post', 'ai-post-scheduler'));
+		}
+		$actions['edit']          = sprintf('<a href="#" class="aips-edit-topic" data-topic-id="%d">%s</a>', $topic_id, esc_html__('Quick Edit', 'ai-post-scheduler'));
+		$actions['delete']        = sprintf('<a href="#" class="aips-delete-topic aips-link-danger" data-topic-id="%d">%s</a>', $topic_id, esc_html__('Delete', 'ai-post-scheduler'));
 
 		$html .= $this->row_actions($actions);
 		$html .= '</div>';
@@ -363,20 +402,14 @@ class AIPS_Author_Topics_List_Table extends AIPS_List_Table {
 	}
 
 	/**
-	 * Article structure column rendering.
+	 * Add a scoped class so author-topic layout CSS doesn't affect other tables.
 	 *
-	 * @param object $item Topic row object.
-	 * @return string
+	 * @return string[]
 	 */
-	protected function column_structure($item) {
-		$structure_id = (int) ($item->article_structure_id ?? 0);
-		if ($structure_id > 0 && isset($this->structure_names[$structure_id])) {
-			return sprintf(
-				'<span class="aips-badge aips-badge-secondary"><span class="dashicons dashicons-layout" aria-hidden="true"></span> %s</span>',
-				esc_html($this->structure_names[$structure_id])
-			);
-		}
-		return '<span class="cell-meta">—</span>';
+	protected function get_table_classes() {
+		$classes   = parent::get_table_classes();
+		$classes[] = 'aips-author-topics-table';
+		return $classes;
 	}
 
 	/**

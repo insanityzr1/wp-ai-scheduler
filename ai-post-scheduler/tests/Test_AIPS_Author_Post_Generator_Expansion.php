@@ -76,6 +76,12 @@ class Test_AIPS_Author_Post_Generator_Expansion extends WP_UnitTestCase {
 					public function record($level, $message, $context = array(), $resource = null, $details = array()) {
 						return true;
 					}
+					public function complete_success($result_data = array()) {
+						return true;
+					}
+					public function complete_failure($error_message, $error_data = array()) {
+						return true;
+					}
 				};
 			}
 		};
@@ -214,6 +220,12 @@ class Test_AIPS_Author_Post_Generator_Expansion extends WP_UnitTestCase {
 			public function create($type, $metadata = array()) {
 				return new class {
 					public function record($level, $message, $context = array(), $resource = null, $details = array()) {
+						return true;
+					}
+					public function complete_success($result_data = array()) {
+						return true;
+					}
+					public function complete_failure($error_message, $error_data = array()) {
 						return true;
 					}
 				};

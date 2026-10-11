@@ -507,7 +507,8 @@ class AIPS_Author_Post_Generator extends AIPS_Author_Slice_Scheduler_Base implem
 						'error' => $post_id->get_error_message(),
 					)
 				);
-				
+				$history->complete_failure($post_id->get_error_message());
+
 				return $post_id;
 			}
 			
@@ -562,7 +563,8 @@ class AIPS_Author_Post_Generator extends AIPS_Author_Slice_Scheduler_Base implem
 					'author_name' => $author->name,
 				)
 			);
-			
+			$history->complete_success(array('post_id' => $post_id));
+
 			$this->logger->log("Successfully generated post {$post_id} from topic {$topic->id}", 'info');
 			
 			return $post_id;
@@ -619,7 +621,8 @@ class AIPS_Author_Post_Generator extends AIPS_Author_Slice_Scheduler_Base implem
 					'error' => $e->getMessage(),
 				)
 			);
-			
+			$history->complete_failure($e->getMessage());
+
 			return new WP_Error('generation_failed', $e->getMessage());
 		}
 	}

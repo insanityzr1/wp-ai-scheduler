@@ -79,7 +79,7 @@ class AIPS_Post_Review_Repository {
 		$where_args = array();
 		
 		// Only get completed generations that have a post_id
-		$where_clauses[] = "h.status = 'completed'";
+		$where_clauses[] = "h.status IN ('completed', 'partial')";
 		$where_clauses[] = "h.post_id IS NOT NULL";
 		
 		// Join with wp_posts to check post_status
@@ -178,7 +178,7 @@ class AIPS_Post_Review_Repository {
 			SELECT COUNT(*) 
 			FROM {$this->table_name} h
 			INNER JOIN {$posts_table} p ON h.post_id = p.ID
-			WHERE h.status = 'completed' 
+			WHERE h.status IN ('completed', 'partial') 
 			AND h.post_id IS NOT NULL 
 			AND p.post_status = 'draft'
 		");

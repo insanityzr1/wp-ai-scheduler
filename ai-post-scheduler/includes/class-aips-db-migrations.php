@@ -208,6 +208,18 @@ class AIPS_DB_Migrations {
 		if ( version_compare( $from_version, '3.7.8', '<' ) ) {
 			$this->migrate_to_3_7_8();
 		}
+
+		// migrate_to_3_7_12() closes History rows that one-shot event containers
+		// left in 'processing'. It reads the indexed event_status log column, so it
+		// runs after the Layer-1 schema apply.
+		if ( version_compare( $from_version, '3.7.12', '<' ) ) {
+			$this->migrate_to_3_7_12();
+		}
+
+		// migrate_to_3_7_13() reads post meta, so it also runs after the schema apply.
+		if ( version_compare( $from_version, '3.7.13', '<' ) ) {
+			$this->migrate_to_3_7_13();
+		}
     
 		// Use AIPS_Config::set_option() so the per-request option cache is
 		// invalidated immediately; bare update_option() would leave the cache
@@ -1249,6 +1261,55 @@ class AIPS_DB_Migrations {
 		}
 
 		$this->logger->log( 'Migration 3.7.8: Dropped redundant aips_history_log indexes covered by history_type_timestamp.', 'info' );
+	}
+
+	/**
+	 * Migration for version 3.7.12.
+	 *
+	 * Review-queue actions, topic-generation wrappers and notifications created a
+	 * History container (always opened as 'processing') and never closed it, so
+	 * they showed as in progress forever. Close them from their logged outcome,
+	 * then close any other row that has had no activity for a day. Persistent
+	 * lifecycle containers are never touched.
+	 *
+	 * @return void
+	 */
+	private function migrate_to_3_7_12() {
+		$repository = AIPS_History_Repository::instance();
+
+		$orphans = $repository->close_orphaned_event_rows(
+			array( 'post_review_action', 'topic_post_generation', 'notification_sent' )
+		);
+
+		// 'post_review_action' is a lifecycle method but was handled above; the other
+		// lifecycle containers are intentionally long-lived.
+		$stale = $repository->close_stale_processing_rows(
+			DAY_IN_SECONDS,
+			array_diff( AIPS_History_Event_Recorder::lifecycle_creation_methods(), array( 'post_review_action' ) )
+		);
+
+		$this->logger->log(
+			sprintf( 'Migration 3.7.12: Closed %d orphaned event rows and %d abandoned in-progress rows in History.', $orphans, $stale ),
+			'info'
+		);
+	}
+
+	/**
+	 * Migration for version 3.7.13.
+	 *
+	 * Generations that finished with missing components used to be stored as
+	 * 'completed'. They are now 'partial', so mark each post's newest generation row
+	 * as partial when the post is flagged incomplete.
+	 *
+	 * @return void
+	 */
+	private function migrate_to_3_7_13() {
+		$changed = AIPS_History_Repository::instance()->backfill_partial_generation_status();
+
+		$this->logger->log(
+			sprintf( 'Migration 3.7.13: Marked %d incomplete generations as partial in History.', $changed ),
+			'info'
+		);
 	}
 
 	/**
